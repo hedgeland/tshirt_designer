@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+
+# uv
+.python-version
+
+# Environment
+.env
+
+# App output
+output/
+
+# macOS
+.DS_Store
