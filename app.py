@@ -1,3 +1,4 @@
+import os
 import tempfile
 from collections.abc import Generator
 from typing import Any
@@ -6,8 +7,10 @@ import gradio as gr
 from gradio.themes import Soft
 from PIL import Image
 
-from config import BRAINSTORM_SIZE, GOOGLE_API_KEY, NUM_VARIANTS, OUTPUT_DIR
+from config import BG_REMOVAL_TOLERANCE, BRAINSTORM_SIZE, GOOGLE_API_KEY, MAX_COLORS, NUM_VARIANTS, OUTPUT_DIR
+from src.background import remove_background_color
 from src.brainstorm import generate_concepts
+from src.vectorize import raster_to_svg
 from src.finalize import finalize_design
 from src.image import generate_image
 from src.output import save_variants
@@ -27,7 +30,7 @@ def brainstorm(theme: str) -> Generator[Any, None, None]:
         gr.update(value=[], visible=False),   # gallery
         gr.update(visible=False),             # finalize_row
         gr.update(visible=False),             # final_group
-        [], None,                             # prompts_state, selected_variant_state
+        [], [], None,                         # prompts_state, images_state, selected_variant_state
         gr.update(interactive=False),         # brainstorm_btn
         gr.update(value="Generating concepts...", visible=True),  # brainstorm_status
     )
@@ -40,10 +43,19 @@ def brainstorm(theme: str) -> Generator[Any, None, None]:
         gr.update(value=[], visible=False),
         gr.update(visible=False),
         gr.update(visible=False),
-        [], None,
+        [], [], None,
         gr.update(interactive=True),
         gr.update(value="", visible=False),
     )
+
+
+def _generate_btn_label(n: int) -> str:
+    plural = "Variant" if n == 1 else "Variants"
+    return f"🎨 Generate {n} {plural}"
+
+
+def update_generate_btn_label(n: float) -> Any:
+    return gr.update(value=_generate_btn_label(int(n)))
 
 
 def select_concept(concept: str | None) -> tuple[Any, str]:
@@ -52,7 +64,7 @@ def select_concept(concept: str | None) -> tuple[Any, str]:
     return gr.update(visible=True), concept
 
 
-def generate(edited_concept: str, bg_color: str, num_variants: float, theme: str, concepts: list[str], original_concept: str | None) -> Generator[Any, None, None]:
+def generate(edited_concept: str, bg_color: str, num_variants: float, theme: str, concepts: list[str], original_concept: str | None, max_colors: float) -> Generator[Any, None, None]:
     if not edited_concept.strip():
         raise gr.Error("No concept to generate from.")
     num_variants = int(num_variants)
@@ -61,18 +73,18 @@ def generate(edited_concept: str, bg_color: str, num_variants: float, theme: str
         gr.update(value=[], visible=False),  # gallery
         gr.update(visible=False),            # finalize_row
         gr.update(visible=False),            # final_group
-        [], None,                            # prompts_state, selected_variant_state
+        [], [], None,                        # prompts_state, images_state, selected_variant_state
         gr.update(interactive=False),        # generate_btn
         gr.update(value="Building prompts...", visible=True),  # generate_status
     )
 
-    prompts = build_prompts(edited_concept.strip(), GOOGLE_API_KEY, bg_color=bg_color, num_variants=num_variants)
+    prompts = build_prompts(edited_concept.strip(), GOOGLE_API_KEY, bg_color=bg_color, num_variants=num_variants, max_colors=int(max_colors))
     images: list[Image.Image] = []
 
     for i, prompt in enumerate(prompts):
         yield (
             gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-            [], None,
+            [], [], None,
             gr.update(interactive=False),
             gr.update(value=f"Generating variant {i + 1} of {num_variants}...", visible=True),  # generate_status
         )
@@ -86,7 +98,7 @@ def generate(edited_concept: str, bg_color: str, num_variants: float, theme: str
         gr.update(value=images, visible=True, columns=num_variants),
         gr.update(visible=True),
         gr.update(visible=False),
-        prompts, None,
+        prompts, images, 0 if num_variants == 1 else None,  # auto-select when only one variant
         gr.update(interactive=True),
         gr.update(value="", visible=False),
     )
@@ -96,17 +108,43 @@ def select_variant(evt: gr.SelectData):
     return evt.index
 
 
-def do_finalize(selected_idx: int | None, prompts: list[str]) -> Generator[Any, None, None]:
-    if selected_idx is None:
-        raise gr.Error("Click a variant image to select it first.")
+def _has_transparency(img: Image.Image) -> bool:
+    """Return True if the image has any fully-transparent pixels."""
+    if img.mode != "RGBA":
+        return False
+    return img.getextrema()[3][0] == 0  # min alpha channel value
 
+
+def do_finalize(selected_idx: int | None, prompts: list[str], images: list[Image.Image], hex_color: str, tolerance: float) -> Generator[Any, None, None]:
     yield (
-        gr.update(), gr.update(), gr.update(),   # final_image, final_group, download_btn
-        gr.update(interactive=False),             # finalize_btn
-        gr.update(value="Generating 4K design...", visible=True),  # finalize_status
+        gr.update(), gr.update(), gr.update(),
+        gr.update(interactive=False),
+        gr.update(value="Generating 4K design...", visible=True),
     )
 
-    final_img = finalize_design(prompts[selected_idx], GOOGLE_API_KEY)
+    if not images:
+        yield (gr.update(), gr.update(), gr.update(), gr.update(interactive=True), gr.update(value="Generate variants first.", visible=True))
+        return
+
+    if selected_idx is None:
+        selected_idx = 0
+
+    variant = images[selected_idx]
+    bg_was_removed = _has_transparency(variant)
+
+    # Finalize uses the original variant as a visual reference. If the user removed
+    # the background, pass the original colors back so the model isn't confused by
+    # transparency — we'll re-apply removal afterwards.
+    final_img = finalize_design(prompts[selected_idx], variant, GOOGLE_API_KEY)
+
+    if bg_was_removed:
+        yield (
+            gr.update(), gr.update(), gr.update(),
+            gr.update(interactive=False),
+            gr.update(value="Removing background from 4K image...", visible=True),
+        )
+        final_img = remove_background_color(final_img, hex_color, tolerance=int(tolerance))
+
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
         final_img.save(tmp.name, "PNG")
 
@@ -119,11 +157,173 @@ def do_finalize(selected_idx: int | None, prompts: list[str]) -> Generator[Any, 
     )
 
 
+def do_remove_variant_bg(selected_idx: int | None, images: list[Image.Image], hex_color: str, tolerance: float) -> Generator[Any, None, None]:
+    yield (
+        gr.update(), gr.update(),
+        gr.update(interactive=False),
+        gr.update(value="Removing background from variant...", visible=True),
+    )
+
+    if not images:
+        yield (gr.update(), gr.update(), gr.update(interactive=True), gr.update(value="Generate variants first.", visible=True))
+        return
+
+    if selected_idx is None:
+        selected_idx = 0
+
+    updated = list(images)
+    updated[selected_idx] = remove_background_color(images[selected_idx], hex_color, tolerance=int(tolerance))
+
+    yield (
+        gr.update(value=updated, columns=len(updated)),
+        updated,
+        gr.update(interactive=True),
+        gr.update(value="", visible=False),
+    )
+
+
+def _numpy_to_pil(arr: Any) -> Image.Image:
+    """Convert a Gradio image value (numpy array) to a PIL Image, preserving RGBA if present."""
+    import numpy as np
+    a = np.asarray(arr)
+    if a.ndim == 3 and a.shape[2] == 4:
+        return Image.fromarray(a, mode="RGBA")
+    return Image.fromarray(a).convert("RGBA")
+
+
+def do_final_svg(current_image: Any | None, hex_color: str, tolerance: float, max_colors: float) -> Generator[Any, None, None]:
+    yield (
+        gr.update(interactive=False),
+        gr.update(visible=False),
+        gr.update(value="Starting...", visible=True),
+        gr.update(visible=False),
+    )
+
+    if current_image is None:
+        yield (gr.update(interactive=True), gr.update(visible=False), gr.update(value="No final image to convert.", visible=True), gr.update(visible=False))
+        return
+
+    try:
+        img = _numpy_to_pil(current_image)
+
+        if not _has_transparency(img):
+            yield (gr.update(), gr.update(), gr.update(value="Removing background...", visible=True), gr.update())
+            img = remove_background_color(img, hex_color, tolerance=int(tolerance))
+
+        yield (gr.update(), gr.update(), gr.update(value="Converting to SVG...", visible=True), gr.update())
+
+        svg_str = raster_to_svg(img, max_colors=int(max_colors))
+        if not svg_str:
+            raise RuntimeError("vtracer returned an empty SVG")
+
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        svg_path = os.path.join(OUTPUT_DIR, "output_4k.svg")
+        with open(svg_path, "w", encoding="utf-8") as f:
+            f.write(svg_str)
+
+        yield (
+            gr.update(interactive=True),
+            gr.update(value=svg_path, visible=True),
+            gr.update(value="", visible=False),
+            gr.update(value=_svg_html(svg_str), visible=True),
+        )
+    except Exception as e:
+        yield (
+            gr.update(interactive=True),
+            gr.update(visible=False),
+            gr.update(value=f"Error: {e}", visible=True),
+            gr.update(visible=False),
+        )
+
+
+def do_remove_bg(current_image: Image.Image | None, hex_color: str, tolerance: float) -> Generator[Any, None, None]:
+    if current_image is None:
+        raise gr.Error("No final image to process.")
+
+    yield (
+        gr.update(), gr.update(),             # final_image, download_btn
+        gr.update(interactive=False),         # remove_bg_btn
+        gr.update(value="Removing background...", visible=True),  # remove_bg_status
+    )
+
+    result = remove_background_color(_numpy_to_pil(current_image), hex_color, tolerance=int(tolerance))
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        result.save(tmp.name, "PNG")
+
+    yield (
+        gr.update(value=result),
+        tmp.name,
+        gr.update(interactive=True),
+        gr.update(value="", visible=False),
+    )
+
+
+def _svg_html(svg_str: str) -> str:
+    """Wrap SVG in a responsive container for inline display."""
+    return f'<div style="width:100%;aspect-ratio:1/1;background:transparent;">{svg_str}</div>'
+
+
+def do_convert_svg(selected_idx: int | None, images: list[Image.Image], hex_color: str, tolerance: float, max_colors: float) -> Generator[Any, None, None]:
+    # Yield before any validation so Gradio registers the generator and shows feedback.
+    yield (
+        gr.update(interactive=False),
+        gr.update(visible=False),
+        gr.update(value="Starting...", visible=True),
+        gr.update(visible=False),
+    )
+
+    if not images:
+        yield (gr.update(interactive=True), gr.update(visible=False), gr.update(value="Generate variants first.", visible=True), gr.update(visible=False))
+        return
+
+    # Fall back to the first image if state didn't capture the auto-selection.
+    if selected_idx is None:
+        selected_idx = 0
+
+    try:
+        variant = images[selected_idx]
+        # PIL Images from gr.State may arrive as numpy arrays in some Gradio versions.
+        if not isinstance(variant, Image.Image):
+            variant = _numpy_to_pil(variant)
+
+        # Always remove background before tracing — the tracer treats every opaque
+        # region as a filled path, so a solid background becomes a giant filled rectangle.
+        if not _has_transparency(variant):
+            yield (gr.update(), gr.update(), gr.update(value="Removing background...", visible=True), gr.update())
+            variant = remove_background_color(variant, hex_color, tolerance=int(tolerance))
+
+        yield (gr.update(), gr.update(), gr.update(value="Converting to SVG...", visible=True), gr.update())
+
+        svg_str = raster_to_svg(variant, max_colors=int(max_colors))
+        if not svg_str:
+            raise RuntimeError("vtracer returned an empty SVG")
+
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        svg_path = os.path.join(OUTPUT_DIR, "output.svg")
+        with open(svg_path, "w", encoding="utf-8") as f:
+            f.write(svg_str)
+
+        yield (
+            gr.update(interactive=True),
+            gr.update(value=svg_path, visible=True),
+            gr.update(value="", visible=False),
+            gr.update(value=_svg_html(svg_str), visible=True),
+        )
+    except Exception as e:
+        yield (
+            gr.update(interactive=True),
+            gr.update(visible=False),
+            gr.update(value=f"Error: {e}", visible=True),
+            gr.update(visible=False),
+        )
+
+
 # ── Layout ────────────────────────────────────────────────────────────────────
 with gr.Blocks(title="T-Shirt Design Generator") as app:
 
     concepts_state = gr.State([])
     prompts_state = gr.State([])
+    images_state = gr.State([])
     theme_state = gr.State("")
     selected_variant_state = gr.State(None)
 
@@ -138,6 +338,16 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
                 label="Number of variants",
                 minimum=1, maximum=5, step=1, value=NUM_VARIANTS,
             )
+            bg_tolerance_slider = gr.Slider(
+                label="Background removal tolerance",
+                minimum=0, maximum=128, step=1, value=BG_REMOVAL_TOLERANCE,
+            )
+            gr.Markdown("*Higher = removes more color variation at edges.*")
+            max_colors_slider = gr.Slider(
+                label="Max colors",
+                minimum=1, maximum=8, step=1, value=MAX_COLORS,
+            )
+            gr.Markdown("*Applies to image generation and SVG tracing.*")
             gr.Markdown(f"*Output: `{OUTPUT_DIR}/`*")
 
         with gr.Column(scale=4):
@@ -160,7 +370,7 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
             with gr.Group(visible=False) as generate_group:
                 gr.Markdown("### 3 · Refine & generate")
                 concept_editor = gr.Textbox(label="Edit concept (optional)", lines=2)
-                generate_btn = gr.Button("🎨 Generate Variants", variant="primary")
+                generate_btn = gr.Button(_generate_btn_label(NUM_VARIANTS), variant="primary")
                 generate_status = gr.Markdown("", visible=False)
 
             # Step 4
@@ -172,18 +382,31 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
             )
             with gr.Row(visible=False) as finalize_row:
                 finalize_btn = gr.Button("Finalize selected variant at 4K", variant="primary")
+                remove_variant_bg_btn = gr.Button("✂ Remove BG from Selected", variant="secondary")
+                svg_btn = gr.Button("🖋 Convert to SVG", variant="secondary")
+            variant_bg_status = gr.Markdown("", visible=False)
             finalize_status = gr.Markdown("", visible=False)
+            svg_status = gr.Markdown("", visible=False)
+            svg_display = gr.HTML(visible=False)
+            svg_download_btn = gr.DownloadButton("⬇ Download SVG", visible=False)
 
             # Step 5
             with gr.Group(visible=False) as final_group:
                 gr.Markdown("### 5 · Final Design (4K)")
                 final_image = gr.Image(show_label=False)
-                download_btn = gr.DownloadButton("⬇ Download Final 4K PNG")
+                with gr.Row():
+                    download_btn = gr.DownloadButton("⬇ Download Final 4K PNG")
+                    remove_bg_btn = gr.Button("✂ Remove Background", variant="secondary")
+                    final_svg_btn = gr.Button("🖋 Convert to SVG", variant="secondary")
+                remove_bg_status = gr.Markdown("", visible=False)
+                final_svg_status = gr.Markdown("", visible=False)
+                final_svg_display = gr.HTML(visible=False)
+                final_svg_download_btn = gr.DownloadButton("⬇ Download SVG", visible=False)
 
     # ── Events ────────────────────────────────────────────────────────────────
     brainstorm_outputs: list[Any] = [
         concept_radio, concepts_state, theme_state, generate_group,
-        gallery, finalize_row, final_group, prompts_state, selected_variant_state,
+        gallery, finalize_row, final_group, prompts_state, images_state, selected_variant_state,
         brainstorm_btn, brainstorm_status,
     ]
     brainstorm_btn.click(brainstorm, inputs=[theme_input], outputs=brainstorm_outputs)
@@ -191,18 +414,44 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
 
     concept_radio.change(select_concept, inputs=[concept_radio], outputs=[generate_group, concept_editor])
 
+    num_variants_slider.change(update_generate_btn_label, inputs=[num_variants_slider], outputs=[generate_btn])
+
     generate_btn.click(
         generate,
-        inputs=[concept_editor, bg_color, num_variants_slider, theme_state, concepts_state, concept_radio],
-        outputs=[gallery, finalize_row, final_group, prompts_state, selected_variant_state, generate_btn, generate_status],
+        inputs=[concept_editor, bg_color, num_variants_slider, theme_state, concepts_state, concept_radio, max_colors_slider],
+        outputs=[gallery, finalize_row, final_group, prompts_state, images_state, selected_variant_state, generate_btn, generate_status],
     )
 
     gallery.select(select_variant, outputs=[selected_variant_state])
 
+    remove_variant_bg_btn.click(
+        do_remove_variant_bg,
+        inputs=[selected_variant_state, images_state, bg_color, bg_tolerance_slider],
+        outputs=[gallery, images_state, remove_variant_bg_btn, variant_bg_status],
+    )
+
     finalize_btn.click(
         do_finalize,
-        inputs=[selected_variant_state, prompts_state],
+        inputs=[selected_variant_state, prompts_state, images_state, bg_color, bg_tolerance_slider],
         outputs=[final_image, final_group, download_btn, finalize_btn, finalize_status],
+    )
+
+    remove_bg_btn.click(
+        do_remove_bg,
+        inputs=[final_image, bg_color, bg_tolerance_slider],
+        outputs=[final_image, download_btn, remove_bg_btn, remove_bg_status],
+    )
+
+    final_svg_btn.click(
+        do_final_svg,
+        inputs=[final_image, bg_color, bg_tolerance_slider, max_colors_slider],
+        outputs=[final_svg_btn, final_svg_download_btn, final_svg_status, final_svg_display],
+    )
+
+    svg_btn.click(
+        do_convert_svg,
+        inputs=[selected_variant_state, images_state, bg_color, bg_tolerance_slider, max_colors_slider],
+        outputs=[svg_btn, svg_download_btn, svg_status, svg_display],
     )
 
 

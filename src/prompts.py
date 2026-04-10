@@ -11,19 +11,24 @@ from config import MODEL
 def _get_client(api_key: str) -> genai.Client:
     return genai.Client(api_key=api_key)
 
-def _style_suffix(bg_color: str) -> str:
+def _style_suffix(bg_color: str, max_colors: int) -> str:
     # bg_color is a hex string (e.g. "#00B140"). Explicit negatives are needed because
-    # "t-shirt design" in the prompt tends to make the model render a full garment.
+    # "t-shirt design" in the prompt tends to make the model render a full garment or
+    # background scene. Any scene elements (e.g. coral, trees) should appear as props
+    # directly around the subject, not as an environmental background.
     return (
-        f"flat vector graphic design, bold clean lines, limited color palette, "
-        f"solid {bg_color} colored background filling the entire image, "
+        f"flat vector graphic design, bold clean lines, "
+        f"maximum {max_colors} colors total including background, limited color palette, "
+        f"solid {bg_color} background filling the entire image with no scene or environment, "
+        f"subject and props floating on the solid {bg_color} background only, "
+        f"no background scenery, no landscape, no environment, no sky, no ground, no underwater scene, "
         f"no gradients, no t-shirt, no clothing, no garment, no mockup, "
-        f"just the graphic design artwork isolated on the solid {bg_color} background, "
+        f"just the graphic artwork on the solid {bg_color} background, "
         f"high contrast, screen print ready"
     )
 
 
-def build_prompts(concept: str, api_key: str, bg_color: str = "#FFFFFF", num_variants: int = 3) -> list[str]:
+def build_prompts(concept: str, api_key: str, bg_color: str = "#FFFFFF", num_variants: int = 3, max_colors: int = 6) -> list[str]:
     client = _get_client(api_key)
 
     # Each variant gets a different stylistic angle on the same concept,
@@ -37,6 +42,7 @@ Create {num_variants} distinct prompt variations for this concept. Each should:
 - Describe the same core idea with a different stylistic angle
   (e.g. variant 1: vintage/retro, variant 2: bold/minimal, variant 3: illustrative/detailed)
 - Be a single descriptive sentence (no bullet points)
+- Focus only on the subject and any props — do NOT describe a background scene or environment
 - NOT include style instructions — those will be appended automatically
 
 Return ONLY a JSON array of {num_variants} prompt strings. No other text.
@@ -61,4 +67,4 @@ Example: ["prompt 1", "prompt 2", "prompt 3"]"""
         base_prompts = [concept] * num_variants
 
     # Append shared style constraints so the model targets POD-friendly output.
-    return [f"{p}, {_style_suffix(bg_color)}" for p in base_prompts[:num_variants]]
+    return [f"{p}, {_style_suffix(bg_color, max_colors)}" for p in base_prompts[:num_variants]]

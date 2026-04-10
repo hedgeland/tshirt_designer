@@ -1,10 +1,10 @@
 from PIL import Image
 
 from config import FINAL_SIZE
-from src.image import generate_image
+from src.image import finalize_image
 
 
-def finalize_design(prompt: str, api_key: str) -> Image.Image:
-    # Re-runs the same prompt at full resolution. The model is non-deterministic,
-    # so the output won't be pixel-identical to the brainstorm preview — that's expected.
-    return generate_image(prompt, api_key, size=FINAL_SIZE)
+def finalize_design(prompt: str, reference: Image.Image, api_key: str) -> Image.Image:
+    # Pass the selected variant as a visual anchor so the model upscales that specific
+    # design rather than generating a new one from the text prompt alone.
+    return finalize_image(prompt, reference, api_key, size=FINAL_SIZE)

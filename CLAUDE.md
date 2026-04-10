@@ -43,6 +43,9 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 ### .claude/commands/ (Claude Code slash commands)
 - `commit.md` — `/commit` stages, commits, and pushes all changes
 
+### Ignore
+- `.gemini/` and `gemini.md` — Gemini CLI configuration; not relevant to this codebase
+
 ## Conventions
 
 - Prefer inline comments. Explain the *why* — the intent, constraint, or non-obvious trade-off — not the *what* (the code already shows that).

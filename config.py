@@ -10,7 +10,9 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 # Gemini 3.1 Flash Image Preview ("Nano Banana 2"); not Imagen.
 MODEL = "gemini-3.1-flash-image-preview"
 
-NUM_VARIANTS = 3        # default; overridden by the UI slider at runtime
+NUM_VARIANTS = 1        # default; overridden by the UI slider at runtime
+BG_REMOVAL_TOLERANCE = 50  # 0–255; higher = removes more color variation at edges
+MAX_COLORS = 6          # max distinct colors in generated image and SVG trace; 1–8
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 
 # Two-phase resolution: fast previews during exploration, full quality on approval.
