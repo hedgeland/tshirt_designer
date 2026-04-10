@@ -9,7 +9,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 # Gemini 3.1 Flash Image Preview ("Nano Banana 2"); not Imagen.
 MODEL = "gemini-3.1-flash-image-preview"
 
-NUM_VARIANTS = 3        # how many design variants to generate per concept
+NUM_VARIANTS = 3        # default; overridden by the UI slider at runtime
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 
 # Two-phase resolution: fast previews during exploration, full quality on approval.

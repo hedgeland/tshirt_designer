@@ -4,9 +4,6 @@ __pycache__/
 *.pyo
 .venv/
 
-# uv
-.python-version
-
 # Environment
 .env
 
