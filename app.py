@@ -11,7 +11,7 @@ from src.output import save_variants
 from src.prompts import build_prompts
 
 
-def brainstorm(theme, _bg_color):  # bg_color unused here — passed to generate(), not brainstorm()
+def brainstorm(theme):
     if not GOOGLE_API_KEY:
         raise gr.Error("GOOGLE_API_KEY is not set. Add it to your .env file.")
     if not theme.strip():
@@ -182,8 +182,8 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
         gallery, finalize_row, final_group, prompts_state, selected_variant_state,
         brainstorm_btn, status_md,
     ]
-    brainstorm_btn.click(brainstorm, inputs=[theme_input, bg_color], outputs=brainstorm_outputs)
-    theme_input.submit(brainstorm, inputs=[theme_input, bg_color], outputs=brainstorm_outputs)
+    brainstorm_btn.click(brainstorm, inputs=[theme_input], outputs=brainstorm_outputs)
+    theme_input.submit(brainstorm, inputs=[theme_input], outputs=brainstorm_outputs)
 
     concept_radio.change(select_concept, inputs=[concept_radio], outputs=[generate_group, concept_editor])
 

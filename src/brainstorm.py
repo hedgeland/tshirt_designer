@@ -34,7 +34,7 @@ Example: ["concept 1 description", "concept 2 description"]"""
         contents=prompt,
     )
 
-    text = response.text.strip()
+    text = (response.text or "").strip()
 
     # Extract the JSON array even if the model wraps it in markdown fences.
     match = re.search(r"\[.*\]", text, re.DOTALL)

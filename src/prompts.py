@@ -47,7 +47,7 @@ Example: ["prompt 1", "prompt 2", "prompt 3"]"""
         contents=prompt,
     )
 
-    text = response.text.strip()
+    text = (response.text or "").strip()
 
     # Extract JSON array; fall back to repeating the raw concept if parsing fails.
     match = re.search(r"\[.*\]", text, re.DOTALL)

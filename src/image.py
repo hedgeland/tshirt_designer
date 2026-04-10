@@ -29,9 +29,12 @@ def generate_image(prompt: str, api_key: str, size: str = "1K") -> Image.Image:
     )
 
     # The API returns multiple parts; find the first one that contains image bytes.
-    for part in response.candidates[0].content.parts:
-        if part.inline_data is not None:
-            return Image.open(io.BytesIO(part.inline_data.data)).convert("RGBA")
+    candidates = response.candidates or []
+    for candidate in candidates:
+        content = candidate.content
+        for part in (content.parts or []) if content else []:
+            if part.inline_data is not None and part.inline_data.data is not None:
+                return Image.open(io.BytesIO(part.inline_data.data)).convert("RGBA")
 
     raise RuntimeError("No image returned from model")
 
