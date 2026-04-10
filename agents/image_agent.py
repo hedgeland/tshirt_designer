@@ -34,11 +34,9 @@ def generate_image(prompt: str, api_key: str, size: str = "1K") -> Image.Image:
     raise RuntimeError("No image returned from model")
 
 
-def remove_background(img: Image.Image) -> Image.Image:
-    # rembg is optional — absence is silent, but real failures are re-raised so the
-    # caller can warn the user rather than silently returning the wrong image.
-    try:
-        from rembg import remove
-    except ImportError:
-        return img
-    return remove(img)
+def apply_background(img: Image.Image, color: tuple[int, int, int] = (0, 177, 64)) -> Image.Image:
+    # Composite the design onto a solid color so apps like Canva can select
+    # and remove it with one click — far more reliable than algorithmic removal.
+    bg = Image.new("RGBA", img.size, (*color, 255))
+    bg.paste(img, mask=img.split()[3])  # use alpha channel as mask
+    return bg.convert("RGB")

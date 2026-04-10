@@ -3,7 +3,7 @@ import streamlit as st
 from config import NUM_VARIANTS, OUTPUT_DIR, BRAINSTORM_SIZE, FINAL_SIZE, GOOGLE_API_KEY
 from agents.brainstorm_agent import generate_concepts
 from agents.prompt_agent import build_prompts
-from agents.image_agent import generate_image, remove_background
+from agents.image_agent import generate_image, apply_background
 from agents.finalize_agent import finalize_design
 from skills.output import save_variants, image_to_bytes
 
@@ -16,10 +16,8 @@ st.set_page_config(
 # ── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("⚙️ Settings")
-    remove_bg = st.checkbox("Remove background (transparent PNG)", value=True)
-    st.caption(
-        "Note: Background removal downloads a ~170 MB model on first run."
-    )
+    bg_hex = st.color_picker("Background color", value="#00B140")
+    st.caption("Pick a solid color easy to remove in Canva or similar apps.")
     st.divider()
     st.caption(f"Output saved to `{OUTPUT_DIR}/`")
 
@@ -119,15 +117,8 @@ if st.session_state.selected_concept:
                 status.info(f"Generating variant {i + 1} of {NUM_VARIANTS} at {BRAINSTORM_SIZE}...")
                 img = generate_image(prompt, GOOGLE_API_KEY, size=BRAINSTORM_SIZE)  # low-res for speed
 
-                if remove_bg:
-                    status.info(
-                        f"Removing background for variant {i + 1}..."
-                        + (" (downloading model on first run)" if i == 0 else "")
-                    )
-                    try:
-                        img = remove_background(img)
-                    except Exception as e:
-                        st.warning(f"Background removal failed for variant {i + 1}: {e}")
+                bg_color = tuple(int(bg_hex.lstrip("#")[j:j+2], 16) for j in (0, 2, 4))
+                img = apply_background(img, bg_color)
 
                 variants.append((prompt, img))
                 progress.progress((i + 1) / NUM_VARIANTS)
@@ -176,11 +167,8 @@ if st.session_state.variants:
                 with st.spinner(f"Regenerating at {FINAL_SIZE}×{FINAL_SIZE} (4K)..."):
                     try:
                         final_img = finalize_design(prompt, GOOGLE_API_KEY)
-                        if remove_bg:
-                            try:
-                                final_img = remove_background(final_img)
-                            except Exception as e:
-                                st.warning(f"Background removal failed: {e}")
+                        bg_color = tuple(int(bg_hex.lstrip("#")[j:j+2], 16) for j in (0, 2, 4))
+                        final_img = apply_background(final_img, bg_color)
                         st.session_state.final_image = final_img
                         st.session_state.final_prompt = prompt
                         st.rerun()  # scroll down to show Step 5
