@@ -1,5 +1,7 @@
 import os
+
 from PIL import Image
+
 from config import OUTPUT_DIR
 
 

@@ -1,14 +1,16 @@
 import tempfile
+
 import gradio as gr
-from config import NUM_VARIANTS, OUTPUT_DIR, BRAINSTORM_SIZE, GOOGLE_API_KEY
+
+from config import BRAINSTORM_SIZE, GOOGLE_API_KEY, NUM_VARIANTS, OUTPUT_DIR
 from src.brainstorm import generate_concepts
-from src.prompts import build_prompts
-from src.image import generate_image
 from src.finalize import finalize_design
+from src.image import generate_image
 from src.output import save_variants
+from src.prompts import build_prompts
 
 
-def brainstorm(theme, bg_color):
+def brainstorm(theme, _bg_color):  # bg_color unused here — passed to generate(), not brainstorm()
     if not GOOGLE_API_KEY:
         raise gr.Error("GOOGLE_API_KEY is not set. Add it to your .env file.")
     if not theme.strip():
@@ -101,8 +103,8 @@ def do_finalize(selected_idx, prompts):
     )
 
     final_img = finalize_design(prompts[selected_idx], GOOGLE_API_KEY)
-    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    final_img.save(tmp.name, "PNG")
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        final_img.save(tmp.name, "PNG")
 
     yield (
         gr.update(value=final_img, visible=True),

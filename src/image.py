@@ -1,8 +1,10 @@
 import io
 from functools import lru_cache
-from PIL import Image
+
 from google import genai
 from google.genai import types
+from PIL import Image
+
 from config import MODEL
 
 
