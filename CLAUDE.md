@@ -33,7 +33,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - `app.py` — Gradio UI, orchestrates all phases
 - `config.py` — single source of truth for all constants
 
-### pipeline/ (one module per step)
+### src/ (one module per step)
 - `brainstorm_agent.py` — generates text concepts from a theme
 - `prompt_agent.py` — builds image prompts from a selected concept
 - `image_agent.py` — calls Gemini image generation API
@@ -48,7 +48,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 ## Conventions
 
 - Prefer inline comments. Explain the *why* — the intent, constraint, or non-obvious trade-off — not the *what* (the code already shows that).
-- All new logic goes in `pipeline/` or `skills/`. Do not add new top-level modules.
+- All new logic goes in `src/` or `skills/`. Do not add new top-level modules.
 - `config.py` is the single source of truth for `MODEL`, `BRAINSTORM_SIZE`, `FINAL_SIZE`, `NUM_VARIANTS`, and `OUTPUT_DIR`.
 - Image generation always produces square output (`width == height == size`).
 
