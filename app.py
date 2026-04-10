@@ -1,10 +1,10 @@
 import tempfile
 import gradio as gr
 from config import NUM_VARIANTS, OUTPUT_DIR, BRAINSTORM_SIZE, FINAL_SIZE, GOOGLE_API_KEY
-from agents.brainstorm_agent import generate_concepts
-from agents.prompt_agent import build_prompts
-from agents.image_agent import generate_image
-from agents.finalize_agent import finalize_design
+from pipeline.brainstorm_agent import generate_concepts
+from pipeline.prompt_agent import build_prompts
+from pipeline.image_agent import generate_image
+from pipeline.finalize_agent import finalize_design
 from skills.output import save_variants
 
 
@@ -13,17 +13,30 @@ def brainstorm(theme, bg_color):
         raise gr.Error("GOOGLE_API_KEY is not set. Add it to your .env file.")
     if not theme.strip():
         raise gr.Error("Enter a theme first.")
+
+    # Disable button and show status while working.
+    yield (
+        gr.update(),                          # concept_radio
+        [], "", gr.update(visible=False),     # concepts_state, theme_state, generate_group
+        gr.update(value=[], visible=False),   # gallery
+        gr.update(visible=False),             # finalize_row
+        gr.update(visible=False),             # final_group
+        [], None,                             # prompts_state, selected_variant_state
+        gr.update(interactive=False),         # brainstorm_btn
+        gr.update(value="Generating concepts...", visible=True),  # status_md
+    )
+
     concepts = generate_concepts(theme.strip(), GOOGLE_API_KEY)
-    return (
-        gr.update(choices=concepts, value=None, visible=True),  # concept_radio
-        concepts,                                                 # concepts_state
-        theme.strip(),                                           # theme_state
-        gr.update(visible=False),                               # generate_group
-        gr.update(value=[], visible=False),                     # gallery
-        gr.update(visible=False),                               # finalize_row
-        gr.update(visible=False),                               # final_group
-        [],                                                      # prompts_state
-        None,                                                    # selected_variant_state
+
+    yield (
+        gr.update(choices=concepts, value=None, visible=True),
+        concepts, theme.strip(), gr.update(visible=False),
+        gr.update(value=[], visible=False),
+        gr.update(visible=False),
+        gr.update(visible=False),
+        [], None,
+        gr.update(interactive=True),
+        gr.update(value="", visible=False),
     )
 
 
@@ -33,46 +46,75 @@ def select_concept(concept):
     return gr.update(visible=True), concept
 
 
-def generate(edited_concept, bg_color, theme, concepts, original_concept):
+def generate(edited_concept, bg_color, num_variants, theme, concepts, original_concept):
     if not edited_concept.strip():
         raise gr.Error("No concept to generate from.")
-    prompts = build_prompts(edited_concept.strip(), GOOGLE_API_KEY, bg_color=bg_color)
+    num_variants = int(num_variants)
+
+    yield (
+        gr.update(value=[], visible=False),  # gallery
+        gr.update(visible=False),            # finalize_row
+        gr.update(visible=False),            # final_group
+        [], None,                            # prompts_state, selected_variant_state
+        gr.update(interactive=False),        # generate_btn
+        gr.update(value="Building prompts...", visible=True),  # status_md
+    )
+
+    prompts = build_prompts(edited_concept.strip(), GOOGLE_API_KEY, bg_color=bg_color, num_variants=num_variants)
     images = []
-    for prompt in prompts:
+
+    for i, prompt in enumerate(prompts):
+        yield (
+            gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
+            [], None,
+            gr.update(interactive=False),
+            gr.update(value=f"Generating variant {i + 1} of {num_variants}...", visible=True),
+        )
         img = generate_image(prompt, GOOGLE_API_KEY, size=BRAINSTORM_SIZE)
         images.append(img)
+
     concept_idx = concepts.index(original_concept) if original_concept in concepts else 0
     save_variants(theme, concept_idx, list(zip(prompts, images)))
-    return (
-        gr.update(value=images, visible=True),  # gallery
-        gr.update(visible=True),                 # finalize_row
-        gr.update(visible=False),                # final_group
-        prompts,                                 # prompts_state
-        None,                                    # selected_variant_state
+
+    yield (
+        gr.update(value=images, visible=True, columns=num_variants),
+        gr.update(visible=True),
+        gr.update(visible=False),
+        prompts, None,
+        gr.update(interactive=True),
+        gr.update(value="", visible=False),
     )
 
 
 def select_variant(evt: gr.SelectData):
-    # Track which gallery image the user clicked so finalize knows which prompt to use.
     return evt.index
 
 
 def do_finalize(selected_idx, prompts):
     if selected_idx is None:
         raise gr.Error("Click a variant image to select it first.")
+
+    yield (
+        gr.update(), gr.update(), gr.update(),   # final_image, final_group, download_btn
+        gr.update(interactive=False),             # finalize_btn
+        gr.update(value="Generating 4K design...", visible=True),  # status_md
+    )
+
     final_img = finalize_design(prompts[selected_idx], GOOGLE_API_KEY)
-    # Save to a temp file — gr.DownloadButton needs a file path, not bytes.
     tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
     final_img.save(tmp.name, "PNG")
-    return (
-        gr.update(value=final_img, visible=True),  # final_image
-        gr.update(visible=True),                    # final_group
-        tmp.name,                                   # download_btn
+
+    yield (
+        gr.update(value=final_img, visible=True),
+        gr.update(visible=True),
+        tmp.name,
+        gr.update(interactive=True),
+        gr.update(value="", visible=False),
     )
 
 
 # ── Layout ────────────────────────────────────────────────────────────────────
-with gr.Blocks(title="T-Shirt Design Generator", theme=gr.themes.Soft()) as app:
+with gr.Blocks(title="T-Shirt Design Generator") as app:
 
     concepts_state = gr.State([])
     prompts_state = gr.State([])
@@ -86,6 +128,10 @@ with gr.Blocks(title="T-Shirt Design Generator", theme=gr.themes.Soft()) as app:
             gr.Markdown("### ⚙️ Settings")
             bg_color = gr.ColorPicker(label="Background color", value="#00B140")
             gr.Markdown("*Pick a solid color easy to remove in Canva.*")
+            num_variants_slider = gr.Slider(
+                label="Number of variants",
+                minimum=1, maximum=5, step=1, value=NUM_VARIANTS,
+            )
             gr.Markdown(f"*Output: `{OUTPUT_DIR}/`*")
 
         with gr.Column(scale=4):
@@ -99,6 +145,9 @@ with gr.Blocks(title="T-Shirt Design Generator", theme=gr.themes.Soft()) as app:
                 )
                 brainstorm_btn = gr.Button("🧠 Brainstorm", variant="primary", scale=1)
 
+            # Shared status line — shown during any active operation.
+            status_md = gr.Markdown("", visible=False)
+
             # Step 2
             concept_radio = gr.Radio(label="2 · Pick a concept", choices=[], visible=False)
 
@@ -106,7 +155,7 @@ with gr.Blocks(title="T-Shirt Design Generator", theme=gr.themes.Soft()) as app:
             with gr.Group(visible=False) as generate_group:
                 gr.Markdown("### 3 · Refine & generate")
                 concept_editor = gr.Textbox(label="Edit concept (optional)", lines=2)
-                generate_btn = gr.Button(f"🎨 Generate {NUM_VARIANTS} Variants", variant="primary")
+                generate_btn = gr.Button("🎨 Generate Variants", variant="primary")
 
             # Step 4
             gallery = gr.Gallery(
@@ -114,7 +163,6 @@ with gr.Blocks(title="T-Shirt Design Generator", theme=gr.themes.Soft()) as app:
                 visible=False,
                 columns=NUM_VARIANTS,
                 allow_preview=True,
-                show_download_button=True,
             )
             with gr.Row(visible=False) as finalize_row:
                 finalize_btn = gr.Button("Finalize selected variant at 4K", variant="primary")
@@ -122,36 +170,35 @@ with gr.Blocks(title="T-Shirt Design Generator", theme=gr.themes.Soft()) as app:
             # Step 5
             with gr.Group(visible=False) as final_group:
                 gr.Markdown("### 5 · Final Design (4K)")
-                final_image = gr.Image(show_label=False, show_download_button=True)
+                final_image = gr.Image(show_label=False)
                 download_btn = gr.DownloadButton("⬇ Download Final 4K PNG")
 
     # ── Events ────────────────────────────────────────────────────────────────
-    brainstorm_btn.click(
-        brainstorm,
-        inputs=[theme_input, bg_color],
-        outputs=[concept_radio, concepts_state, theme_state, generate_group,
-                 gallery, finalize_row, final_group, prompts_state, selected_variant_state],
-    )
-    concept_radio.change(
-        select_concept,
-        inputs=[concept_radio],
-        outputs=[generate_group, concept_editor],
-    )
+    brainstorm_outputs = [
+        concept_radio, concepts_state, theme_state, generate_group,
+        gallery, finalize_row, final_group, prompts_state, selected_variant_state,
+        brainstorm_btn, status_md,
+    ]
+    brainstorm_btn.click(brainstorm, inputs=[theme_input, bg_color], outputs=brainstorm_outputs)
+    theme_input.submit(brainstorm, inputs=[theme_input, bg_color], outputs=brainstorm_outputs)
+
+    concept_radio.change(select_concept, inputs=[concept_radio], outputs=[generate_group, concept_editor])
+
     generate_btn.click(
         generate,
-        inputs=[concept_editor, bg_color, theme_state, concepts_state, concept_radio],
-        outputs=[gallery, finalize_row, final_group, prompts_state, selected_variant_state],
+        inputs=[concept_editor, bg_color, num_variants_slider, theme_state, concepts_state, concept_radio],
+        outputs=[gallery, finalize_row, final_group, prompts_state, selected_variant_state, generate_btn, status_md],
     )
-    gallery.select(
-        select_variant,
-        outputs=[selected_variant_state],
-    )
+
+    gallery.select(select_variant, outputs=[selected_variant_state])
+
     finalize_btn.click(
         do_finalize,
         inputs=[selected_variant_state, prompts_state],
-        outputs=[final_image, final_group, download_btn],
+        outputs=[final_image, final_group, download_btn, finalize_btn, status_md],
     )
 
 
 if __name__ == "__main__":
-    app.launch()
+    app.queue()  # required for generator (streaming) functions
+    app.launch(theme=gr.themes.Soft())
