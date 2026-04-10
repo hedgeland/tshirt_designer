@@ -1,4 +1,6 @@
 import tempfile
+from collections.abc import Generator
+from typing import Any
 
 import gradio as gr
 from gradio.themes import Soft
@@ -11,7 +13,7 @@ from src.output import save_variants
 from src.prompts import build_prompts
 
 
-def brainstorm(theme):
+def brainstorm(theme: str) -> Generator[Any, None, None]:
     if not GOOGLE_API_KEY:
         raise gr.Error("GOOGLE_API_KEY is not set. Add it to your .env file.")
     if not theme.strip():
@@ -43,13 +45,13 @@ def brainstorm(theme):
     )
 
 
-def select_concept(concept):
+def select_concept(concept: str | None) -> tuple[Any, str]:
     if not concept:
         return gr.update(visible=False), ""
     return gr.update(visible=True), concept
 
 
-def generate(edited_concept, bg_color, num_variants, theme, concepts, original_concept):
+def generate(edited_concept: str, bg_color: str, num_variants: float, theme: str, concepts: list[str], original_concept: str | None) -> Generator[Any, None, None]:
     if not edited_concept.strip():
         raise gr.Error("No concept to generate from.")
     num_variants = int(num_variants)
@@ -93,7 +95,7 @@ def select_variant(evt: gr.SelectData):
     return evt.index
 
 
-def do_finalize(selected_idx, prompts):
+def do_finalize(selected_idx: int | None, prompts: list[str]) -> Generator[Any, None, None]:
     if selected_idx is None:
         raise gr.Error("Click a variant image to select it first.")
 
