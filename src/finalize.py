@@ -1,5 +1,5 @@
 from PIL import Image
-from src.image_agent import generate_image
+from src.image import generate_image
 from config import FINAL_SIZE
 
 

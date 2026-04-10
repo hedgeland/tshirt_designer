@@ -44,5 +44,5 @@ Example: ["concept 1 description", "concept 2 description"]"""
             pass
 
     # Fallback: strip leading numbering (e.g. "1. ", "2) ") and return plain lines.
-    lines = [re.sub(r"^\d+[\.\)]\s*", "", l).strip() for l in text.split("\n") if l.strip()]
-    return [l for l in lines if l][:num_concepts]
+    lines = [re.sub(r"^\d+[\.\)]\s*", "", line).strip() for line in text.split("\n") if line.strip()]
+    return [line for line in lines if line][:num_concepts]

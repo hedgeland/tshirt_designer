@@ -10,3 +10,8 @@ dependencies = [
     "pillow>=12.2.0",
     "python-dotenv>=1.2.2",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.10",
+]

@@ -54,9 +54,9 @@ Example: ["prompt 1", "prompt 2", "prompt 3"]"""
             prompts = json.loads(match.group())
             base_prompts = [str(p) for p in prompts[:num_variants]]
         except json.JSONDecodeError:
-            base_prompts = [concept] * NUM_VARIANTS  # graceful degradation
+            base_prompts = [concept] * num_variants  # graceful degradation
     else:
-        base_prompts = [concept] * NUM_VARIANTS
+        base_prompts = [concept] * num_variants
 
     # Append shared style constraints so the model targets POD-friendly output.
     return [f"{p}, {_style_suffix(bg_color)}" for p in base_prompts[:num_variants]]

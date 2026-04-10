@@ -1,6 +1,6 @@
 import tempfile
 import gradio as gr
-from config import NUM_VARIANTS, OUTPUT_DIR, BRAINSTORM_SIZE, FINAL_SIZE, GOOGLE_API_KEY
+from config import NUM_VARIANTS, OUTPUT_DIR, BRAINSTORM_SIZE, GOOGLE_API_KEY
 from src.brainstorm import generate_concepts
 from src.prompts import build_prompts
 from src.image import generate_image
