@@ -4,6 +4,7 @@ from typing import Any
 
 import gradio as gr
 from gradio.themes import Soft
+from PIL import Image
 
 from config import BRAINSTORM_SIZE, GOOGLE_API_KEY, NUM_VARIANTS, OUTPUT_DIR
 from src.brainstorm import generate_concepts
@@ -66,7 +67,7 @@ def generate(edited_concept: str, bg_color: str, num_variants: float, theme: str
     )
 
     prompts = build_prompts(edited_concept.strip(), GOOGLE_API_KEY, bg_color=bg_color, num_variants=num_variants)
-    images = []
+    images: list[Image.Image] = []
 
     for i, prompt in enumerate(prompts):
         yield (
