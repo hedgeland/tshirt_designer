@@ -1,6 +1,7 @@
 import tempfile
 
 import gradio as gr
+from gradio.themes import Soft
 
 from config import BRAINSTORM_SIZE, GOOGLE_API_KEY, NUM_VARIANTS, OUTPUT_DIR
 from src.brainstorm import generate_concepts
@@ -203,4 +204,4 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
 
 if __name__ == "__main__":
     app.queue()  # required for generator (streaming) functions
-    app.launch(theme=gr.themes.Soft())
+    app.launch(theme=Soft())
