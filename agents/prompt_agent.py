@@ -9,16 +9,17 @@ from config import MODEL, NUM_VARIANTS
 def _get_client(api_key: str) -> genai.Client:
     return genai.Client(api_key=api_key)
 
-# Appended to every image prompt. Kept separate so the LLM doesn't repeat
-# style instructions, and so we can tune POD constraints in one place.
-_STYLE_SUFFIX = (
-    "flat vector illustration, bold clean lines, limited color palette, "
-    "white background, no gradients, suitable for t-shirt screen printing, "
-    "high contrast, graphic art style"
-)
+def _style_suffix(bg_color: str) -> str:
+    # bg_color is a hex string (e.g. "#00B140"). Telling the model the exact color
+    # is more reliable than trying to composite it in post — the model renders it natively.
+    return (
+        f"flat vector illustration, bold clean lines, limited color palette, "
+        f"solid {bg_color} background, no gradients, suitable for t-shirt screen printing, "
+        f"high contrast, graphic art style"
+    )
 
 
-def build_prompts(concept: str, api_key: str) -> list[str]:
+def build_prompts(concept: str, api_key: str, bg_color: str = "#FFFFFF") -> list[str]:
     client = _get_client(api_key)
 
     # Each variant gets a different stylistic angle on the same concept,
@@ -56,4 +57,4 @@ Example: ["prompt 1", "prompt 2", "prompt 3"]"""
         base_prompts = [concept] * NUM_VARIANTS
 
     # Append shared style constraints so the model targets POD-friendly output.
-    return [f"{p}, {_STYLE_SUFFIX}" for p in base_prompts]
+    return [f"{p}, {_style_suffix(bg_color)}" for p in base_prompts]

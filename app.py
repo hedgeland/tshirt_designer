@@ -3,7 +3,7 @@ import streamlit as st
 from config import NUM_VARIANTS, OUTPUT_DIR, BRAINSTORM_SIZE, FINAL_SIZE, GOOGLE_API_KEY
 from agents.brainstorm_agent import generate_concepts
 from agents.prompt_agent import build_prompts
-from agents.image_agent import generate_image, apply_background
+from agents.image_agent import generate_image
 from agents.finalize_agent import finalize_design
 from skills.output import save_variants, image_to_bytes
 
@@ -111,14 +111,11 @@ if st.session_state.selected_concept:
         status = st.empty()  # reusable status line — avoids stacking info messages
 
         try:
-            prompts = build_prompts(edited.strip(), GOOGLE_API_KEY)
+            prompts = build_prompts(edited.strip(), GOOGLE_API_KEY, bg_color=bg_hex)
 
             for i, prompt in enumerate(prompts):
                 status.info(f"Generating variant {i + 1} of {NUM_VARIANTS} at {BRAINSTORM_SIZE}...")
                 img = generate_image(prompt, GOOGLE_API_KEY, size=BRAINSTORM_SIZE)  # low-res for speed
-
-                bg_color = tuple(int(bg_hex.lstrip("#")[j:j+2], 16) for j in (0, 2, 4))
-                img = apply_background(img, bg_color)
 
                 variants.append((prompt, img))
                 progress.progress((i + 1) / NUM_VARIANTS)
@@ -167,8 +164,6 @@ if st.session_state.variants:
                 with st.spinner(f"Regenerating at {FINAL_SIZE}×{FINAL_SIZE} (4K)..."):
                     try:
                         final_img = finalize_design(prompt, GOOGLE_API_KEY)
-                        bg_color = tuple(int(bg_hex.lstrip("#")[j:j+2], 16) for j in (0, 2, 4))
-                        final_img = apply_background(final_img, bg_color)
                         st.session_state.final_image = final_img
                         st.session_state.final_prompt = prompt
                         st.rerun()  # scroll down to show Step 5
