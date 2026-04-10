@@ -12,6 +12,8 @@ MODEL = "gemini-3.1-flash-image-preview"
 
 NUM_VARIANTS = 1        # default; overridden by the UI slider at runtime
 BG_REMOVAL_TOLERANCE = 50  # 0–255; higher = removes more color variation at edges
+EDGE_ERODE_PX = 1       # shrink alpha mask inward after removal to clip fringe ring
+EDGE_DECONTAMINATE = 50 # 0–100; subtracts background color spill from boundary pixels
 MAX_COLORS = 6          # max distinct colors in generated image and SVG trace; 1–8
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 

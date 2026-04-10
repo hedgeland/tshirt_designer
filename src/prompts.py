@@ -11,6 +11,7 @@ from config import MODEL
 def _get_client(api_key: str) -> genai.Client:
     return genai.Client(api_key=api_key)
 
+
 def _style_suffix(bg_color: str, max_colors: int) -> str:
     # bg_color is a hex string (e.g. "#00B140"). Explicit negatives are needed because
     # "t-shirt design" in the prompt tends to make the model render a full garment or

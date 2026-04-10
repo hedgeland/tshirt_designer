@@ -85,5 +85,3 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
     )
 
     return _extract_image(response)
-
-
