@@ -5,7 +5,7 @@ from src.brainstorm_agent import generate_concepts
 from src.prompt_agent import build_prompts
 from src.image_agent import generate_image
 from src.finalize_agent import finalize_design
-from skills.output import save_variants
+from src.output import save_variants
 
 
 def brainstorm(theme, bg_color):
