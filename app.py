@@ -29,7 +29,7 @@ def brainstorm(theme: str) -> Generator[Any, None, None]:
         gr.update(visible=False),             # final_group
         [], None,                             # prompts_state, selected_variant_state
         gr.update(interactive=False),         # brainstorm_btn
-        gr.update(value="Generating concepts...", visible=True),  # status_md
+        gr.update(value="Generating concepts...", visible=True),  # brainstorm_status
     )
 
     concepts = generate_concepts(theme.strip(), GOOGLE_API_KEY)
@@ -63,7 +63,7 @@ def generate(edited_concept: str, bg_color: str, num_variants: float, theme: str
         gr.update(visible=False),            # final_group
         [], None,                            # prompts_state, selected_variant_state
         gr.update(interactive=False),        # generate_btn
-        gr.update(value="Building prompts...", visible=True),  # status_md
+        gr.update(value="Building prompts...", visible=True),  # generate_status
     )
 
     prompts = build_prompts(edited_concept.strip(), GOOGLE_API_KEY, bg_color=bg_color, num_variants=num_variants)
@@ -74,7 +74,7 @@ def generate(edited_concept: str, bg_color: str, num_variants: float, theme: str
             gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
             [], None,
             gr.update(interactive=False),
-            gr.update(value=f"Generating variant {i + 1} of {num_variants}...", visible=True),
+            gr.update(value=f"Generating variant {i + 1} of {num_variants}...", visible=True),  # generate_status
         )
         img = generate_image(prompt, GOOGLE_API_KEY, size=BRAINSTORM_SIZE)
         images.append(img)
@@ -103,7 +103,7 @@ def do_finalize(selected_idx: int | None, prompts: list[str]) -> Generator[Any, 
     yield (
         gr.update(), gr.update(), gr.update(),   # final_image, final_group, download_btn
         gr.update(interactive=False),             # finalize_btn
-        gr.update(value="Generating 4K design...", visible=True),  # status_md
+        gr.update(value="Generating 4K design...", visible=True),  # finalize_status
     )
 
     final_img = finalize_design(prompts[selected_idx], GOOGLE_API_KEY)
@@ -151,8 +151,7 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
                 )
                 brainstorm_btn = gr.Button("🧠 Brainstorm", variant="primary", scale=1)
 
-            # Shared status line — shown during any active operation.
-            status_md = gr.Markdown("", visible=False)
+            brainstorm_status = gr.Markdown("", visible=False)
 
             # Step 2
             concept_radio = gr.Radio(label="2 · Pick a concept", choices=[], visible=False)
@@ -162,6 +161,7 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
                 gr.Markdown("### 3 · Refine & generate")
                 concept_editor = gr.Textbox(label="Edit concept (optional)", lines=2)
                 generate_btn = gr.Button("🎨 Generate Variants", variant="primary")
+                generate_status = gr.Markdown("", visible=False)
 
             # Step 4
             gallery = gr.Gallery(
@@ -172,6 +172,7 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
             )
             with gr.Row(visible=False) as finalize_row:
                 finalize_btn = gr.Button("Finalize selected variant at 4K", variant="primary")
+            finalize_status = gr.Markdown("", visible=False)
 
             # Step 5
             with gr.Group(visible=False) as final_group:
@@ -183,7 +184,7 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
     brainstorm_outputs: list[Any] = [
         concept_radio, concepts_state, theme_state, generate_group,
         gallery, finalize_row, final_group, prompts_state, selected_variant_state,
-        brainstorm_btn, status_md,
+        brainstorm_btn, brainstorm_status,
     ]
     brainstorm_btn.click(brainstorm, inputs=[theme_input], outputs=brainstorm_outputs)
     theme_input.submit(brainstorm, inputs=[theme_input], outputs=brainstorm_outputs)
@@ -193,7 +194,7 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
     generate_btn.click(
         generate,
         inputs=[concept_editor, bg_color, num_variants_slider, theme_state, concepts_state, concept_radio],
-        outputs=[gallery, finalize_row, final_group, prompts_state, selected_variant_state, generate_btn, status_md],
+        outputs=[gallery, finalize_row, final_group, prompts_state, selected_variant_state, generate_btn, generate_status],
     )
 
     gallery.select(select_variant, outputs=[selected_variant_state])
@@ -201,7 +202,7 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
     finalize_btn.click(
         do_finalize,
         inputs=[selected_variant_state, prompts_state],
-        outputs=[final_image, final_group, download_btn, finalize_btn, status_md],
+        outputs=[final_image, final_group, download_btn, finalize_btn, finalize_status],
     )
 
 
