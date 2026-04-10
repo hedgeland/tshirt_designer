@@ -1,10 +1,10 @@
 import tempfile
 import gradio as gr
 from config import NUM_VARIANTS, OUTPUT_DIR, BRAINSTORM_SIZE, FINAL_SIZE, GOOGLE_API_KEY
-from src.brainstorm_agent import generate_concepts
-from src.prompt_agent import build_prompts
-from src.image_agent import generate_image
-from src.finalize_agent import finalize_design
+from src.brainstorm import generate_concepts
+from src.prompts import build_prompts
+from src.image import generate_image
+from src.finalize import finalize_design
 from src.output import save_variants
 
 

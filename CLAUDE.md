@@ -34,10 +34,10 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - `config.py` — single source of truth for all constants
 
 ### src/
-- `brainstorm_agent.py` — generates text concepts from a theme
-- `prompt_agent.py` — builds image prompts from a selected concept
-- `image_agent.py` — calls Gemini image generation API
-- `finalize_agent.py` — regenerates the approved design at `FINAL_SIZE`
+- `brainstorm.py` — generates text concepts from a theme
+- `prompts.py` — builds image prompts from a selected concept
+- `image.py` — calls Gemini image generation API
+- `finalize.py` — regenerates the approved design at `FINAL_SIZE`
 - `output.py` — saves images to disk
 
 ### .claude/commands/ (Claude Code slash commands)
