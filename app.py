@@ -1,188 +1,157 @@
-import os
-import streamlit as st
+import tempfile
+import gradio as gr
 from config import NUM_VARIANTS, OUTPUT_DIR, BRAINSTORM_SIZE, FINAL_SIZE, GOOGLE_API_KEY
 from agents.brainstorm_agent import generate_concepts
 from agents.prompt_agent import build_prompts
 from agents.image_agent import generate_image
 from agents.finalize_agent import finalize_design
-from skills.output import save_variants, image_to_bytes
+from skills.output import save_variants
 
-st.set_page_config(
-    page_title="T-Shirt Design Generator",
-    page_icon="👕",
-    layout="wide",
-)
 
-# ── Sidebar ──────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.title("⚙️ Settings")
-    bg_hex = st.color_picker("Background color", value="#00B140")
-    st.caption("Pick a solid color easy to remove in Canva or similar apps.")
-    st.divider()
-    st.caption(f"Output saved to `{OUTPUT_DIR}/`")
-
-# ── Session state ─────────────────────────────────────────────────────────────
-# All mutable UI state lives here so Streamlit reruns don't reset it.
-defaults = {
-    "concepts": [],
-    "theme": "",
-    "selected_concept": "",
-    "variants": [],      # list of (prompt, PIL.Image) at BRAINSTORM_SIZE
-    "final_image": None, # PIL.Image at FINAL_SIZE, set when user finalizes
-    "final_prompt": "",  # prompt used to generate final_image
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# ── Header ────────────────────────────────────────────────────────────────────
-st.title("👕 T-Shirt Design Generator")
-st.caption("Brainstorm → Select → Generate · Powered by Gemini 3.1 Flash Image Preview")
-st.divider()
-
-# ── Step 1: Theme ─────────────────────────────────────────────────────────────
-st.subheader("1 · Enter a theme")
-col_input, col_btn = st.columns([4, 1])
-with col_input:
-    theme = st.text_input(
-        "Theme",
-        placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop...",
-        label_visibility="collapsed",
-    )
-with col_btn:
-    brainstorm_clicked = st.button(
-        "🧠 Brainstorm", use_container_width=True, type="primary"
-    )
-
-if brainstorm_clicked:
+def brainstorm(theme, bg_color):
     if not GOOGLE_API_KEY:
-        st.error("GOOGLE_API_KEY is not set. Add it to your .env file.")
-    elif not theme.strip():
-        st.error("Enter a theme to brainstorm.")
-    else:
-        with st.spinner("Generating concepts with Gemini..."):
-            try:
-                st.session_state.concepts = generate_concepts(theme.strip(), GOOGLE_API_KEY)
-                st.session_state.theme = theme.strip()
-                # Reset downstream state so stale variants don't show for a new theme.
-                st.session_state.selected_concept = ""
-                st.session_state.variants = []
-            except Exception as e:
-                st.error(f"Brainstorm failed: {e}")
-
-# ── Step 2: Concept selection ─────────────────────────────────────────────────
-if st.session_state.concepts:
-    st.divider()
-    st.subheader("2 · Pick a concept")
-
-    for i, concept in enumerate(st.session_state.concepts):
-        is_selected = st.session_state.selected_concept == concept
-        with st.container(border=True):
-            c1, c2 = st.columns([6, 1])
-            with c1:
-                st.markdown(f"**{i + 1}.** {concept}")
-            with c2:
-                label = "✓ Selected" if is_selected else "Select"
-                if st.button(label, key=f"sel_{i}", use_container_width=True):
-                    st.session_state.selected_concept = concept
-                    # Clear variants and final image so the new concept starts fresh.
-                    st.session_state.variants = []
-                    st.session_state.final_image = None
-                    st.session_state.final_prompt = ""
-                    st.rerun()
-
-# ── Step 3: Edit + Generate ───────────────────────────────────────────────────
-if st.session_state.selected_concept:
-    st.divider()
-    st.subheader("3 · Refine & generate")
-
-    # Let the user tweak the concept text before it goes to the prompt builder.
-    edited = st.text_area(
-        "Edit concept (optional):",
-        value=st.session_state.selected_concept,
-        height=80,
+        raise gr.Error("GOOGLE_API_KEY is not set. Add it to your .env file.")
+    if not theme.strip():
+        raise gr.Error("Enter a theme first.")
+    concepts = generate_concepts(theme.strip(), GOOGLE_API_KEY)
+    return (
+        gr.update(choices=concepts, value=None, visible=True),  # concept_radio
+        concepts,                                                 # concepts_state
+        theme.strip(),                                           # theme_state
+        gr.update(visible=False),                               # generate_group
+        gr.update(value=[], visible=False),                     # gallery
+        gr.update(visible=False),                               # finalize_row
+        gr.update(visible=False),                               # final_group
+        [],                                                      # prompts_state
+        None,                                                    # selected_variant_state
     )
 
-    if st.button(
-        f"🎨 Generate {NUM_VARIANTS} Variants", type="primary", use_container_width=True
-    ):
-        variants = []
-        progress = st.progress(0, text="Building prompts with Gemini...")
-        status = st.empty()  # reusable status line — avoids stacking info messages
 
-        try:
-            prompts = build_prompts(edited.strip(), GOOGLE_API_KEY, bg_color=bg_hex)
+def select_concept(concept):
+    if not concept:
+        return gr.update(visible=False), ""
+    return gr.update(visible=True), concept
 
-            for i, prompt in enumerate(prompts):
-                status.info(f"Generating variant {i + 1} of {NUM_VARIANTS} at {BRAINSTORM_SIZE}...")
-                img = generate_image(prompt, GOOGLE_API_KEY, size=BRAINSTORM_SIZE)  # low-res for speed
 
-                variants.append((prompt, img))
-                progress.progress((i + 1) / NUM_VARIANTS)
-
-            status.empty()
-            progress.empty()
-            st.session_state.variants = variants
-
-            # Find the concept index so the save path reflects the right concept folder.
-            concept_idx = (
-                st.session_state.concepts.index(st.session_state.selected_concept)
-                if st.session_state.selected_concept in st.session_state.concepts
-                else 0
-            )
-            saved = save_variants(st.session_state.theme, concept_idx, variants)
-            st.success(f"Saved to: {os.path.dirname(saved[0])}/")
-
-        except Exception as e:
-            status.empty()
-            progress.empty()
-            st.error(f"Generation failed: {e}")
-
-# ── Step 4: Results ───────────────────────────────────────────────────────────
-if st.session_state.variants:
-    st.divider()
-    st.subheader("4 · Results")
-    st.caption(f"Preview variants at {BRAINSTORM_SIZE} — select one to finalize at {FINAL_SIZE}.")
-
-    cols = st.columns(NUM_VARIANTS)
-    for i, (prompt, img) in enumerate(st.session_state.variants):
-        with cols[i]:
-            st.image(img, caption=f"Variant {i + 1}", use_container_width=True)
-            st.download_button(
-                label=f"⬇ Download Variant {i + 1}",
-                data=image_to_bytes(img),
-                file_name=f"variant_{i + 1}.png",
-                mime="image/png",
-                use_container_width=True,
-                key=f"dl_{i}",
-            )
-            if st.button(
-                f"Finalize Variant {i + 1} at 4K",
-                key=f"finalize_{i}",
-                use_container_width=True,
-            ):
-                with st.spinner(f"Regenerating at {FINAL_SIZE}×{FINAL_SIZE} (4K)..."):
-                    try:
-                        final_img = finalize_design(prompt, GOOGLE_API_KEY)
-                        st.session_state.final_image = final_img
-                        st.session_state.final_prompt = prompt
-                        st.rerun()  # scroll down to show Step 5
-                    except Exception as e:
-                        st.error(f"Finalization failed: {e}")
-            with st.expander("View prompt"):
-                st.caption(prompt)
-
-# ── Step 5: Final 4K design ───────────────────────────────────────────────────
-if st.session_state.final_image is not None:
-    st.divider()
-    st.subheader("5 · Final Design (4K)")
-    st.image(st.session_state.final_image, use_container_width=True)
-    st.download_button(
-        label="⬇ Download Final 4K Design",
-        data=image_to_bytes(st.session_state.final_image),
-        file_name="final_design_4k.png",
-        mime="image/png",
-        use_container_width=True,
+def generate(edited_concept, bg_color, theme, concepts, original_concept):
+    if not edited_concept.strip():
+        raise gr.Error("No concept to generate from.")
+    prompts = build_prompts(edited_concept.strip(), GOOGLE_API_KEY, bg_color=bg_color)
+    images = []
+    for prompt in prompts:
+        img = generate_image(prompt, GOOGLE_API_KEY, size=BRAINSTORM_SIZE)
+        images.append(img)
+    concept_idx = concepts.index(original_concept) if original_concept in concepts else 0
+    save_variants(theme, concept_idx, list(zip(prompts, images)))
+    return (
+        gr.update(value=images, visible=True),  # gallery
+        gr.update(visible=True),                 # finalize_row
+        gr.update(visible=False),                # final_group
+        prompts,                                 # prompts_state
+        None,                                    # selected_variant_state
     )
-    with st.expander("View prompt"):
-        st.caption(st.session_state.final_prompt)
+
+
+def select_variant(evt: gr.SelectData):
+    # Track which gallery image the user clicked so finalize knows which prompt to use.
+    return evt.index
+
+
+def do_finalize(selected_idx, prompts):
+    if selected_idx is None:
+        raise gr.Error("Click a variant image to select it first.")
+    final_img = finalize_design(prompts[selected_idx], GOOGLE_API_KEY)
+    # Save to a temp file — gr.DownloadButton needs a file path, not bytes.
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    final_img.save(tmp.name, "PNG")
+    return (
+        gr.update(value=final_img, visible=True),  # final_image
+        gr.update(visible=True),                    # final_group
+        tmp.name,                                   # download_btn
+    )
+
+
+# ── Layout ────────────────────────────────────────────────────────────────────
+with gr.Blocks(title="T-Shirt Design Generator", theme=gr.themes.Soft()) as app:
+
+    concepts_state = gr.State([])
+    prompts_state = gr.State([])
+    theme_state = gr.State("")
+    selected_variant_state = gr.State(None)
+
+    gr.Markdown("# 👕 T-Shirt Design Generator\nBrainstorm → Select → Generate · Powered by Gemini 3.1 Flash Image Preview")
+
+    with gr.Row():
+        with gr.Column(scale=1, min_width=220):
+            gr.Markdown("### ⚙️ Settings")
+            bg_color = gr.ColorPicker(label="Background color", value="#00B140")
+            gr.Markdown("*Pick a solid color easy to remove in Canva.*")
+            gr.Markdown(f"*Output: `{OUTPUT_DIR}/`*")
+
+        with gr.Column(scale=4):
+            # Step 1
+            gr.Markdown("### 1 · Enter a theme")
+            with gr.Row():
+                theme_input = gr.Textbox(
+                    placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop...",
+                    show_label=False,
+                    scale=4,
+                )
+                brainstorm_btn = gr.Button("🧠 Brainstorm", variant="primary", scale=1)
+
+            # Step 2
+            concept_radio = gr.Radio(label="2 · Pick a concept", choices=[], visible=False)
+
+            # Step 3
+            with gr.Group(visible=False) as generate_group:
+                gr.Markdown("### 3 · Refine & generate")
+                concept_editor = gr.Textbox(label="Edit concept (optional)", lines=2)
+                generate_btn = gr.Button(f"🎨 Generate {NUM_VARIANTS} Variants", variant="primary")
+
+            # Step 4
+            gallery = gr.Gallery(
+                label="4 · Variants — click one to select for finalization",
+                visible=False,
+                columns=NUM_VARIANTS,
+                allow_preview=True,
+                show_download_button=True,
+            )
+            with gr.Row(visible=False) as finalize_row:
+                finalize_btn = gr.Button("Finalize selected variant at 4K", variant="primary")
+
+            # Step 5
+            with gr.Group(visible=False) as final_group:
+                gr.Markdown("### 5 · Final Design (4K)")
+                final_image = gr.Image(show_label=False, show_download_button=True)
+                download_btn = gr.DownloadButton("⬇ Download Final 4K PNG")
+
+    # ── Events ────────────────────────────────────────────────────────────────
+    brainstorm_btn.click(
+        brainstorm,
+        inputs=[theme_input, bg_color],
+        outputs=[concept_radio, concepts_state, theme_state, generate_group,
+                 gallery, finalize_row, final_group, prompts_state, selected_variant_state],
+    )
+    concept_radio.change(
+        select_concept,
+        inputs=[concept_radio],
+        outputs=[generate_group, concept_editor],
+    )
+    generate_btn.click(
+        generate,
+        inputs=[concept_editor, bg_color, theme_state, concepts_state, concept_radio],
+        outputs=[gallery, finalize_row, final_group, prompts_state, selected_variant_state],
+    )
+    gallery.select(
+        select_variant,
+        outputs=[selected_variant_state],
+    )
+    finalize_btn.click(
+        do_finalize,
+        inputs=[selected_variant_state, prompts_state],
+        outputs=[final_image, final_group, download_btn],
+    )
+
+
+if __name__ == "__main__":
+    app.launch()

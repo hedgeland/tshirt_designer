@@ -1,11 +1,11 @@
 # T-Shirt Designer
 
-A Streamlit app that generates print-on-demand t-shirt designs using Google's Gemini API. The workflow is: enter a theme → brainstorm concepts → select one → generate image variants at low resolution → approve and finalize at 4K.
+A Gradio app that generates print-on-demand t-shirt designs using Google's Gemini API. The workflow is: enter a theme → brainstorm concepts → select one → generate image variants at low resolution → approve and finalize at 4K.
 
 ## Running the app
 
 ```bash
-uv run streamlit run app.py
+uv run python app.py
 ```
 
 ## Model

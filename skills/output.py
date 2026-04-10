@@ -1,4 +1,3 @@
-import io
 import os
 from PIL import Image
 from config import OUTPUT_DIR
@@ -17,10 +16,3 @@ def save_variants(theme: str, concept_idx: int, variants: list[tuple[str, Image.
         paths.append(filepath)
 
     return paths  # caller uses paths[0] to show the parent directory in the UI
-
-
-def image_to_bytes(img: Image.Image) -> bytes:
-    # Streamlit download buttons require bytes, not a file path or PIL object.
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return buf.getvalue()
