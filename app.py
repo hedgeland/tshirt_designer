@@ -180,7 +180,7 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
                 download_btn = gr.DownloadButton("⬇ Download Final 4K PNG")
 
     # ── Events ────────────────────────────────────────────────────────────────
-    brainstorm_outputs = [
+    brainstorm_outputs: list[Any] = [
         concept_radio, concepts_state, theme_state, generate_group,
         gallery, finalize_row, final_group, prompts_state, selected_variant_state,
         brainstorm_btn, status_md,
