@@ -30,26 +30,20 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 ## Architecture
 
 ### Root
-- `app.py` — Streamlit UI, orchestrates all phases
+- `app.py` — Gradio UI, orchestrates all phases
 - `config.py` — single source of truth for all constants
 
 ### agents/ (one concern per agent)
 - `brainstorm_agent.py` — generates text concepts from a theme
 - `prompt_agent.py` — builds image prompts from a selected concept
-- `image_agent.py` — calls Gemini image generation API; also handles background removal
+- `image_agent.py` — calls Gemini image generation API
 - `finalize_agent.py` — regenerates the approved design at `FINAL_SIZE`
 
-### skills/ (reusable utilities shared across agents)
-- `output.py` — saves images to disk; `image_to_bytes` helper for downloads
-- `theme_analyzer.py` — parse and enrich user theme input
-- `style_mixer.py` — generate stylistic variation across prompts
-- `quality_checker.py` — validate output before saving
-
-### .claude/agents/ (Claude Code sub-agent definitions)
-Markdown files that define specialized Claude sub-agents for development tasks within this project (brainstorming, prompt engineering, image generation).
+### skills/
+- `output.py` — saves images to disk
 
 ### .claude/commands/ (Claude Code slash commands)
-Markdown files that define project-specific slash commands: `/brainstorm`, `/generate`, `/finalize`.
+- `commit.md` — `/commit` stages, commits, and pushes all changes
 
 ## Conventions
 
@@ -57,7 +51,6 @@ Markdown files that define project-specific slash commands: `/brainstorm`, `/gen
 - All new logic goes in `agents/` or `skills/`. Do not add new top-level modules.
 - `config.py` is the single source of truth for `MODEL`, `BRAINSTORM_SIZE`, `FINAL_SIZE`, `NUM_VARIANTS`, and `OUTPUT_DIR`.
 - Image generation always produces square output (`width == height == size`).
-- Background removal (`rembg`) is optional and user-controlled via the sidebar toggle. It should never be forced.
 
 ## Output
 
