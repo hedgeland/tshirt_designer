@@ -1,3 +1,5 @@
+"""Thin wrapper that re-generates the approved variant at FINAL_SIZE resolution."""
+
 from PIL import Image
 
 from config import FINAL_SIZE

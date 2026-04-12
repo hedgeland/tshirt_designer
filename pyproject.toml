@@ -5,10 +5,17 @@ description = "Generate print-on-demand t-shirt designs using Google's Gemini AI
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "python-multipart>=0.0.6",
+    "jinja2>=3.1.0",
     "google-genai>=0.8.0",
-    "gradio>=5.0.0",
+    "numpy>=1.26.0",
     "pillow>=12.2.0",
     "python-dotenv>=1.2.2",
+    "authlib>=1.6.9",
+    "httpx>=0.28.1",
+    "itsdangerous>=2.2.0",
 ]
 
 [dependency-groups]
@@ -21,4 +28,4 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "ARG", "SIM"]
-ignore = ["E501"]  # long lines acceptable in Gradio layout code
+ignore = ["E501"]

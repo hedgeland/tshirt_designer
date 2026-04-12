@@ -1,0 +1,301 @@
+// ── SSE helper ────────────────────────────────────────────────────────────────
+// Streams a POST request as Server-Sent Events and dispatches each parsed event
+// to the matching handler in `handlers`. Uses fetch + ReadableStream rather than
+// EventSource because EventSource only supports GET requests.
+async function streamSSE(url, formData, handlers) {
+    let response;
+    try {
+        response = await fetch(url, { method: "POST", body: formData });
+    } catch (err) {
+        if (handlers.error) handlers.error({ message: `Network error: ${err.message}` });
+        return;
+    }
+
+    if (!response.ok) {
+        if (handlers.error) handlers.error({ message: `Request failed: HTTP ${response.status}` });
+        return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // SSE events are separated by blank lines; split on newlines and process complete lines
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // keep the last (possibly incomplete) line
+        for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+                const event = JSON.parse(line.slice(6));
+                if (handlers[event.type]) handlers[event.type](event);
+            } catch {
+                // malformed JSON — skip
+            }
+        }
+    }
+}
+
+
+// ── Alpine component ──────────────────────────────────────────────────────────
+function designer() {
+    const cfg = window.CONFIG;
+
+    return {
+        // ── Session ────────────────────────────────────────────────────────
+        // Generate a UUID once per page load so the server can associate state
+        // (PIL images in memory) with this browser tab.
+        sessionId: crypto.randomUUID(),
+
+        // ── Workflow state ─────────────────────────────────────────────────
+        step: 1,               // controls which sections are visible
+        theme: "",
+        concepts: [],
+        selectedConcept: null,
+        editedConcept: "",
+        variants: [],          // [{url, ts}] — ts is Date.now() for cache-busting
+        prompts: [],
+        selectedVariant: null,
+        finalUrl: null,
+        finalTs: 0,
+
+        // ── UI state ───────────────────────────────────────────────────────
+        isLoading: false,
+        loadingMsg: "",
+        error: "",
+        promptLog: "",
+        showPromptLog: false,
+        showPresets: false,
+
+        // ── Settings ───────────────────────────────────────────────────────
+        bgColor: cfg.bgColor,
+        numVariants: cfg.numVariants,
+        bgTolerance: cfg.bgTolerance,
+        edgeErode: cfg.edgeErode,
+        decontaminate: cfg.decontaminate,
+        maxColors: cfg.maxColors,
+
+        // ── Preset management ──────────────────────────────────────────────
+        presetNames: cfg.presetNames,
+        activePreset: cfg.builtinName,
+        newPresetName: "",
+        presetStatus: "",
+        conceptsTemplate: cfg.conceptsTemplate,
+        variantsTemplate: cfg.variantsTemplate,
+        styleTemplate: cfg.styleTemplate,
+
+        // ── Computed ───────────────────────────────────────────────────────
+        get generateBtnLabel() {
+            const n = this.numVariants;
+            return `Generate ${n} ${n === 1 ? "Variant" : "Variants"}`;
+        },
+
+        // ── Internal helpers ───────────────────────────────────────────────
+        _startLoading(msg) {
+            this.isLoading = true;
+            this.loadingMsg = msg;
+            this.error = "";
+        },
+
+        _stopLoading() {
+            this.isLoading = false;
+            this.loadingMsg = "";
+        },
+
+        _onError(msg) {
+            this._stopLoading();
+            this.error = msg;
+        },
+
+        _bgFormData() {
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("bg_color", this.bgColor);
+            fd.append("bg_tolerance", this.bgTolerance);
+            fd.append("edge_erode", this.edgeErode);
+            fd.append("decontaminate", this.decontaminate);
+            return fd;
+        },
+
+        // ── Workflow actions ───────────────────────────────────────────────
+        selectConcept(concept) {
+            this.selectedConcept = concept;
+            this.editedConcept = concept;
+            this.step = Math.max(this.step, 3);
+        },
+
+        async doBrainstorm() {
+            if (this.isLoading || !this.theme.trim()) return;
+            this._startLoading("Generating concepts...");
+
+            // Reset everything below step 1
+            this.concepts = [];
+            this.selectedConcept = null;
+            this.editedConcept = "";
+            this.variants = [];
+            this.prompts = [];
+            this.selectedVariant = null;
+            this.finalUrl = null;
+            this.step = 1;
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("theme", this.theme);
+            fd.append("concepts_template", this.conceptsTemplate);
+
+            await streamSSE("/brainstorm", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                concepts: (e) => {
+                    this.concepts = e.concepts;
+                    this.step = 2;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doGenerate() {
+            if (this.isLoading || !this.editedConcept.trim()) return;
+            this._startLoading("Building prompts...");
+
+            this.variants = [];
+            this.prompts = [];
+            this.selectedVariant = null;
+            this.finalUrl = null;
+            this.step = Math.max(this.step, 3);
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("concept", this.editedConcept);
+            fd.append("original_concept", this.selectedConcept ?? this.editedConcept);
+            fd.append("bg_color", this.bgColor);
+            fd.append("num_variants", this.numVariants);
+            fd.append("max_colors", this.maxColors);
+            fd.append("variants_template", this.variantsTemplate);
+            fd.append("style_template", this.styleTemplate);
+
+            await streamSSE("/generate", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                prompts: (e) => {
+                    this.prompts = e.prompts;
+                    this.promptLog = e.prompts
+                        .map((p, i) => `── Variant ${i + 1} ──\n${p}`)
+                        .join("\n\n");
+                },
+                variants: (e) => {
+                    const ts = Date.now();
+                    this.variants = e.urls.map((url) => ({ url, ts }));
+                    this.selectedVariant = e.urls.length === 1 ? 0 : null;
+                    this.step = 4;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doFinalize() {
+            if (this.isLoading) return;
+            const idx = this.selectedVariant ?? 0;
+            this._startLoading("Generating 4K design...");
+
+            const fd = this._bgFormData();
+            fd.append("selected_idx", idx);
+
+            await streamSSE("/finalize", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                final: (e) => {
+                    this.finalUrl = e.url;
+                    this.finalTs = Date.now();
+                    this.step = 5;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doRemoveVariantBg() {
+            if (this.isLoading) return;
+            const idx = this.selectedVariant ?? 0;
+            this._startLoading("Removing background...");
+
+            const fd = this._bgFormData();
+            fd.append("selected_idx", idx);
+
+            await streamSSE("/remove-bg/variant", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                variant_updated: (e) => {
+                    // Bump timestamp so the browser re-fetches the updated image
+                    const updated = [...this.variants];
+                    updated[e.index] = { url: e.url, ts: Date.now() };
+                    this.variants = updated;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doRemoveFinalBg() {
+            if (this.isLoading) return;
+            this._startLoading("Removing background...");
+
+            await streamSSE("/remove-bg/final", this._bgFormData(), {
+                status: (e) => { this.loadingMsg = e.message; },
+                final_updated: (e) => {
+                    this.finalUrl = e.url;
+                    this.finalTs = Date.now();
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        // ── Preset actions ─────────────────────────────────────────────────
+        async loadPreset(name) {
+            if (!name) return;
+            const res = await fetch(`/presets/${encodeURIComponent(name)}`);
+            const data = await res.json();
+            if (!data.error) {
+                this.conceptsTemplate = data.concepts_prompt;
+                this.variantsTemplate = data.variants_prompt;
+                this.styleTemplate = data.style_suffix;
+            }
+        },
+
+        async savePreset() {
+            const name = this.newPresetName.trim();
+            if (!name) { this.presetStatus = "Enter a preset name."; return; }
+
+            const fd = new FormData();
+            fd.append("name", name);
+            fd.append("concepts", this.conceptsTemplate);
+            fd.append("variants", this.variantsTemplate);
+            fd.append("style", this.styleTemplate);
+
+            const res = await fetch("/presets", { method: "POST", body: fd });
+            const data = await res.json();
+            if (data.error) {
+                this.presetStatus = data.error;
+            } else {
+                this.presetNames = data.names;
+                this.activePreset = data.saved;
+                this.newPresetName = "";
+                this.presetStatus = `Saved "${name}".`;
+            }
+        },
+
+        async deletePreset() {
+            const name = this.activePreset;
+            if (name === cfg.builtinName) { this.presetStatus = "Cannot delete the built-in preset."; return; }
+
+            const res = await fetch(`/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
+            const data = await res.json();
+            this.presetNames = data.names;
+            this.activePreset = cfg.builtinName;
+            await this.loadPreset(cfg.builtinName);
+            this.presetStatus = `Deleted "${name}".`;
+        },
+    };
+}

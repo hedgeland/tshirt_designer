@@ -1,12 +1,14 @@
 # T-Shirt Designer
 
-A Gradio app that generates print-on-demand t-shirt designs using Google's Gemini API. The workflow is: enter a theme → brainstorm concepts → select one → generate image variants at low resolution → approve and finalize at 4K.
+A FastAPI + HTMX web app that generates print-on-demand t-shirt designs using Google's Gemini API. The workflow is: enter a theme → brainstorm concepts → select one → generate image variants at low resolution → approve and finalize at 4K.
 
 ## Running the app
 
 ```bash
-uv run python app.py
+uv run uvicorn main:app --reload
 ```
+
+Then open `http://127.0.0.1:8000`.
 
 ## Model
 
@@ -30,8 +32,14 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 ## Architecture
 
 ### Root
-- `app.py` — Gradio UI, orchestrates all phases
+- `main.py` — FastAPI app: routes, SSE streaming, session store, static file serving
 - `config.py` — single source of truth for all constants
+
+### templates/
+- `index.html` — single-page Jinja2 template; Tailwind CSS (Play CDN) + Alpine.js for UI state
+
+### static/
+- `app.js` — Alpine.js component (`designer()`) and `streamSSE` helper for reading streamed responses
 
 ### src/
 - `brainstorm.py` — generates text concepts from a theme
@@ -39,6 +47,8 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - `image.py` — calls Gemini image generation API
 - `finalize.py` — regenerates the approved design at `FINAL_SIZE`
 - `output.py` — saves images to disk
+- `background.py` — removes a solid background color from an image
+- `presets.py` — load/save named prompt template sets
 
 ### .claude/commands/ (Claude Code slash commands)
 - `commit.md` — `/commit` stages, commits, and pushes all changes
@@ -46,10 +56,18 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 ### Ignore
 - `.gemini/` and `gemini.md` — Gemini CLI configuration; not relevant to this codebase
 
+## Streaming
+
+Long-running operations (brainstorm, generate, finalize, background removal) are streamed as Server-Sent Events via FastAPI's `StreamingResponse`. Each event is a JSON line: `data: {"type": "...", ...}\n\n`. The client reads them with `fetch` + `ReadableStream` (see `streamSSE` in `static/app.js`).
+
+## Session state
+
+In-memory dict keyed by a UUID the browser generates on page load (`crypto.randomUUID()`). Stores PIL Images, prompts, and file paths for the current workflow. Single-user local tool — replace with Redis or a DB for multi-user.
+
 ## Conventions
 
 - Prefer inline comments. Explain the *why* — the intent, constraint, or non-obvious trade-off — not the *what* (the code already shows that).
-- All new logic goes in `src/`. Do not add new top-level modules.
+- All new backend logic goes in `src/`. `main.py` is routing + orchestration only.
 - `config.py` is the single source of truth for `MODEL`, `BRAINSTORM_SIZE`, `FINAL_SIZE`, `NUM_VARIANTS`, and `OUTPUT_DIR`.
 - Image generation always produces square output (`width == height == size`).
 

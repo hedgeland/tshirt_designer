@@ -1,3 +1,5 @@
+"""Background color removal via normalization, BFS flood fill, and edge decontamination."""
+
 from collections import deque
 
 import numpy as np

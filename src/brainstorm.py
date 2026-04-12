@@ -1,20 +1,15 @@
+"""Generate design concept names from a theme using the Gemini text model."""
+
 import json
 import re
-from functools import lru_cache
-
-from google import genai
 
 from config import MODEL
+from src.client import get_client
 from src.prompt_templates import concepts_prompt
 
 
-@lru_cache(maxsize=4)
-def _get_client(api_key: str) -> genai.Client:
-    return genai.Client(api_key=api_key)
-
-
 def generate_concepts(theme: str, api_key: str, concepts_template: str, num_concepts: int = 5) -> list[str]:
-    client = _get_client(api_key)
+    client = get_client(api_key)
 
     # Ask the model to return strict JSON so parsing is reliable.
     # The "creative director" framing keeps outputs POD-focused and printable.

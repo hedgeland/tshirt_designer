@@ -1,20 +1,28 @@
-import os
+"""Save generated images to disk under output/<theme>/concept_N/variant_N.png."""
+
+from pathlib import Path
 
 from PIL import Image
 
 from config import OUTPUT_DIR
 
 
-def save_variants(theme: str, concept_idx: int, variants: list[tuple[str, Image.Image]]) -> list[str]:
-    # Sanitize the theme string so it's safe to use as a directory name.
-    safe_theme = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in theme.strip().replace(" ", "_"))
-    dir_path = os.path.join(OUTPUT_DIR, safe_theme, f"concept_{concept_idx + 1}")
-    os.makedirs(dir_path, exist_ok=True)  # create nested dirs if they don't exist
+def safe_theme_name(theme: str) -> str:
+    """Return a filesystem-safe version of a theme string."""
+    return "".join(
+        c if c.isalnum() or c in ("-", "_") else "_"
+        for c in theme.strip().replace(" ", "_")
+    )
+
+
+def save_variants(theme: str, concept_idx: int, images: list[Image.Image]) -> list[str]:
+    dir_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / f"concept_{concept_idx + 1}"
+    dir_path.mkdir(parents=True, exist_ok=True)  # create nested dirs if they don't exist
 
     paths = []
-    for i, (_, img) in enumerate(variants):  # prompt is stored in session state, not needed here
-        filepath = os.path.join(dir_path, f"variant_{i + 1}.png")
-        img.save(filepath, "PNG")
-        paths.append(filepath)
+    for i, img in enumerate(images):
+        path = dir_path / f"variant_{i + 1}.png"
+        img.save(path, "PNG")
+        paths.append(str(path))
 
-    return paths  # caller uses paths[0] to show the parent directory in the UI
+    return paths  # caller uses these to build static URLs for the UI

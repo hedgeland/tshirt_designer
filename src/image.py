@@ -1,19 +1,15 @@
-import io
-from functools import lru_cache
+"""Gemini image generation — brainstorm variants and high-resolution finalization."""
 
-from google import genai
+import io
+
 from google.genai import types
 from PIL import Image
 
 from config import MODEL
+from src.client import get_client
 
 
-@lru_cache(maxsize=4)
-def _get_client(api_key: str) -> genai.Client:
-    return genai.Client(api_key=api_key)
-
-
-def _extract_image(response: genai.types.GenerateContentResponse) -> Image.Image:
+def _extract_image(response) -> Image.Image:
     """Pull the first image out of a Gemini response, regardless of how it was generated."""
     candidates = response.candidates or []
     for candidate in candidates:
@@ -25,7 +21,7 @@ def _extract_image(response: genai.types.GenerateContentResponse) -> Image.Image
 
 
 def generate_image(prompt: str, api_key: str, size: str = "1K") -> Image.Image:
-    client = _get_client(api_key)
+    client = get_client(api_key)
 
     response = client.models.generate_content(
         model=MODEL,
@@ -49,7 +45,7 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
     entirely different composition — it treats the variant as the target and upscales it
     rather than starting from scratch.
     """
-    client = _get_client(api_key)
+    client = get_client(api_key)
 
     # Encode the reference variant as PNG bytes for the multimodal request.
     # If the variant has transparency (bg was removed), flatten it onto white before

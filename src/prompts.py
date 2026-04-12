@@ -1,16 +1,11 @@
+"""Build per-variant image prompts from a selected concept using the Gemini text model."""
+
 import json
 import re
-from functools import lru_cache
-
-from google import genai
 
 from config import MODEL
+from src.client import get_client
 from src.prompt_templates import style_suffix, variants_prompt
-
-
-@lru_cache(maxsize=4)
-def _get_client(api_key: str) -> genai.Client:
-    return genai.Client(api_key=api_key)
 
 
 def build_prompts(
@@ -22,7 +17,7 @@ def build_prompts(
     num_variants: int = 3,
     max_colors: int = 6,
 ) -> list[str]:
-    client = _get_client(api_key)
+    client = get_client(api_key)
 
     # Each variant gets a different stylistic angle on the same concept,
     # which gives the user meaningful visual choice without re-describing the idea.
