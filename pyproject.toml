@@ -1,7 +1,7 @@
 [project]
 name = "tshirt-designer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Generate print-on-demand t-shirt designs using Google's Gemini AI"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,7 +9,6 @@ dependencies = [
     "gradio>=5.0.0",
     "pillow>=12.2.0",
     "python-dotenv>=1.2.2",
-    "vtracer>=0.6.15",
 ]
 
 [dependency-groups]

@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 .venv/
+.ruff_cache/
 
 # Environment
 .env
@@ -15,3 +16,6 @@ output/
 
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json
+
+# Type checker config (machine-specific)
+pyrightconfig.json

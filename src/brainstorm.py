@@ -5,6 +5,7 @@ from functools import lru_cache
 from google import genai
 
 from config import MODEL
+from src.prompt_templates import concepts_prompt
 
 
 @lru_cache(maxsize=4)
@@ -17,21 +18,9 @@ def generate_concepts(theme: str, api_key: str, num_concepts: int = 5) -> list[s
 
     # Ask the model to return strict JSON so parsing is reliable.
     # The "creative director" framing keeps outputs POD-focused and printable.
-    prompt = f"""You are a creative director for a print-on-demand t-shirt business.
-
-Generate {num_concepts} distinct t-shirt design concepts for the theme: "{theme}"
-
-Each concept should:
-- Be vivid and specific (2-3 sentences)
-- Work well as a vector graphic: bold, clear silhouettes, limited colors
-- Be visually striking on a t-shirt
-
-Return ONLY a JSON array of {num_concepts} strings. No other text.
-Example: ["concept 1 description", "concept 2 description"]"""
-
     response = client.models.generate_content(
         model=MODEL,
-        contents=prompt,
+        contents=concepts_prompt(theme, num_concepts),
     )
 
     text = (response.text or "").strip()
