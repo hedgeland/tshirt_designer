@@ -42,7 +42,7 @@ async function streamSSE(url, formData, handlers) {
 
 // ── Alpine component ──────────────────────────────────────────────────────────
 function designer() {
-    const cfg = window.CONFIG;
+    const cfg = JSON.parse(document.getElementById('app-config').textContent);
 
     return {
         // ── Session ────────────────────────────────────────────────────────

@@ -327,23 +327,21 @@
         </div>
     </div>
 
-    <!-- Server-injected config — must come before app.js -->
-    <!-- prettier-ignore -->
-    <script>
-        // prettier-ignore
-        window.CONFIG = {
-            numVariants: {{ num_variants }},
-            bgColor: {{ bg_color | tojson }},
-            bgTolerance: {{ bg_tolerance }},
-            edgeErode: {{ edge_erode }},
-            decontaminate: {{ decontaminate }},
-            maxColors: {{ max_colors }},
-            presetNames: {{ preset_names | tojson }},
-            builtinName: {{ builtin_name | tojson }},
-            conceptsTemplate: {{ concepts_template | tojson }},
-            variantsTemplate: {{ variants_template | tojson }},
-            styleTemplate: {{ style_template | tojson }},
-        };
+    <!-- Server-injected config — type=application/json prevents JS formatter from mangling Jinja2 tags -->
+    <script type="application/json" id="app-config">
+        {
+            "numVariants": {{ num_variants }},
+            "bgColor": {{ bg_color | tojson }},
+            "bgTolerance": {{ bg_tolerance }},
+            "edgeErode": {{ edge_erode }},
+            "decontaminate": {{ decontaminate }},
+            "maxColors": {{ max_colors }},
+            "presetNames": {{ preset_names | tojson }},
+            "builtinName": {{ builtin_name | tojson }},
+            "conceptsTemplate": {{ concepts_template | tojson }},
+            "variantsTemplate": {{ variants_template | tojson }},
+            "styleTemplate": {{ style_template | tojson }}
+        }
     </script>
     <script src="/static/app.js"></script>
 
