@@ -31,6 +31,11 @@ EDGE_ERODE_PX = 1       # shrink alpha mask inward after removal to clip fringe 
 EDGE_DECONTAMINATE = 50 # 0–100; subtracts background color spill from boundary pixels
 MAX_COLORS = 6          # max distinct colors in generated image; 1–8
 MAX_PRESETS = 20        # max number of saved user presets (excludes built-in default)
+
+# Printify integration — leave PRINTIFY_TOKEN unset to hide publishing features.
+PRINTIFY_TOKEN = os.getenv("PRINTIFY_TOKEN", "")
+# Pre-set your shop ID to skip the shop-selector step in the publish modal.
+PRINTIFY_SHOP_ID = os.getenv("PRINTIFY_SHOP_ID", "")
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 
 # Two-phase resolution: fast previews during exploration, full quality on approval.

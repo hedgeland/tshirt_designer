@@ -87,6 +87,35 @@ function designer() {
         variantsTemplate: cfg.variantsTemplate,
         styleTemplate: cfg.styleTemplate,
 
+        // ── Printify state ─────────────────────────────────────────────────
+        cfg,                        // expose to template for printifyEnabled check
+        showPrintify: false,
+        printifyBusy: false,
+        printifyStatus: "",
+        printifyError: "",
+        printifyDone: null,
+
+        pShops: [],
+        pShopId: cfg.printifyShopId || "",
+
+        pAllBlueprints: [],         // full catalog (fetched once)
+        pFilteredBlueprints: [],    // filtered by search term
+        pBlueprintSearch: "",
+        pBlueprint: null,
+
+        pProviders: [],
+        pProviderId: "",
+
+        pAllVariants: [],           // raw variant list from API
+        pColors: [],                // unique color names
+        pSizes: [],                 // unique size names (in natural order)
+        pSelectedColors: [],
+        pSelectedSizes: [],
+
+        pTitle: "",
+        pDescription: "",
+        pPrice: "29.99",
+
         // ── Lifecycle ──────────────────────────────────────────────────────
         init() {
             // Warn before unload if the user has typed a theme — reloading would
@@ -103,6 +132,15 @@ function designer() {
         get generateBtnLabel() {
             const n = this.numVariants;
             return `Generate ${n} ${n === 1 ? "Variant" : "Variants"}`;
+        },
+
+        get selectedVariantCount() {
+            // Count variants whose color AND size are both selected.
+            return this.pAllVariants.filter(v => {
+                const color = v.options?.color ?? "";
+                const size = v.options?.size ?? "";
+                return this.pSelectedColors.includes(color) && this.pSelectedSizes.includes(size);
+            }).length;
         },
 
         // ── Internal helpers ───────────────────────────────────────────────
@@ -308,6 +346,180 @@ function designer() {
             this.activePreset = cfg.builtinName;
             await this.loadPreset(cfg.builtinName);
             this.presetStatus = `Deleted "${name}".`;
+        },
+
+        // ── Printify actions ───────────────────────────────────────────────
+
+        async openPrintify() {
+            // Reset publish result each time the modal opens.
+            this.printifyError = "";
+            this.printifyStatus = "";
+            this.printifyDone = null;
+            this.pBlueprint = null;
+            this.pProviders = [];
+            this.pProviderId = "";
+            this.pAllVariants = [];
+            this.pColors = [];
+            this.pSizes = [];
+            this.pSelectedColors = [];
+            this.pSelectedSizes = [];
+            this.pTitle = this.theme || "Custom T-Shirt";
+            this.showPrintify = true;
+
+            // Load shops (skip if shop ID already configured server-side).
+            if (!cfg.printifyShopId && this.pShops.length === 0) {
+                const res = await fetch("/printify/shops");
+                const data = await res.json();
+                if (data.error) { this.printifyError = data.error; return; }
+                this.pShops = data;
+                if (data.length === 1) this.pShopId = String(data[0].id);
+            }
+
+            // Load blueprint catalog (fetched once; subsequent opens reuse cache).
+            if (this.pAllBlueprints.length === 0) {
+                this.printifyStatus = "Loading catalog…";
+                const res = await fetch("/printify/blueprints");
+                const data = await res.json();
+                this.printifyStatus = "";
+                if (data.error) { this.printifyError = data.error; return; }
+                this.pAllBlueprints = data;
+            }
+
+            // Default search to show common shirt styles on open.
+            this.pBlueprintSearch = "shirt";
+            this.filterBlueprints();
+        },
+
+        filterBlueprints() {
+            const q = this.pBlueprintSearch.trim().toLowerCase();
+            if (!q) {
+                this.pFilteredBlueprints = this.pAllBlueprints.slice(0, 50);
+                return;
+            }
+            const terms = q.split(/\s+/);
+            this.pFilteredBlueprints = this.pAllBlueprints.filter(bp =>
+                terms.every(t => bp.title.toLowerCase().includes(t) || (bp.brand || "").toLowerCase().includes(t))
+            ).slice(0, 50);
+        },
+
+        async selectBlueprint(bp) {
+            this.pBlueprint = bp;
+            this.pProviders = [];
+            this.pProviderId = "";
+            this.pAllVariants = [];
+            this.pColors = [];
+            this.pSizes = [];
+            this.pSelectedColors = [];
+            this.pSelectedSizes = [];
+            this.printifyError = "";
+
+            this.printifyStatus = "Loading print providers…";
+            const res = await fetch(`/printify/blueprints/${bp.id}/providers`);
+            const data = await res.json();
+            this.printifyStatus = "";
+
+            if (data.error) { this.printifyError = data.error; return; }
+            this.pProviders = data;
+            if (data.length > 0) {
+                this.pProviderId = String(data[0].id);
+                await this.loadVariants();
+            }
+        },
+
+        async loadVariants() {
+            if (!this.pBlueprint || !this.pProviderId) return;
+            this.pAllVariants = [];
+            this.pColors = [];
+            this.pSizes = [];
+            this.pSelectedColors = [];
+            this.pSelectedSizes = [];
+            this.printifyError = "";
+
+            this.printifyStatus = "Loading variants…";
+            const url = `/printify/blueprints/${this.pBlueprint.id}/providers/${this.pProviderId}/variants`;
+            const res = await fetch(url);
+            const data = await res.json();
+            this.printifyStatus = "";
+
+            if (data.error) { this.printifyError = data.error; return; }
+            this.pAllVariants = data;
+
+            // Extract unique colors and sizes, preserving natural order from the API.
+            const colors = [], sizes = [], seenC = new Set(), seenS = new Set();
+            for (const v of data) {
+                const c = v.options?.color ?? "";
+                const s = v.options?.size ?? "";
+                if (c && !seenC.has(c)) { seenC.add(c); colors.push(c); }
+                if (s && !seenS.has(s)) { seenS.add(s); sizes.push(s); }
+            }
+            this.pColors = colors;
+            this.pSizes = sizes;
+            // Default: select all colors and sizes.
+            this.pSelectedColors = [...colors];
+            this.pSelectedSizes = [...sizes];
+        },
+
+        togglePColor(color) {
+            const i = this.pSelectedColors.indexOf(color);
+            if (i === -1) this.pSelectedColors.push(color);
+            else this.pSelectedColors.splice(i, 1);
+        },
+
+        togglePSize(size) {
+            const i = this.pSelectedSizes.indexOf(size);
+            if (i === -1) this.pSelectedSizes.push(size);
+            else this.pSelectedSizes.splice(i, 1);
+        },
+
+        async doPublish(publishNow) {
+            if (this.printifyBusy) return;
+            this.printifyError = "";
+            this.printifyDone = null;
+
+            const shopId = cfg.printifyShopId || this.pShopId;
+            if (!shopId) { this.printifyError = "Select a shop first."; return; }
+            if (!this.pBlueprint) { this.printifyError = "Select a t-shirt style first."; return; }
+            if (!this.pProviderId) { this.printifyError = "Select a print provider first."; return; }
+            if (this.selectedVariantCount === 0) { this.printifyError = "Select at least one color and size."; return; }
+            if (!this.pTitle.trim()) { this.printifyError = "Enter a product title."; return; }
+
+            // Gather the variant IDs that match the selected color+size combinations.
+            const variantIds = this.pAllVariants
+                .filter(v =>
+                    this.pSelectedColors.includes(v.options?.color ?? "") &&
+                    this.pSelectedSizes.includes(v.options?.size ?? "")
+                )
+                .map(v => v.id);
+
+            const priceCents = Math.round(parseFloat(this.pPrice) * 100);
+            if (!priceCents || priceCents < 1) { this.printifyError = "Enter a valid price."; return; }
+
+            this.printifyBusy = true;
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("shop_id", shopId);
+            fd.append("blueprint_id", this.pBlueprint.id);
+            fd.append("provider_id", this.pProviderId);
+            fd.append("variant_ids", JSON.stringify(variantIds));
+            fd.append("title", this.pTitle.trim());
+            fd.append("description", this.pDescription.trim());
+            fd.append("price_cents", priceCents);
+            fd.append("publish_now", publishNow);
+
+            await streamSSE("/printify/publish", fd, {
+                status: (e) => { this.printifyStatus = e.message; },
+                done: (e) => {
+                    this.printifyStatus = "";
+                    this.printifyDone = e;
+                },
+                error: (e) => {
+                    this.printifyStatus = "";
+                    this.printifyError = e.message;
+                },
+            });
+
+            this.printifyBusy = false;
         },
     };
 }

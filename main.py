@@ -28,9 +28,11 @@ from config import (
     MAX_COLORS,
     NUM_VARIANTS,
     OUTPUT_DIR,
+    PRINTIFY_SHOP_ID,
+    PRINTIFY_TOKEN,
     SECRET_KEY,
 )
-from src import presets
+from src import presets, printify
 from src.background import remove_background_color
 from src.brainstorm import generate_concepts
 from src.finalize import finalize_design
@@ -174,6 +176,8 @@ async def index(request: Request):
         "concepts_template": builtin["concepts_prompt"],
         "variants_template": builtin["variants_prompt"],
         "style_template": builtin["style_suffix"],
+        "printify_enabled": bool(PRINTIFY_TOKEN),
+        "printify_shop_id": PRINTIFY_SHOP_ID,
     })
 
 
@@ -454,6 +458,153 @@ async def save_preset_route(
 async def delete_preset_route(name: str):
     presets.delete_preset(name)
     return {"names": presets.all_preset_names()}
+
+
+# ── Printify endpoints ────────────────────────────────────────────────────────
+# These routes are only useful when PRINTIFY_TOKEN is set. Callers should check
+# the `printify_enabled` flag from /config before hitting these.
+
+@app.get("/printify/shops")
+async def printify_shops():
+    if not PRINTIFY_TOKEN:
+        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
+    try:
+        shops = await asyncio.to_thread(printify.list_shops, PRINTIFY_TOKEN)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    return shops
+
+
+@app.get("/printify/blueprints")
+async def printify_blueprints(q: str = ""):
+    """Return blueprints, optionally filtered by a search query."""
+    if not PRINTIFY_TOKEN:
+        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
+    try:
+        all_bps = await asyncio.to_thread(printify.list_blueprints, PRINTIFY_TOKEN)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    # Default filter: show shirt-like items unless user provides a custom query.
+    search = q.strip().lower() if q.strip() else "shirt tee"
+    terms = search.split()
+    filtered = [
+        {"id": bp["id"], "title": bp["title"], "brand": bp.get("brand", ""), "model": bp.get("model", "")}
+        for bp in all_bps
+        if any(t in bp.get("title", "").lower() for t in terms)
+    ]
+    return filtered
+
+
+@app.get("/printify/blueprints/{blueprint_id}/providers")
+async def printify_providers(blueprint_id: int):
+    if not PRINTIFY_TOKEN:
+        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
+    try:
+        providers = await asyncio.to_thread(
+            printify.list_print_providers, PRINTIFY_TOKEN, blueprint_id
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    return providers
+
+
+@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/variants")
+async def printify_variants(blueprint_id: int, provider_id: int):
+    if not PRINTIFY_TOKEN:
+        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
+    try:
+        variants = await asyncio.to_thread(
+            printify.list_variants, PRINTIFY_TOKEN, blueprint_id, provider_id
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    return variants
+
+
+@app.post("/printify/publish")
+async def printify_publish(
+    session_id: str = Form(...),
+    shop_id: str = Form(...),
+    blueprint_id: int = Form(...),
+    provider_id: int = Form(...),
+    variant_ids: str = Form(...),   # JSON array of ints
+    title: str = Form(...),
+    description: str = Form(""),
+    price_cents: int = Form(...),
+    publish_now: bool = Form(False),
+):
+    """Upload the session's final image to Printify and create (optionally publish) a product."""
+    async def stream():
+        if not PRINTIFY_TOKEN:
+            yield sse({"type": "error", "message": "PRINTIFY_TOKEN not configured."})
+            return
+
+        session = get_session(session_id)
+        final_path = session.get("final_path")
+        if not final_path:
+            yield sse({"type": "error", "message": "Finalize a design first."})
+            return
+
+        try:
+            ids: list[int] = json.loads(variant_ids)
+        except json.JSONDecodeError:
+            yield sse({"type": "error", "message": "Invalid variant selection."})
+            return
+
+        if not ids:
+            yield sse({"type": "error", "message": "Select at least one color/size variant."})
+            return
+
+        # Step 1: Upload image
+        yield sse({"type": "status", "message": "Uploading image to Printify..."})
+        try:
+            image_id = await asyncio.to_thread(
+                printify.upload_image, PRINTIFY_TOKEN, final_path
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": f"Image upload failed: {e}"})
+            return
+
+        # Step 2: Create product draft
+        yield sse({"type": "status", "message": "Creating product..."})
+        try:
+            product_id = await asyncio.to_thread(
+                printify.create_product,
+                PRINTIFY_TOKEN,
+                shop_id,
+                title.strip(),
+                description.strip(),
+                blueprint_id,
+                provider_id,
+                image_id,
+                ids,
+                price_cents,
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": f"Product creation failed: {e}"})
+            return
+
+        # Step 3 (optional): Publish to store
+        if publish_now:
+            yield sse({"type": "status", "message": "Publishing to store..."})
+            try:
+                await asyncio.to_thread(
+                    printify.publish_product, PRINTIFY_TOKEN, shop_id, product_id
+                )
+            except Exception as e:
+                yield sse({"type": "error", "message": f"Publish failed: {e}"})
+                return
+
+        product_url = f"https://printify.com/app/editor/{product_id}"
+        yield sse({
+            "type": "done",
+            "product_id": product_id,
+            "product_url": product_url,
+            "published": publish_now,
+        })
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":
