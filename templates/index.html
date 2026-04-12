@@ -61,7 +61,15 @@
         <div class="flex flex-1 overflow-hidden">
 
             <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
-            <aside class="w-60 bg-slate-700 border-r border-slate-600 flex-shrink-0 overflow-y-auto">
+            <aside x-data="{ sidebarWidth: 300, resizing: false }"
+                   :style="`width: ${sidebarWidth}px`"
+                   class="bg-slate-700 border-r border-slate-600 flex-shrink-0 overflow-y-auto relative"
+                   @mousemove.window="resizing && (sidebarWidth = Math.max(120, Math.min(480, $event.clientX)))"
+                   @mouseup.window="resizing = false"
+                   @mouseleave.window="resizing = false">
+                <!-- Drag handle -->
+                <div class="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-indigo-400 transition-colors z-10"
+                     @mousedown.prevent="resizing = true"></div>
                 <div class="p-4 space-y-5">
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-100">Settings</p>
 
@@ -175,10 +183,10 @@
                 <section class="bg-slate-700 rounded-xl border border-slate-200 shadow-sm p-5">
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">1 · Enter a theme
                     </h2>
-                    <div class="flex gap-3">
-                        <input type="text" x-model="theme" @keydown.enter="doBrainstorm()"
+                    <div class="flex gap-3 items-start">
+                        <textarea x-model="theme" @keydown.enter.prevent="doBrainstorm()" rows="2"
                             placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
-                            class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
                         <button @click="doBrainstorm()" :disabled="isLoading"
                             class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             <!-- Spinner shown only while brainstorming -->

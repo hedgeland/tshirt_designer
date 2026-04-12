@@ -87,6 +87,18 @@ function designer() {
         variantsTemplate: cfg.variantsTemplate,
         styleTemplate: cfg.styleTemplate,
 
+        // ── Lifecycle ──────────────────────────────────────────────────────
+        init() {
+            // Warn before unload if the user has typed a theme — reloading would
+            // clear both the textarea and all server-side session state (images, concepts).
+            window.addEventListener('beforeunload', (e) => {
+                if (this.theme.trim()) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
+        },
+
         // ── Computed ───────────────────────────────────────────────────────
         get generateBtnLabel() {
             const n = this.numVariants;
