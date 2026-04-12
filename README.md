@@ -21,7 +21,7 @@ Get a free API key at [aistudio.google.com](https://aistudio.google.com).
 ## Quickstart
 
 ```bash
-git clone https://github.com/your-username/tshirt-designer.git
+git clone https://github.com/hedgeland/tshirt_designer.git
 cd tshirt-designer
 
 cp .env.example .env
