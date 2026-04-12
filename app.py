@@ -17,6 +17,7 @@ from config import (
     NUM_VARIANTS,
     OUTPUT_DIR,
 )
+from src import presets
 from src.background import remove_background_color
 from src.brainstorm import generate_concepts
 from src.finalize import finalize_design
@@ -25,7 +26,7 @@ from src.output import save_variants
 from src.prompts import build_prompts
 
 
-def brainstorm(theme: str) -> Generator[Any, None, None]:
+def brainstorm(theme: str, concepts_template: str) -> Generator[Any, None, None]:
     if not GOOGLE_API_KEY:
         raise gr.Error("GOOGLE_API_KEY is not set. Add it to your .env file.")
     if not theme.strip():
@@ -48,7 +49,7 @@ def brainstorm(theme: str) -> Generator[Any, None, None]:
         gr.update(value=""),  # prompt_log
     )
 
-    concepts = generate_concepts(theme.strip(), GOOGLE_API_KEY)
+    concepts = generate_concepts(theme.strip(), GOOGLE_API_KEY, concepts_template)
 
     yield (
         gr.update(choices=concepts, value=None, visible=True),
@@ -90,6 +91,8 @@ def generate(
     concepts: list[str],
     original_concept: str | None,
     max_colors: float,
+    variants_template: str,
+    style_template: str,
 ) -> Generator[Any, None, None]:
     if not edited_concept.strip():
         raise gr.Error("No concept to generate from.")
@@ -111,6 +114,8 @@ def generate(
     prompts = build_prompts(
         edited_concept.strip(),
         GOOGLE_API_KEY,
+        variants_template=variants_template,
+        style_template=style_template,
         bg_color=bg_color,
         num_variants=num_variants,
         max_colors=int(max_colors),
@@ -340,6 +345,39 @@ def _format_prompts(prompts: list[str]) -> str:
     return "\n\n".join(parts)
 
 
+# ── Preset helpers ────────────────────────────────────────────────────────────
+
+def _preset_fields(name: str) -> tuple[str, str, str]:
+    """Return (concepts_prompt, variants_prompt, style_suffix) for a preset name."""
+    p = presets.get_preset(name)
+    return p["concepts_prompt"], p["variants_prompt"], p["style_suffix"]
+
+
+def _save_preset_fn(name: str, concepts: str, variants: str, style: str) -> tuple[Any, str]:
+    name = name.strip()
+    if not name or name == presets.BUILTIN_NAME:
+        return gr.update(), "Name required (cannot overwrite built-in)."
+    try:
+        presets.save_preset(name, concepts, variants, style)
+    except ValueError as e:
+        return gr.update(), str(e)
+    return gr.update(choices=presets.all_preset_names(), value=name), f'Saved "{name}".'
+
+
+def _delete_preset_fn(name: str) -> tuple[Any, str, str, str, str]:
+    d = presets.load_builtin()
+    if name == presets.BUILTIN_NAME:
+        return gr.update(), d["concepts_prompt"], d["variants_prompt"], d["style_suffix"], "Cannot delete the built-in preset."
+    presets.delete_preset(name)
+    return (
+        gr.update(choices=presets.all_preset_names(), value=presets.BUILTIN_NAME),
+        d["concepts_prompt"],
+        d["variants_prompt"],
+        d["style_suffix"],
+        f'Deleted "{name}".',
+    )
+
+
 # ── Layout ────────────────────────────────────────────────────────────────────
 SLIDER_CSS = """
     .slider-only input[type='number'] {
@@ -353,9 +391,37 @@ SLIDER_CSS = """
     }
     .slider-only input[type='number']::-webkit-inner-spin-button,
     .slider-only input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    /* Remove pill/button appearance from component labels */
+    span[data-testid="block-info"] {
+        background: none !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+    }
 """
 
-with gr.Blocks(title="T-Shirt Design Generator") as app:
+TOGGLE_JS = """
+() => {
+    // Make the color swatch toggle the picker closed if it's already open.
+    // Svelte's click handler always opens; we intercept in the capture phase
+    // before Svelte sees it and dispatch a synthetic outside-click to close.
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('button.dialog-button');
+        if (!btn) return;
+        const picker = btn.parentElement.querySelector('.color-picker');
+        if (!picker) return;  // picker is closed — let Svelte open it normally
+        // Synthetic events are untrusted and ignored by Svelte's outside-click handler,
+        // so we directly remove the picker element. Svelte's open=true handler will
+        // recreate it on the next click, so this leaves the component fully functional.
+        e.stopImmediatePropagation();
+        picker.remove();
+    }, true);
+}
+"""
+
+with gr.Blocks(title="T-Shirt Design Generator", js=TOGGLE_JS) as app:
     concepts_state = gr.State([])
     prompts_state = gr.State([])
     images_state = gr.State([])
@@ -370,7 +436,8 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
         with gr.Column(scale=1, min_width=220):
             gr.Markdown("### ⚙️ Settings")
             bg_color = gr.ColorPicker(label="Background color", value="#FF00FF")
-            gr.Markdown("*Pick a solid color easy to remove in Canva.*")
+            gr.Markdown("*Pick a solid color easy to remove i" \
+            "n Canva.*")
             num_variants_slider = gr.Slider(
                 label="Number of variants",
                 minimum=1,
@@ -425,6 +492,26 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
                     interactive=False,
                     placeholder="Prompts appear here after generating variants.",
                 )
+
+            with gr.Accordion("🗂 Prompt Presets", open=False):
+                preset_dropdown = gr.Dropdown(
+                    choices=presets.all_preset_names(),
+                    value=presets.BUILTIN_NAME,
+                    label="Active preset",
+                    interactive=True,
+                )
+                concepts_tpl = gr.Textbox(label="Brainstorm prompt", lines=8)
+                variants_tpl = gr.Textbox(label="Variants prompt", lines=8)
+                style_tpl = gr.Textbox(label="Style suffix", lines=4)
+                with gr.Row():
+                    preset_name_input = gr.Textbox(
+                        label="Preset name",
+                        placeholder="My preset name",
+                        scale=3,
+                    )
+                    save_preset_btn = gr.Button("Save", scale=1)
+                    delete_preset_btn = gr.Button("Delete", scale=1, variant="stop")
+                preset_status = gr.Markdown("")
 
         with gr.Column(scale=4):
             # Step 1
@@ -491,8 +578,8 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
         brainstorm_status,
         prompt_log,
     ]
-    brainstorm_btn.click(brainstorm, inputs=[theme_input], outputs=brainstorm_outputs)
-    theme_input.submit(brainstorm, inputs=[theme_input], outputs=brainstorm_outputs)
+    brainstorm_btn.click(brainstorm, inputs=[theme_input, concepts_tpl], outputs=brainstorm_outputs)
+    theme_input.submit(brainstorm, inputs=[theme_input, concepts_tpl], outputs=brainstorm_outputs)
 
     concept_radio.change(
         select_concept, inputs=[concept_radio], outputs=[generate_group, concept_editor]
@@ -512,6 +599,8 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
             concepts_state,
             concept_radio,
             max_colors_slider,
+            variants_tpl,
+            style_tpl,
         ],
         outputs=[
             gallery,
@@ -560,6 +649,31 @@ with gr.Blocks(title="T-Shirt Design Generator") as app:
         do_remove_bg,
         inputs=[final_image, bg_color, bg_tolerance_slider, erode_slider, decontaminate_slider],
         outputs=[final_image, download_btn, remove_bg_btn, remove_bg_status],
+    )
+
+    # ── Preset events ─────────────────────────────────────────────────────────
+    preset_dropdown.change(
+        _preset_fields,
+        inputs=[preset_dropdown],
+        outputs=[concepts_tpl, variants_tpl, style_tpl],
+    )
+
+    save_preset_btn.click(
+        _save_preset_fn,
+        inputs=[preset_name_input, concepts_tpl, variants_tpl, style_tpl],
+        outputs=[preset_dropdown, preset_status],
+    )
+
+    delete_preset_btn.click(
+        _delete_preset_fn,
+        inputs=[preset_dropdown],
+        outputs=[preset_dropdown, concepts_tpl, variants_tpl, style_tpl, preset_status],
+    )
+
+    # Populate text areas with the built-in default on startup.
+    app.load(
+        lambda: _preset_fields(presets.BUILTIN_NAME),
+        outputs=[concepts_tpl, variants_tpl, style_tpl],
     )
 
 

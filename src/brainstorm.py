@@ -13,14 +13,14 @@ def _get_client(api_key: str) -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
-def generate_concepts(theme: str, api_key: str, num_concepts: int = 5) -> list[str]:
+def generate_concepts(theme: str, api_key: str, concepts_template: str, num_concepts: int = 5) -> list[str]:
     client = _get_client(api_key)
 
     # Ask the model to return strict JSON so parsing is reliable.
     # The "creative director" framing keeps outputs POD-focused and printable.
     response = client.models.generate_content(
         model=MODEL,
-        contents=concepts_prompt(theme, num_concepts),
+        contents=concepts_prompt(concepts_template, theme, num_concepts),
     )
 
     text = (response.text or "").strip()

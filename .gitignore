@@ -19,3 +19,6 @@ output/
 
 # Type checker config (machine-specific)
 pyrightconfig.json
+
+# User prompt presets (machine-local, created by the app UI)
+prompt_presets.json

@@ -15,6 +15,7 @@ BG_REMOVAL_TOLERANCE = 50  # 0–255; higher = removes more color variation at e
 EDGE_ERODE_PX = 1       # shrink alpha mask inward after removal to clip fringe ring
 EDGE_DECONTAMINATE = 50 # 0–100; subtracts background color spill from boundary pixels
 MAX_COLORS = 6          # max distinct colors in generated image; 1–8
+MAX_PRESETS = 20        # max number of saved user presets (excludes built-in default)
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 
 # Two-phase resolution: fast previews during exploration, full quality on approval.

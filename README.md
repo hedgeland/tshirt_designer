@@ -32,6 +32,18 @@ uv run python app.py
 
 Then open the URL printed in the terminal (default: `http://127.0.0.1:7860`).
 
+## Prompt Presets
+
+Open the **Prompt Presets** panel in the left sidebar to edit the three AI prompt templates and save named presets. Presets persist across restarts in a local `prompt_presets.json` file (not committed to git).
+
+| Template | Controls |
+|---|---|
+| Brainstorm prompt | How concepts are generated from your theme |
+| Variants prompt | How each concept expands into stylistic variations |
+| Style suffix | Image constraints appended to every generation prompt |
+
+Variables in `{curly_braces}` are filled in automatically at runtime — don't remove them. The **Default (built-in)** preset cannot be overwritten or deleted; save under a new name to customize it.
+
 ## Configuration
 
 All tunable constants live in `config.py`:
