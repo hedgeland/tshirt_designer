@@ -24,6 +24,8 @@ HTTPS_ONLY = os.getenv("HTTPS_ONLY", "true").lower() == "true"
 MODEL = "gemini-3.1-flash-image-preview"
 
 NUM_VARIANTS = 1        # default; overridden by the UI slider at runtime
+DEFAULT_BG_COLOR = "#FF00FF"  # solid magenta — easy to key out in Canva
+DEFAULT_BG_COLOR_NAME = "Magenta"
 BG_REMOVAL_TOLERANCE = 50  # 0–255; higher = removes more color variation at edges
 EDGE_ERODE_PX = 1       # shrink alpha mask inward after removal to clip fringe ring
 EDGE_DECONTAMINATE = 50 # 0–100; subtracts background color spill from boundary pixels

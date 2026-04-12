@@ -17,6 +17,8 @@ from config import (
     ALLOWED_EMAILS,
     BG_REMOVAL_TOLERANCE,
     BRAINSTORM_SIZE,
+    DEFAULT_BG_COLOR,
+    DEFAULT_BG_COLOR_NAME,
     EDGE_DECONTAMINATE,
     EDGE_ERODE_PX,
     GOOGLE_API_KEY,
@@ -160,7 +162,8 @@ async def index(request: Request):
     builtin = presets.load_builtin()
     return templates.TemplateResponse(request, "index.html", {
         "num_variants": NUM_VARIANTS,
-        "bg_color": "#FF00FF",
+        "bg_color": DEFAULT_BG_COLOR,
+        "bg_color_name": DEFAULT_BG_COLOR_NAME,
         "bg_tolerance": BG_REMOVAL_TOLERANCE,
         "edge_erode": EDGE_ERODE_PX,
         "decontaminate": EDGE_DECONTAMINATE,
