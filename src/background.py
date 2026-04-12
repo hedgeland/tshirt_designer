@@ -3,7 +3,27 @@
 from collections import deque
 
 import numpy as np
-from PIL import Image, ImageColor, ImageFilter
+from PIL import Image, ImageFilter
+
+
+def _sample_background_color(arr: np.ndarray) -> tuple[int, int, int]:
+    """Estimate the background color by averaging the four corner pixels.
+
+    AI image models often render the prompt's bg color slightly off (e.g. #FF00FF
+    becomes a hot pink with B≈150 instead of 255). Using the actual corner pixels
+    as the target means the flood fill seeds correctly regardless of color drift.
+    Corner pixels are safe proxies for background because the style prompt explicitly
+    floats design elements on a solid background, leaving corners clear.
+    """
+    h, w = arr.shape[:2]
+    corners = np.array([
+        arr[0, 0, :3],
+        arr[0, w - 1, :3],
+        arr[h - 1, 0, :3],
+        arr[h - 1, w - 1, :3],
+    ], dtype=np.float32)
+    avg = np.mean(corners, axis=0)
+    return (int(round(float(avg[0]))), int(round(float(avg[1]))), int(round(float(avg[2]))))
 
 
 def remove_background_color(
@@ -28,7 +48,11 @@ def remove_background_color(
     """
     img = image.convert("RGBA")
     arr = np.array(img)
-    target = ImageColor.getrgb(hex_color)
+
+    # Detect the actual background color from corner pixels rather than trusting
+    # hex_color — the model often renders the prompt color slightly off, and a
+    # mismatch in any channel beyond tolerance means the flood fill finds no seeds.
+    target = _sample_background_color(arr)
 
     arr = _normalize_background(arr, target, tolerance)
     arr = _flood_fill_remove(arr, target, tolerance)

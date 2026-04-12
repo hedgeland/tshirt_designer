@@ -83,8 +83,15 @@ def create_product(
     image_id: str,
     variant_ids: list[int],
     price_cents: int,
+    design_x: float = 0.5,
+    design_y: float = 0.5,
+    design_scale: float = 0.8,
 ) -> str:
-    """Create a Printify product draft and return its product ID."""
+    """Create a Printify product draft and return its product ID.
+
+    design_x/y are the image center as fractions (0–1) of the print area.
+    design_scale is the fraction of the print area width the image occupies.
+    """
     payload = {
         "title": title,
         "description": description,
@@ -94,7 +101,7 @@ def create_product(
             {"id": vid, "price": price_cents, "is_enabled": True}
             for vid in variant_ids
         ],
-        # Single print area covering all variants — design centered on the front.
+        # Single print area covering all variants — design on the front.
         "print_areas": [
             {
                 "variant_ids": variant_ids,
@@ -104,9 +111,9 @@ def create_product(
                         "images": [
                             {
                                 "id": image_id,
-                                "x": 0.5,
-                                "y": 0.5,
-                                "scale": 0.8,  # 80% of print area — leaves a natural border
+                                "x": design_x,
+                                "y": design_y,
+                                "scale": design_scale,
                                 "angle": 0,
                             }
                         ],

@@ -65,6 +65,7 @@ function designer() {
         // ── UI state ───────────────────────────────────────────────────────
         isLoading: false,
         loadingMsg: "",
+        loadingStep: 0,   // which step triggered the current load — controls status bar placement
         error: "",
         promptLog: "",
         showPromptLog: false,
@@ -112,6 +113,14 @@ function designer() {
         pSelectedColors: [],
         pSelectedSizes: [],
 
+        // Print area dimensions — extracted from the variant placeholder data.
+        // Used to calculate the correct y offset for top/center positioning.
+        pPrintWidth: 0,
+        pPrintHeight: 0,
+
+        pPosition: "top",           // "top" or "center"
+        pScale: 0.8,                // fraction of print area width the design occupies
+
         pTitle: "",
         pDescription: "",
         pPrice: "29.99",
@@ -153,11 +162,18 @@ function designer() {
         _stopLoading() {
             this.isLoading = false;
             this.loadingMsg = "";
+            // loadingStep is intentionally NOT cleared here — errors need it to know
+            // which section to display in. Clear it only when the error is dismissed.
         },
 
         _onError(msg) {
             this._stopLoading();
             this.error = msg;
+        },
+
+        dismissError() {
+            this.error = "";
+            this.loadingStep = 0;
         },
 
         _bgFormData() {
@@ -179,6 +195,7 @@ function designer() {
 
         async doBrainstorm() {
             if (this.isLoading || !this.theme.trim()) return;
+            this.loadingStep = 1;
             this._startLoading("Generating concepts...");
 
             // Reset everything below step 1
@@ -209,6 +226,7 @@ function designer() {
 
         async doGenerate() {
             if (this.isLoading || !this.editedConcept.trim()) return;
+            this.loadingStep = 3;
             this._startLoading("Building prompts...");
 
             this.variants = [];
@@ -249,6 +267,7 @@ function designer() {
         async doFinalize() {
             if (this.isLoading) return;
             const idx = this.selectedVariant ?? 0;
+            this.loadingStep = 4;
             this._startLoading("Generating 4K design...");
 
             const fd = this._bgFormData();
@@ -269,6 +288,7 @@ function designer() {
         async doRemoveVariantBg() {
             if (this.isLoading) return;
             const idx = this.selectedVariant ?? 0;
+            this.loadingStep = 4;
             this._startLoading("Removing background...");
 
             const fd = this._bgFormData();
@@ -289,6 +309,7 @@ function designer() {
 
         async doRemoveFinalBg() {
             if (this.isLoading) return;
+            this.loadingStep = 5;
             this._startLoading("Removing background...");
 
             await streamSSE("/remove-bg/final", this._bgFormData(), {
@@ -411,6 +432,8 @@ function designer() {
             this.pSizes = [];
             this.pSelectedColors = [];
             this.pSelectedSizes = [];
+            this.pPrintWidth = 0;
+            this.pPrintHeight = 0;
             this.printifyError = "";
 
             this.printifyStatus = "Loading print providers…";
@@ -433,6 +456,8 @@ function designer() {
             this.pSizes = [];
             this.pSelectedColors = [];
             this.pSelectedSizes = [];
+            this.pPrintWidth = 0;
+            this.pPrintHeight = 0;
             this.printifyError = "";
 
             this.printifyStatus = "Loading variants…";
@@ -444,6 +469,17 @@ function designer() {
             if (data.error) { this.printifyError = data.error; return; }
             this.pAllVariants = data;
 
+            // Extract the front print area dimensions from the first variant that has them.
+            // All variants for a blueprint+provider share the same print area dimensions.
+            for (const v of data) {
+                const front = (v.placeholders ?? []).find(p => p.position === "front");
+                if (front?.width && front?.height) {
+                    this.pPrintWidth = front.width;
+                    this.pPrintHeight = front.height;
+                    break;
+                }
+            }
+
             // Extract unique colors and sizes, preserving natural order from the API.
             const colors = [], sizes = [], seenC = new Set(), seenS = new Set();
             for (const v of data) {
@@ -454,9 +490,10 @@ function designer() {
             }
             this.pColors = colors;
             this.pSizes = sizes;
-            // Default: select all colors and sizes.
-            this.pSelectedColors = [...colors];
-            this.pSelectedSizes = [...sizes];
+            // Default: no colors selected; sizes default to S–2XL only.
+            this.pSelectedColors = [];
+            const defaultSizes = new Set(["S", "M", "L", "XL", "2XL", "XXL"]);
+            this.pSelectedSizes = sizes.filter(s => defaultSizes.has(s.toUpperCase()));
         },
 
         togglePColor(color) {
@@ -494,6 +531,19 @@ function designer() {
             const priceCents = Math.round(parseFloat(this.pPrice) * 100);
             if (!priceCents || priceCents < 1) { this.printifyError = "Enter a valid price."; return; }
 
+            // Calculate y so the design sits at the requested vertical position.
+            // x/y in Printify are the CENTER of the image as fractions of the print area.
+            // scale is the fraction of the print area WIDTH that the square design occupies.
+            // For a square design the displayed height = scale * printWidth pixels.
+            // To anchor the top of the design at y=0:  y_center = (scale * W) / (2 * H)
+            const scale = this.pScale;
+            let designY;
+            if (this.pPosition === "top" && this.pPrintWidth && this.pPrintHeight) {
+                designY = (scale * this.pPrintWidth) / (2 * this.pPrintHeight);
+            } else {
+                designY = 0.5;
+            }
+
             this.printifyBusy = true;
 
             const fd = new FormData();
@@ -506,6 +556,9 @@ function designer() {
             fd.append("description", this.pDescription.trim());
             fd.append("price_cents", priceCents);
             fd.append("publish_now", publishNow);
+            fd.append("design_x", 0.5);
+            fd.append("design_y", designY.toFixed(4));
+            fd.append("design_scale", scale);
 
             await streamSSE("/printify/publish", fd, {
                 status: (e) => { this.printifyStatus = e.message; },

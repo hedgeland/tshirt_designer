@@ -7,6 +7,31 @@
     <title>T-Shirt Design Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Base theme — processed by Tailwind Play CDN. @layer base has lower specificity
+         than utilities, so any explicit class (e.g. bg-slate-600) still wins. -->
+    <style type="text/tailwindcss">
+        @layer base {
+            /* All step cards and sidebar use the same dark card background. */
+            section {
+                @apply bg-slate-700;
+            }
+
+            /* Text inputs, textareas, and selects: light on dark. Exclude special inputs. */
+            input:not([type="color"]):not([type="range"]):not([type="radio"]):not([type="checkbox"]),
+            textarea,
+            select {
+                @apply bg-slate-100 text-slate-800;
+            }
+
+            /* Labels default to the light-on-dark sidebar/card color. The modal
+               overrides with explicit text-slate-500/700 classes where needed. */
+            label {
+                @apply text-slate-100;
+            }
+        }
+    </style>
+
     <style>
         [x-cloak] {
             display: none !important;
@@ -75,7 +100,7 @@
 
                     <!-- Background Color -->
                     <div>
-                        <label class="text-xs font-medium text-white block mb-1.5">Background color</label>
+                        <label class="text-xs font-medium block mb-1.5">Background color</label>
                         <p class="text-xs text-slate-300 mb-1">Default = <span @click="bgColor = '{{ bg_color }}'" class="underline cursor-pointer hover:text-white transition-colors">{{ bg_color }} ({{ bg_color_name }})</span></p>
                         <input type="color" x-model="bgColor"
                             class="block w-full h-9 rounded-md border border-slate-500">
@@ -93,7 +118,7 @@
                     ]">
                             <div>
                                 <div class="flex justify-between items-baseline mb-1">
-                                    <label class="text-xs font-medium text-white" x-text="slider.label"></label>
+                                    <label class="text-xs font-medium" x-text="slider.label"></label>
                                     <span class="text-xs font-semibold text-indigo-300"
                                         x-text="$data[slider.key]"></span>
                                 </div>
@@ -117,7 +142,7 @@
                         <div x-show="showPromptLog" x-transition>
                             <textarea readonly :value="promptLog" rows="10"
                                 placeholder="Prompts appear here after generating variants."
-                                class="w-full text-xs font-mono p-2 bg-slate-600 text-slate-100 border-t border-slate-500 resize-none focus:outline-none"></textarea>
+                                class="w-full text-xs font-mono p-2 bg-slate-800 text-slate-100 border-t border-slate-500 resize-none focus:outline-none"></textarea>
                         </div>
                     </div>
 
@@ -131,9 +156,9 @@
                         <div x-show="showPresets" x-transition class="border-t border-slate-500 p-3 space-y-3">
 
                             <div>
-                                <label class="text-xs font-medium text-white block mb-1">Active preset</label>
+                                <label class="text-xs font-medium block mb-1">Active preset</label>
                                 <select x-model="activePreset" @change="loadPreset(activePreset)"
-                                    class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 bg-slate-600 text-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                    class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                     <template x-for="name in presetNames" :key="name">
                                         <option :value="name" x-text="name"></option>
                                     </template>
@@ -141,25 +166,25 @@
                             </div>
 
                             <div>
-                                <label class="text-xs font-medium text-white block mb-1">Brainstorm prompt</label>
+                                <label class="text-xs font-medium block mb-1">Brainstorm prompt</label>
                                 <textarea x-model="conceptsTemplate" rows="5"
-                                    class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-600 text-white resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
+                                    class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
                             </div>
                             <div>
-                                <label class="text-xs font-medium text-white block mb-1">Variants prompt</label>
+                                <label class="text-xs font-medium block mb-1">Variants prompt</label>
                                 <textarea x-model="variantsTemplate" rows="5"
-                                    class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-600 text-white resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
+                                    class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
                             </div>
                             <div>
-                                <label class="text-xs font-medium text-white block mb-1">Style suffix</label>
+                                <label class="text-xs font-medium block mb-1">Style suffix</label>
                                 <textarea x-model="styleTemplate" rows="3"
-                                    class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-600 text-white resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
+                                    class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
                             </div>
 
                             <div class="flex gap-1.5 items-center">
                                 <input type="text" x-model="newPresetName" placeholder="New preset name"
                                     @keydown.enter="savePreset()"
-                                    class="flex-1 min-w-0 text-xs border border-slate-500 rounded-md px-2 py-1.5 bg-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                    class="flex-1 min-w-0 text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                 <button @click="savePreset()"
                                     class="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap">
                                     Save
@@ -186,11 +211,10 @@
                     <div class="flex gap-3 items-start">
                         <textarea x-model="theme" @keydown.enter.prevent="doBrainstorm()" rows="2"
                             placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
-                            class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
+                            class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
                         <button @click="doBrainstorm()" :disabled="isLoading"
                             class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                            <!-- Spinner shown only while brainstorming -->
-                            <svg x-show="isLoading && step === 1" class="animate-spin h-4 w-4 flex-shrink-0" fill="none"
+                            <svg x-show="isLoading && loadingStep === 1" class="animate-spin h-4 w-4 flex-shrink-0" fill="none"
                                 viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                     stroke-width="4" />
@@ -200,31 +224,25 @@
                             🧠 Brainstorm
                         </button>
                     </div>
+                    <div class="mt-3" x-show="loadingStep === 1 && (isLoading || error)">
+                        <div x-show="error" class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                            <span class="flex-shrink-0">⚠️</span>
+                            <span x-text="error" class="flex-1"></span>
+                            <button @click="dismissError()" class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                        </div>
+                        <div x-show="isLoading" class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                            <svg class="animate-spin h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            <span x-text="loadingMsg"></span>
+                        </div>
+                    </div>
                 </section>
-
-                <!-- Status / error banner -->
-                <div x-show="isLoading || error">
-                    <div x-show="error"
-                        class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-                        <span class="flex-shrink-0">⚠️</span>
-                        <span x-text="error" class="flex-1"></span>
-                        <button @click="error = ''"
-                            class="flex-shrink-0 text-red-400 hover:text-red-600 ml-2">✕</button>
-                    </div>
-                    <div x-show="isLoading"
-                        class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
-                        <svg class="animate-spin h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        <span x-text="loadingMsg"></span>
-                    </div>
-                </div>
 
                 <!-- Step 2: Pick a concept -->
                 <section x-show="step >= 2" x-transition
-                    class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                    class="bg-slate-700 rounded-xl border border-slate-200 shadow-sm p-5">
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">2 · Pick a concept
                     </h2>
                     <div class="space-y-2">
@@ -232,7 +250,7 @@
                             <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
                                 :class="selectedConcept === concept
                                    ? 'border-indigo-400 bg-indigo-50'
-                                   : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'">
+                                   : 'bg-slate-100 border-slate-300 hover:bg-white hover:border-slate-400'">
                                 <input type="radio" name="concept" :value="concept" @change="selectConcept(concept)"
                                     :checked="selectedConcept === concept"
                                     class="mt-0.5 accent-indigo-600 flex-shrink-0">
@@ -244,12 +262,12 @@
 
                 <!-- Step 3: Refine & Generate -->
                 <section x-show="step >= 3" x-transition
-                    class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                    class="bg-slate-700 rounded-xl border border-slate-200 shadow-sm p-5">
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">3 · Refine &amp;
                         generate</h2>
                     <div class="space-y-3">
                         <div>
-                            <label class="text-xs text-slate-500 block mb-1">Edit concept (optional)</label>
+                            <label class="text-xs block mb-1">Edit concept (optional)</label>
                             <textarea x-model="editedConcept" rows="2"
                                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
                         </div>
@@ -265,11 +283,25 @@
                             🎨 <span x-text="generateBtnLabel"></span>
                         </button>
                     </div>
+                    <div class="mt-3" x-show="loadingStep === 3 && (isLoading || error)">
+                        <div x-show="error" class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                            <span class="flex-shrink-0">⚠️</span>
+                            <span x-text="error" class="flex-1"></span>
+                            <button @click="dismissError()" class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                        </div>
+                        <div x-show="isLoading" class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                            <svg class="animate-spin h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            <span x-text="loadingMsg"></span>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- Step 4: Gallery -->
                 <section x-show="step >= 4" x-transition
-                    class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                    class="bg-slate-700 rounded-xl border border-slate-200 shadow-sm p-5">
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">
                         4 · Variants — click one to select for finalization
                     </h2>
@@ -304,15 +336,29 @@
                             ✨ Finalize selected at 4K
                         </button>
                         <button @click="doRemoveVariantBg()" :disabled="isLoading"
-                            class="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            class="px-4 py-2 bg-slate-500 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             ✂️ Remove BG from selected
                         </button>
+                    </div>
+                    <div class="mt-3" x-show="loadingStep === 4 && (isLoading || error)">
+                        <div x-show="error" class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                            <span class="flex-shrink-0">⚠️</span>
+                            <span x-text="error" class="flex-1"></span>
+                            <button @click="dismissError()" class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                        </div>
+                        <div x-show="isLoading" class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                            <svg class="animate-spin h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            <span x-text="loadingMsg"></span>
+                        </div>
                     </div>
                 </section>
 
                 <!-- Step 5: Final Design -->
                 <section x-show="step >= 5" x-transition
-                    class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                    class="rounded-xl border border-slate-200 shadow-sm p-5">
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">5 · Final Design (4K)
                     </h2>
                     <div class="max-w-sm space-y-4">
@@ -324,13 +370,27 @@
                                 ⬇ Download 4K PNG
                             </a>
                             <button @click="doRemoveFinalBg()" :disabled="isLoading"
-                                class="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                class="px-4 py-2 bg-slate-500 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                 ✂️ Remove BG
                             </button>
                             <button x-show="cfg.printifyEnabled" @click="openPrintify()"
                                 class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
                                 🖨 Publish to Printify
                             </button>
+                        </div>
+                        <div class="mt-3" x-show="loadingStep === 5 && (isLoading || error)">
+                            <div x-show="error" class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                                <span class="flex-shrink-0">⚠️</span>
+                                <span x-text="error" class="flex-1"></span>
+                                <button @click="dismissError()" class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                            </div>
+                            <div x-show="isLoading" class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                                <svg class="animate-spin h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                <span x-text="loadingMsg"></span>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -353,24 +413,6 @@
 
             <!-- Modal body (scrollable) -->
             <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-
-                <!-- Printify status / error -->
-                <div x-show="printifyError" class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-                    <span class="flex-shrink-0">⚠️</span>
-                    <span x-text="printifyError" class="flex-1"></span>
-                    <button @click="printifyError = ''" class="text-red-400 hover:text-red-600">✕</button>
-                </div>
-                <div x-show="printifyStatus && !printifyError" class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
-                    <svg class="animate-spin h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    <span x-text="printifyStatus"></span>
-                </div>
-                <div x-show="printifyDone" class="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700 space-y-1">
-                    <p class="font-semibold">✅ <span x-text="printifyDone?.published ? 'Published!' : 'Draft saved!'"></span></p>
-                    <a :href="printifyDone?.product_url" target="_blank" class="underline text-emerald-600 hover:text-emerald-800">Open in Printify →</a>
-                </div>
 
                 <!-- Shop selector (hidden when shop_id pre-configured) -->
                 <div x-show="!cfg.printifyShopId">
@@ -420,7 +462,11 @@
                 <div x-show="pColors.length > 0">
                     <div class="flex items-baseline justify-between mb-1.5">
                         <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Colors</label>
-                        <button @click="pSelectedColors = [...pColors]" class="text-xs text-indigo-500 hover:text-indigo-700">Select all</button>
+                        <div class="flex gap-2">
+                            <button @click="pSelectedColors = [...pColors]" class="text-xs text-indigo-500 hover:text-indigo-700">Select all</button>
+                            <span class="text-slate-300">·</span>
+                            <button @click="pSelectedColors = []" class="text-xs text-indigo-500 hover:text-indigo-700">Deselect all</button>
+                        </div>
                     </div>
                     <div class="flex flex-wrap gap-1.5">
                         <template x-for="color in pColors" :key="color">
@@ -438,7 +484,11 @@
                 <div x-show="pSizes.length > 0">
                     <div class="flex items-baseline justify-between mb-1.5">
                         <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sizes</label>
-                        <button @click="pSelectedSizes = [...pSizes]" class="text-xs text-indigo-500 hover:text-indigo-700">Select all</button>
+                        <div class="flex gap-2">
+                            <button @click="pSelectedSizes = [...pSizes]" class="text-xs text-indigo-500 hover:text-indigo-700">Select all</button>
+                            <span class="text-slate-300">·</span>
+                            <button @click="pSelectedSizes = []" class="text-xs text-indigo-500 hover:text-indigo-700">Deselect all</button>
+                        </div>
                     </div>
                     <div class="flex flex-wrap gap-1.5">
                         <template x-for="size in pSizes" :key="size">
@@ -451,6 +501,29 @@
                         </template>
                     </div>
                     <p class="text-xs text-slate-400 mt-1.5" x-text="selectedVariantCount + ' variant' + (selectedVariantCount === 1 ? '' : 's') + ' selected'"></p>
+                </div>
+
+                <!-- Design placement -->
+                <div x-show="pSizes.length > 0" class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Vertical Position</label>
+                            <select x-model="pPosition" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option value="top">Top</option>
+                                <option value="center">Center</option>
+                            </select>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-baseline mb-1.5">
+                                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Design Size</label>
+                                <span class="text-xs font-semibold text-indigo-500" x-text="Math.round(pScale * 100) + '%'"></span>
+                            </div>
+                            <input type="range" min="0.4" max="1.0" step="0.05" x-model.number="pScale"
+                                   class="w-full">
+                        </div>
+                    </div>
+                    <p x-show="pPrintWidth && pPrintHeight" class="text-xs text-slate-400"
+                       x-text="`Print area: ${pPrintWidth} × ${pPrintHeight} px`"></p>
                 </div>
 
                 <!-- Product details -->
@@ -476,16 +549,38 @@
                 </div>
             </div>
 
-            <!-- Modal footer -->
-            <div x-show="pSizes.length > 0" class="flex gap-3 px-6 py-4 border-t border-slate-200 flex-shrink-0">
-                <button @click="doPublish(false)" :disabled="printifyBusy || selectedVariantCount === 0"
-                        class="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                    Save as Draft
-                </button>
-                <button @click="doPublish(true)" :disabled="printifyBusy || selectedVariantCount === 0"
-                        class="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                    Publish to Store
-                </button>
+            <!-- Modal footer — status + action buttons, always visible (not in scrollable area) -->
+            <div class="border-t border-slate-200 flex-shrink-0">
+                <!-- Status / error / success — shown above buttons whenever active -->
+                <div x-show="printifyError || printifyStatus || printifyDone" class="px-6 pt-4 space-y-2">
+                    <div x-show="printifyError" class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                        <span class="flex-shrink-0">⚠️</span>
+                        <span x-text="printifyError" class="flex-1"></span>
+                        <button @click="printifyError = ''" class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                    </div>
+                    <div x-show="printifyStatus && !printifyError" class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                        <svg class="animate-spin h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                        <span x-text="printifyStatus"></span>
+                    </div>
+                    <div x-show="printifyDone" class="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700 space-y-1">
+                        <p class="font-semibold">✅ <span x-text="printifyDone?.published ? 'Published!' : 'Draft saved!'"></span></p>
+                        <a :href="printifyDone?.product_url" target="_blank" class="underline text-emerald-600 hover:text-emerald-800">Open in Printify →</a>
+                    </div>
+                </div>
+                <!-- Action buttons -->
+                <div x-show="pSizes.length > 0" class="flex gap-3 px-6 py-4">
+                    <button @click="doPublish(false)" :disabled="printifyBusy || selectedVariantCount === 0"
+                            class="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Save as Draft
+                    </button>
+                    <button @click="doPublish(true)" :disabled="printifyBusy || selectedVariantCount === 0"
+                            class="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Publish to Store
+                    </button>
+                </div>
             </div>
         </div>
     </div>

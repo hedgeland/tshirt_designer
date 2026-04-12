@@ -374,10 +374,14 @@ async def remove_variant_bg(
         idx = selected_idx if 0 <= selected_idx < len(images) else 0
         yield sse({"type": "status", "message": "Removing background..."})
 
-        result = await asyncio.to_thread(
-            remove_background_color, images[idx], bg_color,
-            tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
-        )
+        try:
+            result = await asyncio.to_thread(
+                remove_background_color, images[idx], bg_color,
+                tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
 
         updated = list(images)
         updated[idx] = result
@@ -412,10 +416,14 @@ async def remove_final_bg(
 
         yield sse({"type": "status", "message": "Removing background..."})
 
-        result = await asyncio.to_thread(
-            remove_background_color, final_img, bg_color,
-            tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
-        )
+        try:
+            result = await asyncio.to_thread(
+                remove_background_color, final_img, bg_color,
+                tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
         session["final_image"] = result
 
         if final_path:
@@ -533,6 +541,9 @@ async def printify_publish(
     description: str = Form(""),
     price_cents: int = Form(...),
     publish_now: bool = Form(False),
+    design_x: float = Form(0.5),
+    design_y: float = Form(0.5),
+    design_scale: float = Form(0.8),
 ):
     """Upload the session's final image to Printify and create (optionally publish) a product."""
     async def stream():
@@ -580,6 +591,9 @@ async def printify_publish(
                 image_id,
                 ids,
                 price_cents,
+                design_x,
+                design_y,
+                design_scale,
             )
         except Exception as e:
             yield sse({"type": "error", "message": f"Product creation failed: {e}"})
