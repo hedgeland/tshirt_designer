@@ -22,3 +22,7 @@ pyrightconfig.json
 
 # User prompt presets (machine-local, created by the app UI)
 prompt_presets.json
+
+# Gemini CLI config (not part of this codebase)
+.gemini/
+gemini.md
