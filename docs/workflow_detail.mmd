@@ -70,13 +70,58 @@ graph TD
     ReadyToFinalize --> ClickFinalize
     ReadyToPublish --> OpenPrintify
 
-    %% Styling
+    %% Subgraph styling
     style Auth fill:#fff3cd,stroke:#ffc107,stroke-dasharray: 5 5
     style Ideation fill:#d1e7dd,stroke:#198754
     style PromptBuild fill:#d1ecf1,stroke:#0dcaf0
     style VariantGen fill:#cfe2ff,stroke:#0d6efd
     style Finalization fill:#e2d9f3,stroke:#6f42c1
     style Publish fill:#ffe5d0,stroke:#fd7e14
-    style LoginError fill:#f8d7da,stroke:#dc3545
+
+    %% Decision nodes - amber
+    style AuthEnabled fill:#fff3cd,stroke:#ffc107
+    style AllowlistCheck fill:#fff3cd,stroke:#ffc107
+    style IdeationChoice fill:#fff3cd,stroke:#ffc107
+    style LoadPreset fill:#fff3cd,stroke:#ffc107
+    style VariantChoice fill:#fff3cd,stroke:#ffc107
+    style FinalChoice fill:#fff3cd,stroke:#ffc107
+    style PublishChoice fill:#fff3cd,stroke:#ffc107
+
+    %% API call nodes - blue
+    style OAuthRedirect fill:#cfe2ff,stroke:#0d6efd
+    style Brainstorm fill:#cfe2ff,stroke:#0d6efd
+    style ApplyPreset fill:#cfe2ff,stroke:#0d6efd
+    style BuildPrompts fill:#cfe2ff,stroke:#0d6efd
+    style RemoveBGVariant fill:#cfe2ff,stroke:#0d6efd
+    style Gen4K fill:#cfe2ff,stroke:#0d6efd
+    style RemoveBGFinal fill:#cfe2ff,stroke:#0d6efd
+    style SelectShop fill:#cfe2ff,stroke:#0d6efd
+    style SelectBlueprint fill:#cfe2ff,stroke:#0d6efd
+    style SelectProvider fill:#cfe2ff,stroke:#0d6efd
+    style SelectVariants fill:#cfe2ff,stroke:#0d6efd
+    style SetDetails fill:#cfe2ff,stroke:#0d6efd
+    style PublishNow fill:#cfe2ff,stroke:#0d6efd
+    style SaveDraft fill:#cfe2ff,stroke:#0d6efd
+
+    %% View/state nodes - gray
+    style ViewConcepts fill:#f8f9fa,stroke:#6c757d
+    style ViewVariants fill:#f8f9fa,stroke:#6c757d
+    style View4K fill:#f8f9fa,stroke:#6c757d
+
+    %% Terminal nodes - green
+    style PageLoad fill:#d1e7dd,stroke:#198754
+    style AppHome fill:#d1e7dd,stroke:#198754
+    style EnterTheme fill:#d1e7dd,stroke:#198754
+    style ConceptSelected fill:#d1e7dd,stroke:#198754
+    style ConceptIn fill:#d1e7dd,stroke:#198754
+    style GenImages fill:#d1e7dd,stroke:#198754
+    style RerenderVariants fill:#d1e7dd,stroke:#198754
+    style ReadyToFinalize fill:#d1e7dd,stroke:#198754
+    style ClickFinalize fill:#d1e7dd,stroke:#198754
+    style ReadyToPublish fill:#d1e7dd,stroke:#198754
+    style OpenPrintify fill:#d1e7dd,stroke:#198754
     style Done fill:#d1e7dd,stroke:#198754
     style Done2 fill:#d1e7dd,stroke:#198754
+
+    %% Error nodes - red
+    style LoginError fill:#f8d7da,stroke:#dc3545
