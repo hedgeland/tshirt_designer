@@ -129,6 +129,37 @@
                         </template>
                     </div>
 
+                    <!-- Generation options -->
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-xs font-medium block mb-1.5">Aspect ratio</label>
+                            <select x-model="aspectRatio"
+                                class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                <template x-for="r in cfg.aspectRatios" :key="r">
+                                    <option :value="r" x-text="r"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium block mb-1.5">Variant resolution</label>
+                            <select x-model="variantSize"
+                                class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                <template x-for="s in cfg.brainstormSizes" :key="s">
+                                    <option :value="s" x-text="s"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium block mb-1.5">Final resolution</label>
+                            <select x-model="finalSize"
+                                class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                <template x-for="s in cfg.finalSizes" :key="s">
+                                    <option :value="s" x-text="s"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
                     <p class="text-xs text-slate-100">Output: <code
                             class="bg-slate-600 px-1 rounded text-slate-200">{{ output_dir }}/</code></p>
 
@@ -645,7 +676,13 @@
             "variantsTemplate": {{ variants_template | tojson }},
             "styleTemplate": {{ style_template | tojson }},
             "printifyEnabled": {{ printify_enabled | tojson }},
-            "printifyShopId": {{ printify_shop_id | tojson }}
+            "printifyShopId": {{ printify_shop_id | tojson }},
+            "aspectRatios": {{ aspect_ratios | tojson }},
+            "defaultAspectRatio": {{ default_aspect_ratio | tojson }},
+            "brainstormSizes": {{ brainstorm_sizes | tojson }},
+            "defaultVariantSize": {{ brainstorm_size | tojson }},
+            "finalSizes": {{ final_sizes | tojson }},
+            "defaultFinalSize": {{ final_size | tojson }}
         }
     </script>
     <script src="/static/app.js"></script>
