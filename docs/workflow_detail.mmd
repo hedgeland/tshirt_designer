@@ -1,7 +1,7 @@
 graph TD
 
     %% 1. Auth
-    subgraph Auth [1. Auth - optional Google OAuth]
+    subgraph "1. Auth - optional Google OAuth"
         PageLoad([Page load]) --> AuthEnabled{GOOGLE_CLIENT_ID\nconfigured?}
         AuthEnabled -- No --> AppHome([App home])
         AuthEnabled -- Yes --> OAuthRedirect[Redirect to Google OAuth]
@@ -11,7 +11,7 @@ graph TD
     end
 
     %% 2. Ideation
-    subgraph Ideation [2. Ideation]
+    subgraph "2. Ideation"
         EnterTheme([Enter theme]) --> Brainstorm[POST /brainstorm\nGemini generates text concepts]
         Brainstorm --> ViewConcepts(View concept list)
         ViewConcepts --> IdeationChoice{Action?}
@@ -20,7 +20,7 @@ graph TD
     end
 
     %% 3. Prompt Building
-    subgraph PromptBuild [3. Prompt Building]
+    subgraph "3. Prompt Building"
         ConceptIn([Concept ready]) --> LoadPreset{Load preset?}
         LoadPreset -- Yes --> ApplyPreset[GET /presets/:name\nReplace template fields]
         LoadPreset -- No --> BuildPrompts
@@ -29,7 +29,7 @@ graph TD
     end
 
     %% 4. Variant Generation
-    subgraph VariantGen [4. Variant Generation]
+    subgraph "4. Variant Generation"
         ViewVariants(View N low-res variants) --> PickVariant[Pick a variant]
         PickVariant --> VariantChoice{Action?}
         VariantChoice -- "Remove BG" --> RemoveBGVariant[POST /remove-bg/variant\nUpdate variant in session]
@@ -39,7 +39,7 @@ graph TD
     end
 
     %% 5. Finalization
-    subgraph Finalize [5. Finalization]
+    subgraph "5. Finalization"
         ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize\nUpscale to 4K\nAuto-remove BG if variant had it]
         Gen4K --> View4K(View 4K image)
         View4K --> FinalChoice{Action?}
@@ -50,7 +50,7 @@ graph TD
     end
 
     %% 6. Publish
-    subgraph Publish [6. Publish - Printify]
+    subgraph "6. Publish - Printify"
         OpenPrintify([Open Printify panel]) --> SelectShop[GET /printify/shops\nSelect shop]
         SelectShop --> SelectBlueprint[GET /printify/blueprints\nSearch and select blueprint]
         SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers\nSelect print provider]
@@ -72,12 +72,6 @@ graph TD
     ReadyToPublish --> OpenPrintify
 
     %% Styling
-    style Auth fill:#fff9e6,stroke:#ffc107,stroke-dasharray: 5 5
-    style Ideation fill:#e9f7ef,stroke:#198754
-    style PromptBuild fill:#e8f4fd,stroke:#0d6efd
-    style VariantGen fill:#eef2ff,stroke:#4361ee
-    style Finalize fill:#f3e8ff,stroke:#6f42c1
-    style Publish fill:#fff3e8,stroke:#fd7e14
     style LoginError fill:#f8d7da,stroke:#dc3545
     style Done fill:#d1e7dd,stroke:#198754
     style Done2 fill:#d1e7dd,stroke:#198754
