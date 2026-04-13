@@ -43,8 +43,6 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
 
     Sending the reference alongside the prompt keeps the model from drifting to a new
     composition — it treats the variant as the target rather than starting from scratch.
-    aspect_ratio is omitted from ImageConfig here because the API rejects it when an
-    image part is present in the request (it infers the ratio from the input image).
     """
     client = get_client(api_key)
 
