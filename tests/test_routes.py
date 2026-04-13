@@ -88,17 +88,30 @@ def test_static_app_js_served():
 def test_index_config_contains_aspect_ratio_keys():
     response = client.get("/")
     assert response.status_code == 200
-    # Extract the app-config JSON block from the rendered HTML
     html = response.text
     start = html.index('id="app-config">') + len('id="app-config">')
     end = html.index("</script>", start)
     cfg = json.loads(html[start:end])
     assert "aspectRatios" in cfg
+    assert len(cfg["aspectRatios"]) == 14
+    assert "1:1" in cfg["aspectRatios"]
+    assert "16:9" in cfg["aspectRatios"]
     assert "defaultAspectRatio" in cfg
     assert cfg["defaultAspectRatio"] == "1:1"
     assert "brainstormSizes" in cfg
+    assert cfg["brainstormSizes"] == ["512", "1K", "2K"]
     assert "defaultVariantSize" in cfg
     assert cfg["defaultVariantSize"] == "512"
     assert "finalSizes" in cfg
+    assert cfg["finalSizes"] == ["1K", "2K", "4K"]
     assert "defaultFinalSize" in cfg
     assert cfg["defaultFinalSize"] == "4K"
+
+
+def test_analysis_final_returns_default_when_no_image():
+    """When no final image exists in session, endpoint returns full-frame bounds."""
+    response = client.get("/analysis/final", params={"session_id": "nonexistent-session"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["content_top"] == 0.0
+    assert data["content_bottom"] == 1.0

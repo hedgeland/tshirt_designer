@@ -22,12 +22,12 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 
 ## Resolution contract
 
-| Phase | Constant | Value |
-|---|---|---|
-| Brainstorm variants | `BRAINSTORM_SIZE` | `"1K"` (smallest available) |
-| Final approved design | `FINAL_SIZE` | `"4K"` |
+| Phase | Constant | Default value | User-selectable values |
+|---|---|---|---|
+| Brainstorm variants | `BRAINSTORM_SIZE` | `"512"` | `512`, `1K`, `2K` |
+| Final approved design | `FINAL_SIZE` | `"4K"` | `1K`, `2K`, `4K` |
 
-`ImageConfig.image_size` accepts `"1K"`, `"2K"`, or `"4K"` — no arbitrary pixel values. Always pass `size=BRAINSTORM_SIZE` during variant generation and `size=FINAL_SIZE` during finalization. Never hardcode these strings.
+`ImageConfig.image_size` accepts `"512"`, `"1K"`, `"2K"`, or `"4K"`. The defaults (`BRAINSTORM_SIZE`, `FINAL_SIZE`) are the starting values; the user can change them via sidebar dropdowns at runtime. Always reference these constants — never hardcode resolution strings.
 
 ## Architecture & Logic
 - **Logic Blueprint (overview):** `docs/workflow_overview.mmd`

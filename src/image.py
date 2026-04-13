@@ -5,7 +5,7 @@ import io
 from google.genai import types
 from PIL import Image
 
-from config import MODEL
+from config import DEFAULT_ASPECT_RATIO, MODEL
 from src.client import get_client
 
 
@@ -20,7 +20,7 @@ def _extract_image(response) -> Image.Image:
     raise RuntimeError("No image returned from model")
 
 
-def generate_image(prompt: str, api_key: str, size: str = "512", aspect_ratio: str = "1:1") -> Image.Image:
+def generate_image(prompt: str, api_key: str, size: str = "512", aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> Image.Image:
     client = get_client(api_key)
 
     response = client.models.generate_content(
@@ -38,7 +38,7 @@ def generate_image(prompt: str, api_key: str, size: str = "512", aspect_ratio: s
     return _extract_image(response)
 
 
-def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str = "4K", aspect_ratio: str = "1:1") -> Image.Image:
+def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str = "4K", aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> Image.Image:
     """Re-generate the approved variant at full resolution using the image as a visual anchor.
 
     Sending the reference alongside the prompt keeps the model from drifting to a new
@@ -68,6 +68,7 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
         ],
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE"],
+            # aspect_ratio is accepted by the API even when an image part is present — confirmed empirically
             image_config=types.ImageConfig(image_size=size, aspect_ratio=aspect_ratio),
         ),
     )
