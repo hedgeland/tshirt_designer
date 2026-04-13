@@ -63,25 +63,15 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
         contents=[
             types.Part(inline_data=types.Blob(data=buf.getvalue(), mime_type="image/png")),
             types.Part(text=(
-                f"Recreate this exact design at {size} resolution as a single square image (1:1 aspect ratio). "
-                f"Output one copy of the design only — do not tile or repeat it. "
+                f"Recreate this exact design at {size} resolution. "
                 f"Preserve the composition, color palette, style, and every visual element exactly. "
                 f"Original prompt for reference: {prompt}"
             )),
         ],
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE"],
-            # aspect_ratio omitted — invalid when an image part is present in the request.
-            image_config=types.ImageConfig(image_size=size),
+            image_config=types.ImageConfig(image_size=size, aspect_ratio="1:1"),
         ),
     )
 
-    img = _extract_image(response)
-
-    # Safety net: if the model ignored the square instruction and tiled the design
-    # side-by-side (width ≥ 1.5× height), crop to the left square — one clean copy.
-    w, h = img.size
-    if w >= h * 1.5:
-        img = img.crop((0, 0, h, h))
-
-    return img
+    return _extract_image(response)
