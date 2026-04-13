@@ -39,11 +39,11 @@ graph TD
 
     %% 5. Finalization
     subgraph Finalization [5. Finalization]
-        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize Upscale to 4K Auto-remove BG]
-        Gen4K --> View4K(View 4K image)
-        View4K --> FinalChoice{Action?}
+        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize Upscale to selected resolution Auto-remove BG]
+        Gen4K --> ViewFinal(View final image)
+        ViewFinal --> FinalChoice{Action?}
         FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final Update final in session]
-        RemoveBGFinal --> View4K
+        RemoveBGFinal --> ViewFinal
         FinalChoice -- "Re-finalize" --> ClickFinalize
         FinalChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
     end
@@ -106,7 +106,7 @@ graph TD
     %% View/state nodes - gray
     style ViewConcepts fill:#f8f9fa,stroke:#6c757d
     style ViewVariants fill:#f8f9fa,stroke:#6c757d
-    style View4K fill:#f8f9fa,stroke:#6c757d
+    style ViewFinal fill:#f8f9fa,stroke:#6c757d
 
     %% Terminal nodes - green
     style PageLoad fill:#d1e7dd,stroke:#198754
