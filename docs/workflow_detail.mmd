@@ -1,6 +1,6 @@
-flowchart TD
+graph TD
     %% 1. Auth
-    subgraph "1. Auth - optional Google OAuth"
+    subgraph Auth [1. Auth - optional Google OAuth]
         PageLoad([Page load]) --> AuthEnabled{GOOGLE_CLIENT_ID configured?}
         AuthEnabled -- No --> AppHome([App home])
         AuthEnabled -- Yes --> OAuthRedirect[Redirect to Google OAuth]
@@ -10,8 +10,8 @@ flowchart TD
     end
 
     %% 2. Ideation
-    subgraph "2. Ideation"
-        EnterTheme([Enter theme]) --> Brainstorm[POST /brainstorm - Gemini generates text concepts]
+    subgraph Ideation [2. Ideation]
+        EnterTheme([Enter theme]) --> Brainstorm[POST /brainstorm Gemini generates text concepts]
         Brainstorm --> ViewConcepts(View concept list)
         ViewConcepts --> IdeationChoice{Action?}
         IdeationChoice -- "Pick / edit concept" --> ConceptSelected([Concept selected])
@@ -19,45 +19,45 @@ flowchart TD
     end
 
     %% 3. Prompt Building
-    subgraph "3. Prompt Building"
+    subgraph PromptBuild [3. Prompt Building]
         ConceptIn([Concept ready]) --> LoadPreset{Load preset?}
-        LoadPreset -- Yes --> ApplyPreset[GET /presets/:name - Replace template fields]
+        LoadPreset -- Yes --> ApplyPreset[GET /presets/:name Replace template fields]
         LoadPreset -- No --> BuildPrompts
-        ApplyPreset --> BuildPrompts[POST /generate - Build N variant prompts]
+        ApplyPreset --> BuildPrompts[POST /generate Build N variant prompts]
         BuildPrompts --> GenImages([Generate N low-res images])
     end
 
     %% 4. Variant Generation
-    subgraph "4. Variant Generation"
+    subgraph VariantGen [4. Variant Generation]
         ViewVariants(View N low-res variants) --> PickVariant[Pick a variant]
         PickVariant --> VariantChoice{Action?}
-        VariantChoice -- "Remove BG" --> RemoveBGVariant[POST /remove-bg/variant - Update variant in session]
+        VariantChoice -- "Remove BG" --> RemoveBGVariant[POST /remove-bg/variant Update variant in session]
         RemoveBGVariant --> ViewVariants
         VariantChoice -- "Rerender" --> RerenderVariants([Back to Prompt Building])
         VariantChoice -- "Finalize" --> ReadyToFinalize([Proceed to Finalization])
     end
 
     %% 5. Finalization
-    subgraph "5. Finalization"
-        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize - Upscale to 4K - Auto-remove BG if variant had it]
+    subgraph Finalization [5. Finalization]
+        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize Upscale to 4K Auto-remove BG]
         Gen4K --> View4K(View 4K image)
         View4K --> FinalChoice{Action?}
-        FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final - Update final in session]
+        FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final Update final in session]
         RemoveBGFinal --> View4K
         FinalChoice -- "Re-finalize" --> ClickFinalize
         FinalChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
     end
 
     %% 6. Publish
-    subgraph "6. Publish - Printify"
-        OpenPrintify([Open Printify panel]) --> SelectShop[GET /printify/shops - Select shop]
-        SelectShop --> SelectBlueprint[GET /printify/blueprints - Search and select blueprint]
-        SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers - Select print provider]
-        SelectProvider --> SelectVariants[GET /printify/blueprints/:blueprint_id/providers/:provider_id/variants - Select colors and sizes]
-        SelectVariants --> SetDetails[Set title / description / price - Adjust position and scale]
+    subgraph Publish [6. Publish - Printify]
+        OpenPrintify([Open Printify panel]) --> SelectShop[GET /printify/shops Select shop]
+        SelectShop --> SelectBlueprint[GET /printify/blueprints Select blueprint]
+        SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers Select provider]
+        SelectProvider --> SelectVariants[GET /variants Select colors and sizes]
+        SelectVariants --> SetDetails[Set details Adjust position and scale]
         SetDetails --> PublishChoice{Publish now?}
-        PublishChoice -- Yes --> PublishNow[POST /printify/publish - Upload image / create product / publish]
-        PublishChoice -- No --> SaveDraft[POST /printify/publish publish_now=false - Upload image / create draft]
+        PublishChoice -- Yes --> PublishNow[POST /printify/publish Upload and publish]
+        PublishChoice -- No --> SaveDraft[POST /printify/publish Upload and draft]
         PublishNow --> Done([Product live in store])
         SaveDraft --> Done2([Product saved as draft])
     end
