@@ -238,7 +238,7 @@ function designer() {
             this.prompts = [];
             this.selectedVariant = null;
             this.finalUrl = null;
-            this.step = 2;  // show Step 2 so the direct mode badge is visible
+            this.step = 2;  // step >= 2 satisfies the directMode badge condition; doGenerate() will advance to 3
             await this.doGenerate();
         },
 
