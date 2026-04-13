@@ -1,7 +1,7 @@
 graph TD
 
-    %% ── 1. Auth ──────────────────────────────────────────────────────────────
-    subgraph Auth [1. Auth — optional Google OAuth]
+    %% 1. Auth
+    subgraph Auth [1. Auth - optional Google OAuth]
         PageLoad([Page load]) --> AuthEnabled{GOOGLE_CLIENT_ID\nconfigured?}
         AuthEnabled -- No --> AppHome([App home])
         AuthEnabled -- Yes --> OAuthRedirect[Redirect to Google OAuth]
@@ -10,7 +10,7 @@ graph TD
         AllowlistCheck -- Yes --> AppHome
     end
 
-    %% ── 2. Ideation ──────────────────────────────────────────────────────────
+    %% 2. Ideation
     subgraph Ideation [2. Ideation]
         EnterTheme([Enter theme]) --> Brainstorm[POST /brainstorm\nGemini generates text concepts]
         Brainstorm --> ViewConcepts(View concept list)
@@ -19,7 +19,7 @@ graph TD
         IdeationChoice -- "New theme" --> EnterTheme
     end
 
-    %% ── 3. Prompt Building ───────────────────────────────────────────────────
+    %% 3. Prompt Building
     subgraph PromptBuild [3. Prompt Building]
         ConceptIn([Concept ready]) --> LoadPreset{Load preset?}
         LoadPreset -- Yes --> ApplyPreset[GET /presets/:name\nReplace template fields]
@@ -28,7 +28,7 @@ graph TD
         BuildPrompts --> GenImages([Generate N low-res images])
     end
 
-    %% ── 4. Variant Generation ────────────────────────────────────────────────
+    %% 4. Variant Generation
     subgraph VariantGen [4. Variant Generation]
         ViewVariants(View N low-res variants) --> PickVariant[Pick a variant]
         PickVariant --> VariantChoice{Action?}
@@ -38,7 +38,7 @@ graph TD
         VariantChoice -- "Finalize" --> ReadyToFinalize([Proceed to Finalization])
     end
 
-    %% ── 5. Finalization ──────────────────────────────────────────────────────
+    %% 5. Finalization
     subgraph Finalize [5. Finalization]
         ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize\nUpscale to 4K\nAuto-remove BG if variant had it]
         Gen4K --> View4K(View 4K image)
@@ -49,21 +49,21 @@ graph TD
         FinalChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
     end
 
-    %% ── 6. Publish ───────────────────────────────────────────────────────────
-    subgraph Publish [6. Publish — Printify]
+    %% 6. Publish
+    subgraph Publish [6. Publish - Printify]
         OpenPrintify([Open Printify panel]) --> SelectShop[GET /printify/shops\nSelect shop]
-        SelectShop --> SelectBlueprint[GET /printify/blueprints\nSearch & select blueprint]
+        SelectShop --> SelectBlueprint[GET /printify/blueprints\nSearch and select blueprint]
         SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers\nSelect print provider]
-        SelectProvider --> SelectVariants[GET /printify/blueprints/:blueprint_id/providers/:provider_id/variants\nSelect colors & sizes]
-        SelectVariants --> SetDetails[Set title · description · price\nAdjust position & scale]
+        SelectProvider --> SelectVariants[GET /printify/blueprints/:blueprint_id/providers/:provider_id/variants\nSelect colors and sizes]
+        SelectVariants --> SetDetails[Set title / description / price\nAdjust position and scale]
         SetDetails --> PublishChoice{Publish now?}
-        PublishChoice -- Yes --> PublishNow[POST /printify/publish\nUpload image · create product · publish]
-        PublishChoice -- No --> SaveDraft[POST /printify/publish\n(publish_now=false)\nUpload image · create draft]
+        PublishChoice -- Yes --> PublishNow[POST /printify/publish\nUpload image / create product / publish]
+        PublishChoice -- No --> SaveDraft[POST /printify/publish\n(publish_now=false)\nUpload image / create draft]
         PublishNow --> Done([Product live in store])
         SaveDraft --> Done2([Product saved as draft])
     end
 
-    %% ── Phase transitions ────────────────────────────────────────────────────
+    %% Phase transitions
     AppHome --> EnterTheme
     ConceptSelected --> ConceptIn
     GenImages --> ViewVariants
@@ -71,7 +71,7 @@ graph TD
     ReadyToFinalize --> ClickFinalize
     ReadyToPublish --> OpenPrintify
 
-    %% ── Styling ──────────────────────────────────────────────────────────────
+    %% Styling
     style Auth fill:#fff9e6,stroke:#ffc107,stroke-dasharray: 5 5
     style Ideation fill:#e9f7ef,stroke:#198754
     style PromptBuild fill:#e8f4fd,stroke:#0d6efd
