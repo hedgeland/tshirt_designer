@@ -3,11 +3,11 @@ graph TD
     %% ── 1. Auth ──────────────────────────────────────────────────────────────
     subgraph Auth [1. Auth — optional Google OAuth]
         PageLoad([Page load]) --> AuthEnabled{GOOGLE_CLIENT_ID\nconfigured?}
-        AuthEnabled -- No --> AppHome
+        AuthEnabled -- No --> AppHome([App home])
         AuthEnabled -- Yes --> OAuthRedirect[Redirect to Google OAuth]
         OAuthRedirect --> AllowlistCheck{Email in\nALLOWED_EMAILS?}
         AllowlistCheck -- No --> LoginError([Show login error])
-        AllowlistCheck -- Yes --> AppHome([App home])
+        AllowlistCheck -- Yes --> AppHome
     end
 
     %% ── 2. Ideation ──────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ graph TD
 
     %% ── 3. Prompt Building ───────────────────────────────────────────────────
     subgraph PromptBuild [3. Prompt Building]
-        ConceptIn([Concept + templates]) --> LoadPreset{Load preset?}
+        ConceptIn([Concept ready]) --> LoadPreset{Load preset?}
         LoadPreset -- Yes --> ApplyPreset[GET /presets/:name\nReplace template fields]
         LoadPreset -- No --> BuildPrompts
         ApplyPreset --> BuildPrompts[POST /generate\nBuild N variant prompts]
@@ -45,7 +45,7 @@ graph TD
         View4K --> FinalChoice{Action?}
         FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final\nUpdate final in session]
         RemoveBGFinal --> View4K
-        FinalChoice -- "Re-finalize\n(edit prompt)" --> ClickFinalize
+        FinalChoice -- "Re-finalize" --> ClickFinalize
         FinalChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
     end
 
@@ -54,11 +54,11 @@ graph TD
         OpenPrintify([Open Printify panel]) --> SelectShop[GET /printify/shops\nSelect shop]
         SelectShop --> SelectBlueprint[GET /printify/blueprints\nSearch & select blueprint]
         SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers\nSelect print provider]
-        SelectProvider --> SelectVariants[GET /printify/blueprints/:id/providers/:id/variants\nSelect colors & sizes]
+        SelectProvider --> SelectVariants[GET /printify/blueprints/:blueprint_id/providers/:provider_id/variants\nSelect colors & sizes]
         SelectVariants --> SetDetails[Set title · description · price\nAdjust position & scale]
         SetDetails --> PublishChoice{Publish now?}
         PublishChoice -- Yes --> PublishNow[POST /printify/publish\nUpload image · create product · publish]
-        PublishChoice -- No --> SaveDraft[POST /printify/publish\nUpload image · create product draft]
+        PublishChoice -- No --> SaveDraft[POST /printify/publish\n(publish_now=false)\nUpload image · create draft]
         PublishNow --> Done([Product live in store])
         SaveDraft --> Done2([Product saved as draft])
     end
