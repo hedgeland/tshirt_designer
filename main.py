@@ -15,12 +15,17 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from config import (
     ALLOWED_EMAILS,
+    ASPECT_RATIOS,
     BG_REMOVAL_TOLERANCE,
     BRAINSTORM_SIZE,
+    BRAINSTORM_SIZES,
+    DEFAULT_ASPECT_RATIO,
     DEFAULT_BG_COLOR,
     DEFAULT_BG_COLOR_NAME,
     EDGE_DECONTAMINATE,
     EDGE_ERODE_PX,
+    FINAL_SIZE,
+    FINAL_SIZES,
     GOOGLE_API_KEY,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
@@ -33,7 +38,7 @@ from config import (
     SECRET_KEY,
 )
 from src import presets, printify
-from src.background import remove_background_color
+from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
 from src.finalize import finalize_design
 from src.image import generate_image
@@ -178,6 +183,12 @@ async def index(request: Request):
         "style_template": builtin["style_suffix"],
         "printify_enabled": bool(PRINTIFY_TOKEN),
         "printify_shop_id": PRINTIFY_SHOP_ID,
+        "aspect_ratios": ASPECT_RATIOS,
+        "default_aspect_ratio": DEFAULT_ASPECT_RATIO,
+        "brainstorm_sizes": BRAINSTORM_SIZES,
+        "brainstorm_size": BRAINSTORM_SIZE,
+        "final_sizes": FINAL_SIZES,
+        "final_size": FINAL_SIZE,
     })
 
 
@@ -232,6 +243,8 @@ async def generate(
     max_colors: int = Form(...),
     variants_template: str = Form(...),
     style_template: str = Form(...),
+    variant_size: str = Form(BRAINSTORM_SIZE),
+    aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
 ):
     async def stream():
         if not GOOGLE_API_KEY:
@@ -267,7 +280,7 @@ async def generate(
             if i > 0:
                 yield sse({"type": "status", "message": f"Generating variant {i + 1} of {num_variants}..."})
             try:
-                img = await asyncio.to_thread(generate_image, prompt, GOOGLE_API_KEY, size=BRAINSTORM_SIZE)
+                img = await asyncio.to_thread(generate_image, prompt, GOOGLE_API_KEY, size=variant_size, aspect_ratio=aspect_ratio)
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
                 return
@@ -309,6 +322,8 @@ async def finalize(
     bg_tolerance: int = Form(...),
     edge_erode: int = Form(...),
     decontaminate: int = Form(...),
+    final_size: str = Form(FINAL_SIZE),
+    aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
 ):
     async def stream():
         session = get_session(session_id)
@@ -328,7 +343,8 @@ async def finalize(
 
         try:
             final_img = await asyncio.to_thread(
-                finalize_design, prompts[idx], variant, GOOGLE_API_KEY
+                finalize_design, prompts[idx], variant, GOOGLE_API_KEY,
+                size=final_size, aspect_ratio=aspect_ratio,
             )
         except Exception as e:
             yield sse({"type": "error", "message": str(e)})
@@ -433,6 +449,23 @@ async def remove_final_bg(
         yield sse({"type": "final_updated", "url": url})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ── Image analysis endpoints ──────────────────────────────────────────────────
+
+@app.get("/analysis/final")
+async def analyze_final(session_id: str):
+    """Return content bounding box of the final image for Printify placement.
+
+    Fractions of image height: content_top is the first row with a visible pixel,
+    content_bottom is the last. A fully opaque image returns (0.0, 1.0).
+    """
+    session = get_session(session_id)
+    final_img = session.get("final_image")
+    if final_img is None:
+        return {"content_top": 0.0, "content_bottom": 1.0}
+    top, bottom = await asyncio.to_thread(content_bounds, final_img)
+    return {"content_top": top, "content_bottom": bottom}
 
 
 # ── Preset endpoints ──────────────────────────────────────────────────────────

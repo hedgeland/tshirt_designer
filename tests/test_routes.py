@@ -81,3 +81,23 @@ def test_static_app_js_served():
     response = client.get("/static/app.js")
     assert response.status_code == 200
     assert "designer" in response.text
+
+
+def test_index_config_contains_aspect_ratio_keys():
+    import json
+    response = client.get("/")
+    assert response.status_code == 200
+    # Extract the app-config JSON block from the rendered HTML
+    html = response.text
+    start = html.index('id="app-config">') + len('id="app-config">')
+    end = html.index("</script>", start)
+    cfg = json.loads(html[start:end])
+    assert "aspectRatios" in cfg
+    assert "defaultAspectRatio" in cfg
+    assert cfg["defaultAspectRatio"] == "1:1"
+    assert "brainstormSizes" in cfg
+    assert "defaultVariantSize" in cfg
+    assert cfg["defaultVariantSize"] == "512"
+    assert "finalSizes" in cfg
+    assert "defaultFinalSize" in cfg
+    assert cfg["defaultFinalSize"] == "4K"
