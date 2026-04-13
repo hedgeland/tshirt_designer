@@ -38,7 +38,20 @@ PRINTIFY_TOKEN = os.getenv("PRINTIFY_TOKEN", "")
 PRINTIFY_SHOP_ID = os.getenv("PRINTIFY_SHOP_ID", "")
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 
+# Aspect ratio options supported by the Gemini 3.1 Flash Image Preview model.
+# The last four are model-specific extras not available in standard Imagen.
+ASPECT_RATIOS = [
+    "1:1", "3:2", "2:3", "3:4", "4:3", "4:5", "5:4",
+    "9:16", "16:9", "21:9",
+    "1:4", "4:1", "1:8", "8:1",
+]
+DEFAULT_ASPECT_RATIO = "1:1"
+
 # Two-phase resolution: fast previews during exploration, full quality on approval.
-# ImageConfig.image_size accepts "1K", "2K", or "4K" — no arbitrary pixel values.
-BRAINSTORM_SIZE = "1K"  # smallest available; fast previews during variant exploration
-FINAL_SIZE = "4K"       # full quality for approved final design
+# BRAINSTORM_SIZE / FINAL_SIZE are the defaults passed to the frontend as starting values;
+# the actual API call values come from user-submitted form fields.
+BRAINSTORM_SIZES = ["512", "1K", "2K"]
+BRAINSTORM_SIZE = "512"   # 512px is enough for concept evaluation — saves tokens vs "1K"
+
+FINAL_SIZES = ["1K", "2K", "4K"]
+FINAL_SIZE = "4K"         # full quality for approved final design
