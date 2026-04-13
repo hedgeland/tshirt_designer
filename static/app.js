@@ -79,6 +79,9 @@ function designer() {
         edgeErode: cfg.edgeErode,
         decontaminate: cfg.decontaminate,
         maxColors: cfg.maxColors,
+        aspectRatio: cfg.defaultAspectRatio,
+        variantSize: cfg.defaultVariantSize,
+        finalSize: cfg.defaultFinalSize,
 
         // ── Preset management ──────────────────────────────────────────────
         presetNames: cfg.presetNames,
@@ -262,6 +265,8 @@ function designer() {
             fd.append("max_colors", this.maxColors);
             fd.append("variants_template", this.variantsTemplate);
             fd.append("style_template", this.styleTemplate);
+            fd.append("aspect_ratio", this.aspectRatio);
+            fd.append("variant_size", this.variantSize);
 
             await streamSSE("/generate", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
@@ -290,6 +295,8 @@ function designer() {
 
             const fd = this._bgFormData();
             fd.append("selected_idx", idx);
+            fd.append("aspect_ratio", this.aspectRatio);
+            fd.append("final_size", this.finalSize);
 
             await streamSSE("/finalize", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
