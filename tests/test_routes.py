@@ -4,6 +4,8 @@ Auth is bypassed automatically when GOOGLE_CLIENT_ID is not set (the default
 in test environments), so no OAuth mocking is required.
 """
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -84,7 +86,6 @@ def test_static_app_js_served():
 
 
 def test_index_config_contains_aspect_ratio_keys():
-    import json
     response = client.get("/")
     assert response.status_code == 200
     # Extract the app-config JSON block from the rendered HTML

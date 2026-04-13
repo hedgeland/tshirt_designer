@@ -339,7 +339,7 @@ async def finalize(
         variant = images[idx]
         bg_was_removed = _has_transparency(variant)
 
-        yield sse({"type": "status", "message": "Generating 4K design..."})
+        yield sse({"type": "status", "message": f"Generating {final_size} design..."})
 
         try:
             final_img = await asyncio.to_thread(
