@@ -29,7 +29,11 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 
 `ImageConfig.image_size` accepts `"1K"`, `"2K"`, or `"4K"` — no arbitrary pixel values. Always pass `size=BRAINSTORM_SIZE` during variant generation and `size=FINAL_SIZE` during finalization. Never hardcode these strings.
 
-## Architecture
+## Architecture & Logic
+- **Logic Blueprint (overview):** `docs/workflow_overview.mmd`
+- **Logic Blueprint (detail):** `docs/workflow_detail.mmd`
+- **Rule:** All logic changes must be updated in the Mermaid file before implementation.
+- **State Management:** Refer to the Mermaid flow for transition states (e.g., `LR_Choice`, `4K_Choice`).
 
 ### Root
 - `main.py` — FastAPI app: routes, SSE streaming, session store, static file serving
