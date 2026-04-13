@@ -249,7 +249,8 @@
                     class="bg-slate-700 rounded-xl border border-slate-200 shadow-sm p-5">
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">2 · Pick a concept
                     </h2>
-                    <div class="space-y-2">
+                    <!-- Brainstorm mode: radio list of generated concepts -->
+                    <div x-show="!directMode" class="space-y-2">
                         <template x-for="concept in concepts" :key="concept">
                             <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
                                 :class="selectedConcept === concept
@@ -261,6 +262,11 @@
                                 <span x-text="concept" class="text-sm text-slate-700 leading-snug"></span>
                             </label>
                         </template>
+                    </div>
+                    <!-- Direct mode: indicator badge -->
+                    <div x-show="directMode" class="flex items-center gap-2 px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-sm text-slate-300">
+                        <span>🎨</span>
+                        <span>Direct mode — generating from your prompt as-is.</span>
                     </div>
                 </section>
 
