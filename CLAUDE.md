@@ -32,7 +32,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 ## Architecture & Logic
 - **Logic Blueprint (overview):** `docs/workflow_overview.mmd`
 - **Logic Blueprint (detail):** `docs/workflow_detail.mmd`
-- **Rule:** All logic changes must be updated in the Mermaid file before implementation.
+- **Rule:** All logic changes must be updated in the Mermaid files before implementation.
 - **State Management:** Refer to the Mermaid flow for transition states (e.g., `LR_Choice`, `4K_Choice`).
 
 ### Root
