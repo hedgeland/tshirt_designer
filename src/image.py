@@ -20,7 +20,7 @@ def _extract_image(response) -> Image.Image:
     raise RuntimeError("No image returned from model")
 
 
-def generate_image(prompt: str, api_key: str, size: str = "1K") -> Image.Image:
+def generate_image(prompt: str, api_key: str, size: str = "512", aspect_ratio: str = "1:1") -> Image.Image:
     client = get_client(api_key)
 
     response = client.models.generate_content(
@@ -29,8 +29,8 @@ def generate_image(prompt: str, api_key: str, size: str = "1K") -> Image.Image:
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE"],  # text-only response modality is excluded
             image_config=types.ImageConfig(
-                image_size=size,    # "1K", "2K", or "4K" — no arbitrary pixel values
-                aspect_ratio="1:1", # always square — t-shirt designs center better this way
+                image_size=size,
+                aspect_ratio=aspect_ratio,
             ),
         ),
     )
@@ -38,7 +38,7 @@ def generate_image(prompt: str, api_key: str, size: str = "1K") -> Image.Image:
     return _extract_image(response)
 
 
-def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str = "4K") -> Image.Image:
+def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str = "4K", aspect_ratio: str = "1:1") -> Image.Image:
     """Re-generate the approved variant at full resolution using the image as a visual anchor.
 
     Sending the reference alongside the prompt keeps the model from drifting to a new
@@ -70,7 +70,7 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
         ],
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE"],
-            image_config=types.ImageConfig(image_size=size, aspect_ratio="1:1"),
+            image_config=types.ImageConfig(image_size=size, aspect_ratio=aspect_ratio),
         ),
     )
 
