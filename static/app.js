@@ -61,6 +61,7 @@ function designer() {
         selectedVariant: null,
         finalUrl: null,
         finalTs: 0,
+        directMode: false,     // true when user skips brainstorm and generates directly
 
         // ── UI state ───────────────────────────────────────────────────────
         isLoading: false,
@@ -120,6 +121,7 @@ function designer() {
 
         pPosition: "top",           // "top" or "center"
         pScale: 0.8,                // fraction of print area width the design occupies
+        pContentTop: 0,             // fraction of image height above first visible pixel (for gap correction)
 
         pTitle: "",
         pDescription: "",
@@ -199,6 +201,7 @@ function designer() {
             this._startLoading("Generating concepts...");
 
             // Reset everything below step 1
+            this.directMode = false;
             this.concepts = [];
             this.selectedConcept = null;
             this.editedConcept = "";
@@ -222,6 +225,21 @@ function designer() {
                 },
                 error: (e) => { this._onError(e.message); },
             });
+        },
+
+        async doGenerateDirect() {
+            if (this.isLoading || !this.theme.trim()) return;
+            // Skip brainstorm — use the theme text as the concept directly
+            this.directMode = true;
+            this.concepts = [];
+            this.selectedConcept = null;
+            this.editedConcept = this.theme.trim();
+            this.variants = [];
+            this.prompts = [];
+            this.selectedVariant = null;
+            this.finalUrl = null;
+            this.step = 2;  // show Step 2 so the direct mode badge is visible
+            await this.doGenerate();
         },
 
         async doGenerate() {
@@ -384,8 +402,19 @@ function designer() {
             this.pSizes = [];
             this.pSelectedColors = [];
             this.pSelectedSizes = [];
+            this.pContentTop = 0;
             this.pTitle = this.theme || "Custom T-Shirt";
             this.showPrintify = true;
+
+            // Fetch content bounds from the final image alpha channel so we can
+            // shift the Y position to align the subject's top with the print area top.
+            // Non-critical — runs in parallel, falls back to 0 on any error.
+            if (this.finalUrl) {
+                fetch(`/analysis/final?session_id=${encodeURIComponent(this.sessionId)}`)
+                    .then(r => r.json())
+                    .then(data => { this.pContentTop = data.content_top ?? 0; })
+                    .catch(() => {});
+            }
 
             // Load shops (skip if shop ID already configured server-side).
             if (!cfg.printifyShopId && this.pShops.length === 0) {
@@ -535,11 +564,18 @@ function designer() {
             // x/y in Printify are the CENTER of the image as fractions of the print area.
             // scale is the fraction of the print area WIDTH that the square design occupies.
             // For a square design the displayed height = scale * printWidth pixels.
-            // To anchor the top of the design at y=0:  y_center = (scale * W) / (2 * H)
+            //
+            // Without transparency: y_center = (scale * W) / (2 * H) anchors image top at y=0.
+            // With transparency: pContentTop is the fraction of the image height above the first
+            // visible pixel. Shifting up by that amount anchors the SUBJECT top at y=0 instead,
+            // eliminating the visible gap from empty space at the top of the image.
+            //   y_center = scale * W * (0.5 - contentTop) / H
             const scale = this.pScale;
+            const contentTop = this.pContentTop;
             let designY;
             if (this.pPosition === "top" && this.pPrintWidth && this.pPrintHeight) {
-                designY = (scale * this.pPrintWidth) / (2 * this.pPrintHeight);
+                designY = scale * this.pPrintWidth * (0.5 - contentTop) / this.pPrintHeight;
+                designY = Math.max(0.01, designY); // don't push the image fully off the top
             } else {
                 designY = 0.5;
             }
