@@ -176,6 +176,29 @@ def _decontaminate_edges(
     return Image.fromarray(arr.astype(np.uint8), "RGBA")
 
 
+def content_bounds(image: Image.Image) -> tuple[float, float]:
+    """Return (top, bottom) as fractions of image height for non-transparent content.
+
+    Used to compute Printify design_y so that empty transparent space above the
+    subject doesn't create a visible gap at the top of the print area.
+    Returns (0.0, 1.0) if the image is fully opaque or has no opaque pixels.
+    """
+    arr = np.array(image.convert("RGBA"))
+    alpha = arr[:, :, 3]
+
+    if alpha.min() == 255:          # no transparency — content fills the image
+        return (0.0, 1.0)
+
+    non_transparent = np.any(alpha > 0, axis=1)  # rows containing any visible pixel
+
+    if not non_transparent.any():   # fully transparent — shouldn't happen, but safe
+        return (0.0, 1.0)
+
+    h = arr.shape[0]
+    rows = np.where(non_transparent)[0]
+    return (float(rows[0]) / h, float(rows[-1]) / h)
+
+
 def _erode_alpha(img: Image.Image, pixels: int) -> Image.Image:
     """Shrink the alpha mask inward by `pixels` to clip the residual fringe ring.
 
