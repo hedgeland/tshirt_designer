@@ -56,11 +56,14 @@ function designer() {
         concepts: [],
         selectedConcept: null,
         editedConcept: "",
-        variants: [],          // [{url, ts}] — ts is Date.now() for cache-busting
+        variants: [],          // [{url, origUrl, noBgUrl, ts}]
         prompts: [],
         selectedVariant: null,
         finalUrl: null,
         finalTs: 0,
+        finalizedSize: "",  // resolution the final image was actually generated at
+        _origFinalUrl: null,
+        _noBgFinalUrl: null,
         directMode: false,     // true when user skips brainstorm and generates directly
 
         // ── UI state ───────────────────────────────────────────────────────
@@ -132,6 +135,8 @@ function designer() {
 
         // ── Lifecycle ──────────────────────────────────────────────────────
         init() {
+            this.$nextTick(() => this.$refs.themeInput.focus());
+
             // Warn before unload if the user has typed a theme — reloading would
             // clear both the textarea and all server-side session state (images, concepts).
             window.addEventListener('beforeunload', (e) => {
@@ -146,6 +151,15 @@ function designer() {
         get generateBtnLabel() {
             const n = this.numVariants;
             return `Generate ${n} ${n === 1 ? "Variant" : "Variants"}`;
+        },
+
+        get selectedVariantObj() {
+            return this.variants[this.selectedVariant ?? 0];
+        },
+
+        // Derived from URL comparison — no separate flag needed.
+        get finalBgRemoved() {
+            return this._noBgFinalUrl !== null && this.finalUrl === this._noBgFinalUrl;
         },
 
         get selectedVariantCount() {
@@ -278,7 +292,7 @@ function designer() {
                 },
                 variants: (e) => {
                     const ts = Date.now();
-                    this.variants = e.urls.map((url) => ({ url, ts }));
+                    this.variants = e.urls.map((url) => ({ url, origUrl: url, noBgUrl: null, ts }));
                     this.selectedVariant = e.urls.length === 1 ? 0 : null;
                     this.step = 4;
                     this._stopLoading();
@@ -290,8 +304,10 @@ function designer() {
         async doFinalize() {
             if (this.isLoading) return;
             const idx = this.selectedVariant ?? 0;
-            this.loadingStep = 4;
-            this._startLoading("Generating 4K design...");
+            // If already at step 5, keep the loading indicator anchored there so
+            // the user sees feedback without scrolling back up to step 4.
+            this.loadingStep = this.step >= 5 ? 5 : 4;
+            this._startLoading(`Generating ${this.finalSize} design...`);
 
             const fd = this._bgFormData();
             fd.append("selected_idx", idx);
@@ -302,7 +318,10 @@ function designer() {
                 status: (e) => { this.loadingMsg = e.message; },
                 final: (e) => {
                     this.finalUrl = e.url;
+                    this._origFinalUrl = e.url;
+                    this._noBgFinalUrl = null;
                     this.finalTs = Date.now();
+                    this.finalizedSize = this.finalSize;
                     this.step = 5;
                     this._stopLoading();
                 },
@@ -313,6 +332,19 @@ function designer() {
         async doRemoveVariantBg() {
             if (this.isLoading) return;
             const idx = this.selectedVariant ?? 0;
+            const v = this.variants[idx];
+            if (v?.noBgUrl) {
+                const updated = [...this.variants];
+                updated[idx] = { ...v, url: v.noBgUrl, ts: Date.now() };
+                this.variants = updated;
+                const fd = new FormData();
+                fd.append("session_id", this.sessionId);
+                fd.append("selected_idx", idx);
+                fetch("/apply-cached-bg/variant", { method: "POST", body: fd })
+                    .catch(() => this._onError("Failed to sync variant state."));
+                return;
+            }
+
             this.loadingStep = 4;
             this._startLoading("Removing background...");
 
@@ -322,9 +354,14 @@ function designer() {
             await streamSSE("/remove-bg/variant", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
                 variant_updated: (e) => {
-                    // Bump timestamp so the browser re-fetches the updated image
                     const updated = [...this.variants];
-                    updated[e.index] = { url: e.url, ts: Date.now() };
+                    const prev = updated[e.index] ?? {};
+                    updated[e.index] = {
+                        ...prev,
+                        url: e.url,
+                        ts: Date.now(),
+                        noBgUrl: e.bg_removed ? e.url : prev.noBgUrl,
+                    };
                     this.variants = updated;
                     this._stopLoading();
                 },
@@ -332,8 +369,46 @@ function designer() {
             });
         },
 
+        async doRestoreVariantBg() {
+            if (this.isLoading) return;
+            const idx = this.selectedVariant ?? 0;
+            const v = this.variants[idx];
+            // Instant UI swap — both URLs are already known after first removal.
+            const updated = [...this.variants];
+            updated[idx] = { ...v, url: v.origUrl, ts: Date.now() };
+            this.variants = updated;
+            // Sync server session in background so finalize uses the correct image.
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("selected_idx", idx);
+            fetch("/restore-bg/variant", { method: "POST", body: fd })
+                .catch(() => this._onError("Failed to sync variant state."));
+        },
+
+        async doRestoreFinalBg() {
+            if (this.isLoading) return;
+            // Instant UI swap.
+            this.finalUrl = this._origFinalUrl;
+            this.finalTs = Date.now();
+            // Sync server session in background.
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fetch("/restore-bg/final", { method: "POST", body: fd })
+                .catch(() => this._onError("Failed to sync final state."));
+        },
+
         async doRemoveFinalBg() {
             if (this.isLoading) return;
+            // Instant swap if we've already removed bg for this final image before.
+            if (this._noBgFinalUrl) {
+                this.finalUrl = this._noBgFinalUrl;
+                this.finalTs = Date.now();
+                const fd = new FormData();
+                fd.append("session_id", this.sessionId);
+                fetch("/apply-cached-bg/final", { method: "POST", body: fd })
+                    .catch(() => this._onError("Failed to sync final state."));
+                return;
+            }
             this.loadingStep = 5;
             this._startLoading("Removing background...");
 
@@ -342,6 +417,7 @@ function designer() {
                 final_updated: (e) => {
                     this.finalUrl = e.url;
                     this.finalTs = Date.now();
+                    if (e.bg_removed) this._noBgFinalUrl = e.url;
                     this._stopLoading();
                 },
                 error: (e) => { this._onError(e.message); },

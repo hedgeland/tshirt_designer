@@ -4,14 +4,16 @@
 
 [templates]
 
-concepts_prompt = """You are a creative director for a print-on-demand t-shirt business.
+concepts_prompt = """You are a creative director for a print-on-demand t-shirt business specializing in witty, clever humor.
 
 Generate {num_concepts} distinct t-shirt design concepts for the theme: "{theme}"
 
 Each concept should:
 - Be vivid and specific (2-3 sentences)
+- Be internally coherent — every visual element must logically belong together. Do not combine unrelated symbols or props just for visual flair.
 - Work well as a vector graphic: bold, clear silhouettes, limited colors
 - Be visually striking on a t-shirt
+- If it includes a slogan, caption, or wordplay: keep it SHORT — 5 words or fewer. Punchy and immediate. People glance at a t-shirt for one second; if it can't land in that second, cut it down. The joke must be logically coherent and genuinely funny — not just phonetically similar words. Double-check that the punchline actually makes sense before including it.
 
 Return ONLY a JSON array of {num_concepts} strings. No other text.
 Example: ["concept 1 description", "concept 2 description"]"""
@@ -26,8 +28,10 @@ Create {num_variants} distinct prompt variations for this concept. Each should:
 - Describe the same core idea with a different stylistic angle
   (e.g. variant 1: vintage/retro, variant 2: bold/minimal, variant 3: illustrative/detailed)
 - Be a single descriptive sentence (no bullet points)
+- Stay strictly faithful to the concept — do NOT invent elements, props, symbols, or details not implied by the concept. Every visual element must earn its place logically. If it wouldn't make sense to a viewer, cut it.
 - Focus only on the subject and any props — do NOT describe a background scene or environment
 - NOT include style instructions — those will be appended automatically
+- If the concept includes text or a slogan, render it SHORT — 5 words or fewer, exactly as specified. Do not expand, subtitle, or add extra text to the design.
 
 Return ONLY a JSON array of {num_variants} prompt strings. No other text.
 Example: ["prompt 1", "prompt 2", "prompt 3"]"""
@@ -39,6 +43,7 @@ style_suffix = """\
 flat vector graphic design, bold clean lines, \
 maximum {max_colors} colors total including background, limited color palette, \
 solid {bg_color} background filling the entire image with no scene or environment, \
+subject fills the frame edge to edge with only a few pixels of {bg_color} margin around the border, \
 subject and props floating on the solid {bg_color} background only, \
 no background scenery, no landscape, no environment, no sky, no ground, no underwater scene, \
 no gradients, no t-shirt, no clothing, no garment, no mockup, \

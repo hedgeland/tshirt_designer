@@ -25,7 +25,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 | Phase | Constant | Default value | User-selectable values |
 |---|---|---|---|
 | Brainstorm variants | `BRAINSTORM_SIZE` | `"512"` | `512`, `1K`, `2K` |
-| Final approved design | `FINAL_SIZE` | `"4K"` | `1K`, `2K`, `4K` |
+| Final approved design | `FINAL_SIZE` | `"1K"` | `1K`, `2K`, `4K` |
 
 `ImageConfig.image_size` accepts `"512"`, `"1K"`, `"2K"`, or `"4K"`. The defaults (`BRAINSTORM_SIZE`, `FINAL_SIZE`) are the starting values; the user can change them via sidebar dropdowns at runtime. Always reference these constants — never hardcode resolution strings.
 

@@ -118,6 +118,11 @@ def sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
+def _no_bg_path(path: str) -> str:
+    """Derive the no-background output path from a source image path."""
+    return path.replace(".png", "_no_bg.png") if path else ""
+
+
 def _has_transparency(img: Image.Image) -> bool:
     if img.mode != "RGBA":
         return False
@@ -273,12 +278,12 @@ async def generate(
             return
 
         yield sse({"type": "prompts", "prompts": prompts})
-        yield sse({"type": "status", "message": f"Generating variant 1 of {num_variants}..."})
+        yield sse({"type": "status", "message": f"Generating variant 1 of {num_variants} at {variant_size} ({aspect_ratio})..."})
 
         images: list[Image.Image] = []
         for i, prompt in enumerate(prompts):
             if i > 0:
-                yield sse({"type": "status", "message": f"Generating variant {i + 1} of {num_variants}..."})
+                yield sse({"type": "status", "message": f"Generating variant {i + 1} of {num_variants} at {variant_size} ({aspect_ratio})..."})
             try:
                 img = await asyncio.to_thread(generate_image, prompt, GOOGLE_API_KEY, size=variant_size, aspect_ratio=aspect_ratio)
             except Exception as e:
@@ -302,9 +307,15 @@ async def generate(
             "prompts": prompts,
             "images": images,
             "image_paths": paths,
+            "original_images": list(images),       # preserved so bg removal is undoable
+            "original_image_paths": list(paths),
+            "no_bg_variant_cache": {},             # cleared on each new generate
             "selected_idx": 0 if num_variants == 1 else None,
             "final_image": None,
             "final_path": None,
+            "original_final": None,
+            "original_final_path": None,
+            "no_bg_final_cache": None,
         })
 
         # paths are like "output/theme/concept_1/variant_1.png" — prepend / for URL
@@ -351,7 +362,7 @@ async def finalize(
             return
 
         if bg_was_removed:
-            yield sse({"type": "status", "message": "Removing background from 4K image..."})
+            yield sse({"type": "status", "message": f"Removing background from {final_size} image..."})
             final_img = await asyncio.to_thread(
                 remove_background_color, final_img, bg_color,
                 tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
@@ -363,6 +374,9 @@ async def finalize(
 
         session["final_image"] = final_img
         session["final_path"] = str(final_path)
+        session["original_final"] = final_img          # preserved so bg removal is undoable
+        session["original_final_path"] = str(final_path)
+        session["no_bg_final_cache"] = None            # stale on each new finalize
 
         yield sse({"type": "final", "url": f"/{final_path}"})
 
@@ -388,27 +402,37 @@ async def remove_variant_bg(
             return
 
         idx = selected_idx if 0 <= selected_idx < len(images) else 0
-        yield sse({"type": "status", "message": "Removing background..."})
 
-        try:
-            result = await asyncio.to_thread(
-                remove_background_color, images[idx], bg_color,
-                tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
-            )
-        except Exception as e:
-            yield sse({"type": "error", "message": str(e)})
-            return
+        # Use cached no-bg result if available — skip the algorithm on re-apply after undo.
+        cache = session.setdefault("no_bg_variant_cache", {})
+        if idx in cache:
+            result, no_bg_path = cache[idx]
+        else:
+            yield sse({"type": "status", "message": "Removing background..."})
+            try:
+                result = await asyncio.to_thread(
+                    remove_background_color, images[idx], bg_color,
+                    tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
+                )
+            except Exception as e:
+                yield sse({"type": "error", "message": str(e)})
+                return
+            no_bg_path = _no_bg_path(paths[idx]) if idx < len(paths) else ""
+            if no_bg_path:
+                await asyncio.to_thread(result.save, no_bg_path, "PNG")
+            cache[idx] = (result, no_bg_path)
 
         updated = list(images)
         updated[idx] = result
         session["images"] = updated
 
-        # Overwrite the on-disk file so the URL stays the same; client cache-busts with ?t=
-        if idx < len(paths):
-            await asyncio.to_thread(result.save, paths[idx], "PNG")
+        if no_bg_path:
+            updated_paths = list(paths)
+            updated_paths[idx] = no_bg_path
+            session["image_paths"] = updated_paths
 
-        url = f"/{paths[idx]}" if idx < len(paths) else ""
-        yield sse({"type": "variant_updated", "index": idx, "url": url})
+        url = f"/{no_bg_path}" if no_bg_path else ""
+        yield sse({"type": "variant_updated", "index": idx, "url": url, "bg_removed": True})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -430,25 +454,105 @@ async def remove_final_bg(
             yield sse({"type": "error", "message": "Finalize a design first."})
             return
 
-        yield sse({"type": "status", "message": "Removing background..."})
+        # Use cached no-bg result if available — skip the algorithm on re-apply after undo.
+        cached_final = session.get("no_bg_final_cache")
+        if cached_final:
+            result, no_bg_path = cached_final
+        else:
+            yield sse({"type": "status", "message": "Removing background..."})
+            try:
+                result = await asyncio.to_thread(
+                    remove_background_color, final_img, bg_color,
+                    tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
+                )
+            except Exception as e:
+                yield sse({"type": "error", "message": str(e)})
+                return
+            no_bg_path = _no_bg_path(final_path)
+            if no_bg_path:
+                await asyncio.to_thread(result.save, no_bg_path, "PNG")
+            session["no_bg_final_cache"] = (result, no_bg_path)
 
-        try:
-            result = await asyncio.to_thread(
-                remove_background_color, final_img, bg_color,
-                tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
-            )
-        except Exception as e:
-            yield sse({"type": "error", "message": str(e)})
-            return
         session["final_image"] = result
+        session["final_path"] = no_bg_path
 
-        if final_path:
-            await asyncio.to_thread(result.save, final_path, "PNG")
-
-        url = f"/{final_path}" if final_path else ""
-        yield sse({"type": "final_updated", "url": url})
+        url = f"/{no_bg_path}" if no_bg_path else ""
+        yield sse({"type": "final_updated", "url": url, "bg_removed": True})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@app.post("/restore-bg/variant")
+async def restore_variant_bg(session_id: str = Form(...), selected_idx: int = Form(...)):
+    session = get_session(session_id)
+    originals = session.get("original_images", [])
+    orig_paths = session.get("original_image_paths", [])
+    images = session.get("images", [])
+    paths = session.get("image_paths", [])
+
+    if not originals or selected_idx >= len(originals):
+        return {"error": "No original to restore."}
+
+    updated = list(images)
+    updated[selected_idx] = originals[selected_idx]
+    session["images"] = updated
+
+    updated_paths = list(paths)
+    updated_paths[selected_idx] = orig_paths[selected_idx]
+    session["image_paths"] = updated_paths
+
+    url = f"/{orig_paths[selected_idx]}"
+    return {"url": url, "index": selected_idx}
+
+
+@app.post("/restore-bg/final")
+async def restore_final_bg(session_id: str = Form(...)):
+    session = get_session(session_id)
+    original = session.get("original_final")
+    orig_path = session.get("original_final_path")
+
+    if original is None:
+        return {"error": "No original to restore."}
+
+    session["final_image"] = original
+    session["final_path"] = orig_path
+
+    url = f"/{orig_path}" if orig_path else ""
+    return {"url": url}
+
+
+# ── BG state sync endpoints (plain JSON, no algorithm — used by client cache-hit paths) ──
+
+@app.post("/apply-cached-bg/variant")
+async def apply_cached_variant_bg(session_id: str = Form(...), selected_idx: int = Form(...)):
+    """Swap session to the cached no-bg variant without re-running the algorithm."""
+    session = get_session(session_id)
+    cache = session.get("no_bg_variant_cache", {})
+    if selected_idx not in cache:
+        return {"error": "No cached result for this variant."}
+    result, no_bg_path = cache[selected_idx]
+    images = list(session.get("images", []))
+    paths = list(session.get("image_paths", []))
+    if selected_idx < len(images):
+        images[selected_idx] = result
+        session["images"] = images
+    if selected_idx < len(paths):
+        paths[selected_idx] = no_bg_path
+        session["image_paths"] = paths
+    return {"ok": True}
+
+
+@app.post("/apply-cached-bg/final")
+async def apply_cached_final_bg(session_id: str = Form(...)):
+    """Swap session to the cached no-bg final image without re-running the algorithm."""
+    session = get_session(session_id)
+    cached = session.get("no_bg_final_cache")
+    if not cached:
+        return {"error": "No cached result for final image."}
+    result, no_bg_path = cached
+    session["final_image"] = result
+    session["final_path"] = no_bg_path
+    return {"ok": True}
 
 
 # ── Image analysis endpoints ──────────────────────────────────────────────────

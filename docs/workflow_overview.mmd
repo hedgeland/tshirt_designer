@@ -1,17 +1,20 @@
 graph TD
     Auth([1. Auth - Google OAuth optional])
     Ideation[2. Ideation - Enter theme brainstorm concepts select one]
-    Variants[3. Variant Generation - Build prompts generate N low-res images optional BG removal]
-    Finalize[4. Finalization - Upscale selected variant to chosen resolution optional BG removal]
-    Publish[5. Publish - Configure Printify product upload optional publish to store]
+    PromptBuild[3. Prompt Building - Load or build prompts generate N low-res images]
+    Variants[4. Variant Generation - Review variants optional BG removal rerender or approve]
+    Finalize[5. Finalization - Upscale selected variant to chosen resolution optional BG removal]
+    Publish[6. Publish - Configure Printify product upload optional publish to store]
 
     Auth --> Ideation
-    Ideation --> Variants
+    Ideation --> PromptBuild
+    PromptBuild --> Variants
     Variants --> Finalize
     Finalize --> Publish
 
     style Auth fill:#fff3cd,stroke:#ffc107,stroke-dasharray: 5 5
     style Ideation fill:#d1e7dd,stroke:#198754
+    style PromptBuild fill:#d1ecf1,stroke:#0dcaf0
     style Variants fill:#cfe2ff,stroke:#0d6efd
     style Finalize fill:#e2d9f3,stroke:#6f42c1
     style Publish fill:#ffe5d0,stroke:#fd7e14

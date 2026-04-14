@@ -54,4 +54,4 @@ BRAINSTORM_SIZES = ["512", "1K", "2K"]
 BRAINSTORM_SIZE = "512"   # 512px is enough for concept evaluation — saves tokens vs "1K"
 
 FINAL_SIZES = ["1K", "2K", "4K"]
-FINAL_SIZE = "4K"         # full quality for approved final design
+FINAL_SIZE = "1K"         # full quality for approved final design

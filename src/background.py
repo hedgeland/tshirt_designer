@@ -26,6 +26,28 @@ def _sample_background_color(arr: np.ndarray) -> tuple[int, int, int]:
     return (int(round(float(avg[0]))), int(round(float(avg[1]))), int(round(float(avg[2]))))
 
 
+def _color_mask(
+    arr: np.ndarray,
+    target: tuple[int, int, int],
+    tolerance: int,
+    require_opaque: bool = False,
+) -> np.ndarray:
+    """Boolean mask of pixels whose RGB channels are within tolerance of target.
+
+    Used by normalize, flood fill, and interior-pocket removal to avoid repeating
+    the same three-channel abs-delta expression.
+    """
+    r, g, b = target
+    mask = (
+        (np.abs(arr[:, :, 0].astype(np.int32) - r) <= tolerance) &
+        (np.abs(arr[:, :, 1].astype(np.int32) - g) <= tolerance) &
+        (np.abs(arr[:, :, 2].astype(np.int32) - b) <= tolerance)
+    )
+    if require_opaque:
+        mask = mask & (arr[:, :, 3] > 0)
+    return mask
+
+
 def remove_background_color(
     image: Image.Image,
     hex_color: str,
@@ -36,12 +58,15 @@ def remove_background_color(
     """Remove the background color using normalization + edge flood fill.
 
     Pipeline:
-    1. normalize   — snap near-background pixels to exact target color, flattening
-                     AI-generated texture/noise so flood fill doesn't need wide tolerance
-    2. flood fill  — BFS from image edges removes only connected background pixels,
-                     preserving interior design elements that share the background hue
-    3. decontaminate — subtracts background color spill from alpha boundary pixels
-    4. erode_px    — shrinks alpha mask inward to clip any residual fringe ring
+    1. normalize      — snap near-background pixels to exact target color, flattening
+                        AI-generated texture/noise so flood fill doesn't need wide tolerance
+    2. flood fill     — BFS from image edges removes only connected background pixels,
+                        preserving interior design elements that share the background hue
+    3. interior fill  — removes isolated pockets (letter joins, enclosed gaps) not
+                        reachable from edges; uses tolerance//2 to catch anti-aliased
+                        stroke edges that weren't fully snapped by normalization
+    4. decontaminate  — subtracts background color spill from alpha boundary pixels
+    5. erode_px       — shrinks alpha mask inward to clip any residual fringe ring
 
     Order matters: normalize before fill (cleaner seeds), decontaminate before erode
     (operates on full edge width), erode last (tightens the mask).
@@ -56,6 +81,7 @@ def remove_background_color(
 
     arr = _normalize_background(arr, target, tolerance)
     arr = _flood_fill_remove(arr, target, tolerance)
+    arr = _remove_interior_bg(arr, target, tolerance=tolerance // 2)
 
     img = Image.fromarray(arr, "RGBA")
 
@@ -78,11 +104,7 @@ def _normalize_background(
     Normalizing first gives flood fill clean, uniform pixels to work with.
     """
     r, g, b = target
-    mask = (
-        (np.abs(arr[:, :, 0].astype(np.int32) - r) <= tolerance) &
-        (np.abs(arr[:, :, 1].astype(np.int32) - g) <= tolerance) &
-        (np.abs(arr[:, :, 2].astype(np.int32) - b) <= tolerance)
-    )
+    mask = _color_mask(arr, target, tolerance)
     result = arr.copy()
     result[mask, 0] = r
     result[mask, 1] = g
@@ -102,15 +124,9 @@ def _flood_fill_remove(
     background-colored pixels.
     """
     h, w = arr.shape[:2]
-    r, g, b = target
 
     # Pre-compute candidate mask vectorized — much faster than per-pixel Python checks.
-    candidate: np.ndarray = (
-        (np.abs(arr[:, :, 0].astype(np.int32) - r) <= tolerance) &
-        (np.abs(arr[:, :, 1].astype(np.int32) - g) <= tolerance) &
-        (np.abs(arr[:, :, 2].astype(np.int32) - b) <= tolerance) &
-        (arr[:, :, 3] > 0)
-    )
+    candidate: np.ndarray = _color_mask(arr, target, tolerance, require_opaque=True)
 
     visited = np.zeros((h, w), dtype=bool)
     queue: deque[tuple[int, int]] = deque()
@@ -141,6 +157,21 @@ def _flood_fill_remove(
 
     result = arr.copy()
     result[visited, 3] = 0
+    return result
+
+
+def _remove_interior_bg(arr: np.ndarray, target: tuple[int, int, int], tolerance: int = 0) -> np.ndarray:
+    """Transparent-ize isolated background-colored pockets not reachable from the edges.
+
+    After flood fill removes edge-connected background, any remaining opaque pixel
+    within tolerance of target is an interior island — background surrounded by design
+    elements. A tolerance slightly looser than zero catches anti-aliased stroke edges
+    inside enclosed pockets (e.g. joins of letters like K or N) that weren't fully
+    snapped by the normalization pass.
+    """
+    mask = _color_mask(arr, target, tolerance, require_opaque=True)
+    result = arr.copy()
+    result[mask, 3] = 0
     return result
 
 

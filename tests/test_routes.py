@@ -9,6 +9,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from config import BRAINSTORM_SIZE, BRAINSTORM_SIZES, DEFAULT_ASPECT_RATIO, FINAL_SIZE, FINAL_SIZES
 from main import app
 
 client = TestClient(app)
@@ -97,15 +98,15 @@ def test_index_config_contains_aspect_ratio_keys():
     assert "1:1" in cfg["aspectRatios"]
     assert "16:9" in cfg["aspectRatios"]
     assert "defaultAspectRatio" in cfg
-    assert cfg["defaultAspectRatio"] == "1:1"
+    assert cfg["defaultAspectRatio"] == DEFAULT_ASPECT_RATIO
     assert "brainstormSizes" in cfg
-    assert cfg["brainstormSizes"] == ["512", "1K", "2K"]
+    assert cfg["brainstormSizes"] == BRAINSTORM_SIZES
     assert "defaultVariantSize" in cfg
-    assert cfg["defaultVariantSize"] == "512"
+    assert cfg["defaultVariantSize"] == BRAINSTORM_SIZE
     assert "finalSizes" in cfg
-    assert cfg["finalSizes"] == ["1K", "2K", "4K"]
+    assert cfg["finalSizes"] == FINAL_SIZES
     assert "defaultFinalSize" in cfg
-    assert cfg["defaultFinalSize"] == "4K"
+    assert cfg["defaultFinalSize"] == FINAL_SIZE
 
 
 def test_analysis_final_returns_default_when_no_image():

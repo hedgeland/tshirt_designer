@@ -144,18 +144,18 @@
                             <label class="text-xs font-medium block mb-1.5">Variant resolution</label>
                             <select x-model="variantSize"
                                 class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                <template x-for="s in cfg.brainstormSizes" :key="s">
-                                    <option :value="s" x-text="s"></option>
-                                </template>
+                                {% for s in brainstorm_sizes %}
+                                <option value="{{ s }}">{{ s }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div>
                             <label class="text-xs font-medium block mb-1.5">Final resolution</label>
                             <select x-model="finalSize"
                                 class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                <template x-for="s in cfg.finalSizes" :key="s">
-                                    <option :value="s" x-text="s"></option>
-                                </template>
+                                {% for s in final_sizes %}
+                                <option value="{{ s }}">{{ s }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
@@ -240,7 +240,7 @@
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">1 · Enter a theme
                     </h2>
                     <div class="flex gap-3 items-start">
-                        <textarea x-model="theme" @keydown.enter.prevent="doBrainstorm()" rows="2"
+                        <textarea x-model="theme" x-ref="themeInput" @keydown.enter.prevent="doBrainstorm()" rows="2"
                             placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
                             class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
                         <button @click="doBrainstorm()" :disabled="isLoading"
@@ -373,12 +373,17 @@
 
                     <div class="flex gap-3 mt-4 flex-wrap">
                         <button @click="doFinalize()" :disabled="isLoading"
-                            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                            ✨ Finalize selected at 4K
-                        </button>
+                            x-text="`✨ Finalize selected at ${finalSize}`"
+                            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
                         <button @click="doRemoveVariantBg()" :disabled="isLoading"
+                            x-show="!(selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl)"
                             class="px-4 py-2 bg-slate-500 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             ✂️ Remove BG from selected
+                        </button>
+                        <button @click="doRestoreVariantBg()" :disabled="isLoading"
+                            x-show="selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl"
+                            class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            ↩ Undo Remove BG
                         </button>
                     </div>
                     <div class="mt-3" x-show="loadingStep === 4 && (isLoading || error)">
@@ -400,24 +405,37 @@
                 <!-- Step 5: Final Design -->
                 <section x-show="step >= 5" x-transition
                     class="rounded-xl border border-slate-200 shadow-sm p-5">
-                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">5 · Final Design (4K)
-                    </h2>
+                    <h2 x-text="`5 · Final Design (${finalizedSize})`"
+                        class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3"></h2>
                     <div class="max-w-sm space-y-4">
                         <img :src="finalUrl ? finalUrl + '?t=' + finalTs : ''"
                             class="w-full rounded-lg border border-slate-200 bg-slate-100 block">
                         <div class="flex gap-3 flex-wrap">
                             <a :href="finalUrl ? finalUrl + '?t=' + finalTs : '#'" download
-                                class="flex-1 text-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-                                ⬇ Download 4K PNG
+                                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+                                <span x-text="`⬇ Download ${finalizedSize} PNG`"></span>
                             </a>
                             <button @click="doRemoveFinalBg()" :disabled="isLoading"
+                                x-show="!finalBgRemoved"
                                 class="px-4 py-2 bg-slate-500 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                 ✂️ Remove BG
+                            </button>
+                            <button @click="doRestoreFinalBg()" :disabled="isLoading"
+                                x-show="finalBgRemoved"
+                                class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                ↩ Undo Remove BG
                             </button>
                             <button x-show="cfg.printifyEnabled" @click="openPrintify()"
                                 class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
                                 🖨 Publish to Printify
                             </button>
+                        </div>
+                        <!-- Re-finalize at a different resolution without scrolling back up -->
+                        <div class="border-t border-slate-600 pt-3 flex gap-3 flex-wrap items-center">
+                            <span class="text-xs text-slate-400">Change resolution and re-generate:</span>
+                            <button @click="doFinalize()" :disabled="isLoading"
+                                x-text="`✨ Finalize at ${finalSize}`"
+                                class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
                         </div>
                         <div class="mt-3" x-show="loadingStep === 5 && (isLoading || error)">
                             <div x-show="error" class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">

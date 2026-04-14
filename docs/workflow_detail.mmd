@@ -11,7 +11,9 @@ graph TD
 
     %% 2. Ideation
     subgraph Ideation [2. Ideation]
-        EnterTheme([Enter theme]) --> Brainstorm[POST /brainstorm Gemini generates text concepts]
+        EnterTheme([Enter theme]) --> IdeationMode{Mode?}
+        IdeationMode -- "Brainstorm" --> Brainstorm[POST /brainstorm Gemini generates text concepts]
+        IdeationMode -- "Generate directly" --> DirectConcept([Theme used as concept skip brainstorm])
         Brainstorm --> ViewConcepts(View concept list)
         ViewConcepts --> IdeationChoice{Action?}
         IdeationChoice -- "Pick / edit concept" --> ConceptSelected([Concept selected])
@@ -31,20 +33,24 @@ graph TD
     subgraph VariantGen [4. Variant Generation]
         ViewVariants(View N low-res variants) --> PickVariant[Pick a variant]
         PickVariant --> VariantChoice{Action?}
-        VariantChoice -- "Remove BG" --> RemoveBGVariant[POST /remove-bg/variant Update variant in session]
+        VariantChoice -- "Remove BG" --> RemoveBGVariant[POST /remove-bg/variant Save _no_bg copy cache result]
         RemoveBGVariant --> ViewVariants
+        VariantChoice -- "Undo Remove BG" --> RestoreBGVariant[POST /restore-bg/variant Restore original from session cache]
+        RestoreBGVariant --> ViewVariants
         VariantChoice -- "Rerender" --> RerenderVariants([Back to Prompt Building])
         VariantChoice -- "Finalize" --> ReadyToFinalize([Proceed to Finalization])
     end
 
     %% 5. Finalization
     subgraph Finalization [5. Finalization]
-        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize Upscale to selected resolution Auto-remove BG]
+        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize Upscale to selected resolution Auto-remove BG if variant had BG removed]
         Gen4K --> ViewFinal(View final image)
         ViewFinal --> FinalChoice{Action?}
-        FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final Update final in session]
+        FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final Save _no_bg copy cache result]
         RemoveBGFinal --> ViewFinal
-        FinalChoice -- "Re-finalize" --> ClickFinalize
+        FinalChoice -- "Undo Remove BG" --> RestoreBGFinal[POST /restore-bg/final Restore original from session cache]
+        RestoreBGFinal --> ViewFinal
+        FinalChoice -- "Re-finalize at new resolution" --> ClickFinalize
         FinalChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
     end
 
@@ -53,8 +59,9 @@ graph TD
         OpenPrintify([Open Printify panel]) --> SelectShop[GET /printify/shops Select shop]
         SelectShop --> SelectBlueprint[GET /printify/blueprints Select blueprint]
         SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers Select provider]
-        SelectProvider --> SelectVariants[GET /variants Select colors and sizes]
-        SelectVariants --> SetDetails[Set details Adjust position and scale]
+        SelectProvider --> SelectVariants[GET /printify/blueprints/:id/providers/:provider_id/variants Select colors and sizes]
+        SelectVariants --> AnalyzeFinal[GET /analysis/final Get content bounds for vertical placement]
+        AnalyzeFinal --> SetDetails[Set details Adjust position and scale]
         SetDetails --> PublishChoice{Publish now?}
         PublishChoice -- Yes --> PublishNow[POST /printify/publish Upload and publish]
         PublishChoice -- No --> SaveDraft[POST /printify/publish Upload and draft]
@@ -65,6 +72,7 @@ graph TD
     %% Phase transitions
     AppHome --> EnterTheme
     ConceptSelected --> ConceptIn
+    DirectConcept --> ConceptIn
     GenImages --> ViewVariants
     RerenderVariants -.-> ConceptIn
     ReadyToFinalize --> ClickFinalize
@@ -81,6 +89,7 @@ graph TD
     %% Decision nodes - amber
     style AuthEnabled fill:#fff3cd,stroke:#ffc107
     style AllowlistCheck fill:#fff3cd,stroke:#ffc107
+    style IdeationMode fill:#fff3cd,stroke:#ffc107
     style IdeationChoice fill:#fff3cd,stroke:#ffc107
     style LoadPreset fill:#fff3cd,stroke:#ffc107
     style VariantChoice fill:#fff3cd,stroke:#ffc107
@@ -93,12 +102,15 @@ graph TD
     style ApplyPreset fill:#cfe2ff,stroke:#0d6efd
     style BuildPrompts fill:#cfe2ff,stroke:#0d6efd
     style RemoveBGVariant fill:#cfe2ff,stroke:#0d6efd
+    style RestoreBGVariant fill:#cfe2ff,stroke:#0d6efd
     style Gen4K fill:#cfe2ff,stroke:#0d6efd
     style RemoveBGFinal fill:#cfe2ff,stroke:#0d6efd
+    style RestoreBGFinal fill:#cfe2ff,stroke:#0d6efd
     style SelectShop fill:#cfe2ff,stroke:#0d6efd
     style SelectBlueprint fill:#cfe2ff,stroke:#0d6efd
     style SelectProvider fill:#cfe2ff,stroke:#0d6efd
     style SelectVariants fill:#cfe2ff,stroke:#0d6efd
+    style AnalyzeFinal fill:#cfe2ff,stroke:#0d6efd
     style SetDetails fill:#cfe2ff,stroke:#0d6efd
     style PublishNow fill:#cfe2ff,stroke:#0d6efd
     style SaveDraft fill:#cfe2ff,stroke:#0d6efd
@@ -112,6 +124,7 @@ graph TD
     style PageLoad fill:#d1e7dd,stroke:#198754
     style AppHome fill:#d1e7dd,stroke:#198754
     style EnterTheme fill:#d1e7dd,stroke:#198754
+    style DirectConcept fill:#d1e7dd,stroke:#198754
     style ConceptSelected fill:#d1e7dd,stroke:#198754
     style ConceptIn fill:#d1e7dd,stroke:#198754
     style GenImages fill:#d1e7dd,stroke:#198754
