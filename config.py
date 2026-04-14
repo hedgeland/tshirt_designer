@@ -36,6 +36,8 @@ MAX_PRESETS = 20        # max number of saved user presets (excludes built-in de
 PRINTIFY_TOKEN = os.getenv("PRINTIFY_TOKEN", "")
 # Pre-set your shop ID to skip the shop-selector step in the publish modal.
 PRINTIFY_SHOP_ID = os.getenv("PRINTIFY_SHOP_ID", "")
+# Auto-select this shop by name when the publish modal opens (case-insensitive).
+PRINTIFY_SHOP_NAME = os.getenv("PRINTIFY_SHOP_NAME", "")
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 
 # Aspect ratio options supported by the Gemini 3.1 Flash Image Preview model.
@@ -55,3 +57,10 @@ BRAINSTORM_SIZE = "512"   # 512px is enough for concept evaluation — saves tok
 
 FINAL_SIZES = ["1K", "2K", "4K"]
 FINAL_SIZE = "1K"         # full quality for approved final design
+
+# Maps Gemini size tokens to their square pixel dimension.
+# Add new entries here if the model gains higher-resolution support (e.g. "8K": 8192).
+SIZE_PX: dict[str, int] = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}
+
+# Minimum size required to publish to Printify. Must be a key in SIZE_PX.
+PRINTIFY_MIN_SIZE = "4K"

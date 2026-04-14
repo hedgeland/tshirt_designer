@@ -47,7 +47,8 @@ def test_save_variants_directory_structure(tmp_path, monkeypatch):
     img = Image.new("RGBA", (64, 64), (0, 255, 0, 255))
     paths = save_variants("my theme", 1, [img])
 
-    # Should be output/my_theme/concept_2/variant_1.png
+    # Should be output/my_theme/concept_2/variant_1_<timestamp>.png
     assert "my_theme" in paths[0]
     assert "concept_2" in paths[0]
-    assert "variant_1.png" in paths[0]
+    assert "variant_1_" in paths[0]
+    assert paths[0].endswith(".png")

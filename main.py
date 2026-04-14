@@ -33,8 +33,11 @@ from config import (
     MAX_COLORS,
     NUM_VARIANTS,
     OUTPUT_DIR,
+    PRINTIFY_MIN_SIZE,
     PRINTIFY_SHOP_ID,
+    PRINTIFY_SHOP_NAME,
     PRINTIFY_TOKEN,
+    SIZE_PX,
     SECRET_KEY,
 )
 from src import presets, printify
@@ -42,7 +45,7 @@ from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
 from src.finalize import finalize_design
 from src.image import generate_image
-from src.output import safe_theme_name, save_variants
+from src.output import safe_theme_name, save_variants, timestamp
 from src.prompts import build_prompts
 
 app = FastAPI()
@@ -188,6 +191,9 @@ async def index(request: Request):
         "style_template": builtin["style_suffix"],
         "printify_enabled": bool(PRINTIFY_TOKEN),
         "printify_shop_id": PRINTIFY_SHOP_ID,
+        "printify_shop_name": PRINTIFY_SHOP_NAME,
+        "printify_min_size": PRINTIFY_MIN_SIZE,
+        "size_px": SIZE_PX,
         "aspect_ratios": ASPECT_RATIOS,
         "default_aspect_ratio": DEFAULT_ASPECT_RATIO,
         "brainstorm_sizes": BRAINSTORM_SIZES,
@@ -368,7 +374,7 @@ async def finalize(
                 tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
             )
 
-        final_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / "final.png"
+        final_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / f"final_{timestamp()}.png"
         final_path.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(final_img.save, str(final_path), "PNG")
 
@@ -681,6 +687,7 @@ async def printify_publish(
     design_x: float = Form(0.5),
     design_y: float = Form(0.5),
     design_scale: float = Form(0.8),
+    final_url: str = Form(""),
 ):
     """Upload the session's final image to Printify and create (optionally publish) a product."""
     async def stream():
@@ -690,9 +697,27 @@ async def printify_publish(
 
         session = get_session(session_id)
         final_path = session.get("final_path")
+
+        # Session may have been wiped by a server restart. Recover the path from the
+        # URL the client already has — the static file is still on disk.
+        if not final_path and final_url:
+            recovered = final_url.lstrip("/")
+            if Path(recovered).is_file():
+                final_path = recovered
+
         if not final_path:
             yield sse({"type": "error", "message": "Finalize a design first."})
             return
+
+        # Enforce minimum resolution — open the file and check its actual dimensions
+        # rather than trusting the session, so this holds even after a server restart.
+        min_px = SIZE_PX.get(PRINTIFY_MIN_SIZE, 0)
+        if min_px:
+            img_check = await asyncio.to_thread(Image.open, final_path)
+            w, h = img_check.size
+            if max(w, h) < min_px:
+                yield sse({"type": "error", "message": f"Image must be at least {PRINTIFY_MIN_SIZE} ({min_px}px) to publish. Re-finalize at a higher resolution."})
+                return
 
         try:
             ids: list[int] = json.loads(variant_ids)

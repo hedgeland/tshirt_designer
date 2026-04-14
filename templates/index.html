@@ -407,9 +407,9 @@
                     class="rounded-xl border border-slate-200 shadow-sm p-5">
                     <h2 x-text="`5 · Final Design (${finalizedSize})`"
                         class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3"></h2>
-                    <div class="max-w-sm space-y-4">
+                    <div class="space-y-4">
                         <img :src="finalUrl ? finalUrl + '?t=' + finalTs : ''"
-                            class="w-full rounded-lg border border-slate-200 bg-slate-100 block">
+                            class="max-w-sm w-full rounded-lg border border-slate-200 bg-slate-100 block">
                         <div class="flex gap-3 flex-wrap">
                             <a :href="finalUrl ? finalUrl + '?t=' + finalTs : '#'" download
                                 class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
@@ -426,8 +426,9 @@
                                 ↩ Undo Remove BG
                             </button>
                             <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
-                                🖨 Publish to Printify
+                                :disabled="(cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize]"
+                                x-text="(cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] ? `🖨 Resolution Must Be at Least: ${cfg.printifyMinSize}` : '🖨 Publish to Printify'"
+                                class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             </button>
                         </div>
                         <!-- Re-finalize at a different resolution without scrolling back up -->
@@ -472,6 +473,21 @@
 
             <!-- Modal body (scrollable) -->
             <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+                <!-- Resolution upgrade banner — shown when the finalized image is below the minimum -->
+                <div x-show="pNeedsUpscale" class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3">
+                    <span class="text-amber-500 text-lg flex-shrink-0">⚠️</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-amber-800">
+                            Design is at <span x-text="finalizedSize"></span> — Printify requires <span x-text="cfg.printifyMinSize"></span>.
+                        </p>
+                        <p class="text-xs text-amber-600 mt-0.5">Re-finalize at a higher resolution before publishing.</p>
+                    </div>
+                    <button @click="doFinalizeForPrintify()" :disabled="printifyBusy"
+                            class="flex-shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Re-finalize at <span x-text="cfg.printifyMinSize"></span>
+                    </button>
+                </div>
 
                 <!-- Shop selector (hidden when shop_id pre-configured) -->
                 <div x-show="!cfg.printifyShopId">
@@ -520,7 +536,10 @@
                 <!-- Color picker -->
                 <div x-show="pColors.length > 0">
                     <div class="flex items-baseline justify-between mb-1.5">
-                        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Colors</label>
+                        <label class="text-xs font-semibold uppercase tracking-wider"
+                               :class="pSelectedColors.length === 0 ? 'text-red-500' : 'text-slate-500'">
+                            <span x-text="pSelectedColors.length === 0 ? 'Select at least one color:' : 'Colors'"></span>
+                        </label>
                         <div class="flex gap-2">
                             <button @click="pSelectedColors = [...pColors]" class="text-xs text-indigo-500 hover:text-indigo-700">Select all</button>
                             <span class="text-slate-300">·</span>
@@ -666,13 +685,13 @@
                 </div>
                 <!-- Action buttons -->
                 <div x-show="pSizes.length > 0" class="flex gap-3 px-6 py-4">
-                    <button @click="doPublish(false)" :disabled="printifyBusy || selectedVariantCount === 0"
-                            class="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                        Save as Draft
+                    <button @click="doPublish(false)" :disabled="printifyBusy || selectedVariantCount === 0 || pNeedsUpscale"
+                            class="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            x-text="pNeedsUpscale ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Save as Draft'">
                     </button>
-                    <button @click="doPublish(true)" :disabled="printifyBusy || selectedVariantCount === 0"
-                            class="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                        Publish to Store
+                    <button @click="doPublish(true)" :disabled="printifyBusy || selectedVariantCount === 0 || pNeedsUpscale"
+                            class="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            x-text="pNeedsUpscale ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Publish to Store'">
                     </button>
                 </div>
             </div>
@@ -695,6 +714,9 @@
             "styleTemplate": {{ style_template | tojson }},
             "printifyEnabled": {{ printify_enabled | tojson }},
             "printifyShopId": {{ printify_shop_id | tojson }},
+            "printifyShopName": {{ printify_shop_name | tojson }},
+            "printifyMinSize": {{ printify_min_size | tojson }},
+            "sizePx": {{ size_px | tojson }},
             "aspectRatios": {{ aspect_ratios | tojson }},
             "defaultAspectRatio": {{ default_aspect_ratio | tojson }},
             "brainstormSizes": {{ brainstorm_sizes | tojson }},

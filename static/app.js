@@ -129,6 +129,8 @@ function designer() {
         pScale: 0.8,                // fraction of print area width the design occupies
         pContentTop: 0,             // fraction of image height above first visible pixel (for gap correction)
 
+        pNeedsUpscale: false,   // true when finalizedSize is below cfg.printifyMinSize
+
         pTitle: "",
         pDescription: "",
         pPrice: "29.99",
@@ -329,6 +331,36 @@ function designer() {
             });
         },
 
+        async doFinalizeForPrintify() {
+            if (this.printifyBusy) return;
+            this.printifyBusy = true;
+            this.printifyError = "";
+            this.printifyStatus = `Re-finalizing at ${cfg.printifyMinSize}…`;
+
+            const idx = this.selectedVariant ?? 0;
+            const fd = this._bgFormData();
+            fd.append("selected_idx", idx);
+            fd.append("aspect_ratio", this.aspectRatio);
+            fd.append("final_size", cfg.printifyMinSize);
+
+            await streamSSE("/finalize", fd, {
+                status: (e) => { this.printifyStatus = e.message; },
+                final: (e) => {
+                    this.finalUrl = e.url;
+                    this._origFinalUrl = e.url;
+                    this._noBgFinalUrl = null;
+                    this.finalTs = Date.now();
+                    this.finalizedSize = cfg.printifyMinSize;
+                    this.step = 5;
+                    this.pNeedsUpscale = false;
+                    this.printifyStatus = "";
+                },
+                error: (e) => { this.printifyError = e.message; },
+            });
+
+            this.printifyBusy = false;
+        },
+
         async doRemoveVariantBg() {
             if (this.isLoading) return;
             const idx = this.selectedVariant ?? 0;
@@ -477,6 +509,7 @@ function designer() {
             this.printifyError = "";
             this.printifyStatus = "";
             this.printifyDone = null;
+            this.pNeedsUpscale = (cfg.sizePx[this.finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize];
             this.pBlueprint = null;
             this.pProviders = [];
             this.pProviderId = "";
@@ -505,7 +538,12 @@ function designer() {
                 const data = await res.json();
                 if (data.error) { this.printifyError = data.error; return; }
                 this.pShops = data;
-                if (data.length === 1) this.pShopId = String(data[0].id);
+                // Auto-select by configured name (case-insensitive), then fall back to
+                // selecting the only shop if there's just one.
+                const preferredName = (cfg.printifyShopName || "").toLowerCase();
+                const match = preferredName && data.find(s => s.title.toLowerCase() === preferredName);
+                if (match) this.pShopId = String(match.id);
+                else if (data.length === 1) this.pShopId = String(data[0].id);
             }
 
             // Load blueprint catalog (fetched once; subsequent opens reuse cache).
@@ -525,14 +563,15 @@ function designer() {
 
         filterBlueprints() {
             const q = this.pBlueprintSearch.trim().toLowerCase();
-            if (!q) {
-                this.pFilteredBlueprints = this.pAllBlueprints.slice(0, 50);
-                return;
-            }
-            const terms = q.split(/\s+/);
-            this.pFilteredBlueprints = this.pAllBlueprints.filter(bp =>
-                terms.every(t => bp.title.toLowerCase().includes(t) || (bp.brand || "").toLowerCase().includes(t))
-            ).slice(0, 50);
+            const pool = q ? (() => {
+                const terms = q.split(/\s+/);
+                return this.pAllBlueprints.filter(bp =>
+                    terms.every(t => bp.title.toLowerCase().includes(t) || (bp.brand || "").toLowerCase().includes(t))
+                );
+            })() : this.pAllBlueprints;
+            // Sort by blueprint ID ascending — lower IDs are older, more established products,
+            // which is the closest proxy to popularity the Printify API exposes.
+            this.pFilteredBlueprints = pool.slice().sort((a, b) => a.id - b.id).slice(0, 50);
         },
 
         async selectBlueprint(bp) {
@@ -678,6 +717,7 @@ function designer() {
             fd.append("design_x", 0.5);
             fd.append("design_y", designY.toFixed(4));
             fd.append("design_scale", scale);
+            fd.append("final_url", this.finalUrl ?? "");
 
             await streamSSE("/printify/publish", fd, {
                 status: (e) => { this.printifyStatus = e.message; },

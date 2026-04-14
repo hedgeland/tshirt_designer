@@ -1,5 +1,6 @@
-"""Save generated images to disk under output/<theme>/concept_N/variant_N.png."""
+"""Save generated images to disk under output/<theme>/concept_N/variant_N_<ts>.png."""
 
+from datetime import datetime
 from pathlib import Path
 
 from PIL import Image
@@ -15,13 +16,19 @@ def safe_theme_name(theme: str) -> str:
     )
 
 
+def timestamp() -> str:
+    """Return a sortable timestamp string for use in filenames."""
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
 def save_variants(theme: str, concept_idx: int, images: list[Image.Image]) -> list[str]:
     dir_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / f"concept_{concept_idx + 1}"
     dir_path.mkdir(parents=True, exist_ok=True)  # create nested dirs if they don't exist
 
+    ts = timestamp()  # one timestamp per batch so variants are grouped by generation run
     paths = []
     for i, img in enumerate(images):
-        path = dir_path / f"variant_{i + 1}.png"
+        path = dir_path / f"variant_{i + 1}_{ts}.png"
         img.save(path, "PNG")
         paths.append(str(path))
 
