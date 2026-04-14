@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -374,9 +375,25 @@ async def finalize(
                 tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
             )
 
-        final_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / f"final_{timestamp()}.png"
+        ts = timestamp()
+        final_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / f"final_{ts}.png"
         final_path.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(final_img.save, str(final_path), "PNG")
+
+        prompt_path = final_path.with_suffix(".md")
+        prompt_path.write_text(
+            f"# Prompt — {theme}\n\n"
+            f"| Field | Value |\n"
+            f"|---|---|\n"
+            f"| Theme | {theme} |\n"
+            f"| Variant | {idx + 1} |\n"
+            f"| Resolution | {final_size} |\n"
+            f"| Aspect Ratio | {aspect_ratio} |\n"
+            f"| Generated | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} |\n\n"
+            f"## Prompt\n\n"
+            f"```\n{prompts[idx]}\n```\n",
+            encoding="utf-8",
+        )
 
         session["final_image"] = final_img
         session["final_path"] = str(final_path)
