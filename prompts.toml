@@ -40,12 +40,10 @@ Example: ["prompt 1", "prompt 2", "prompt 3"]"""
 # style_suffix is a single comma-separated string (no embedded newlines).
 # Line-ending backslashes here trim newlines so it stays one line at runtime.
 style_suffix = """\
-flat vector graphic design, bold clean lines, \
-maximum {max_colors} colors total including background, limited color palette, \
-solid {bg_color} background filling the entire image with no scene or environment, \
-subject fills the frame edge to edge with only a few pixels of {bg_color} margin around the border, \
-subject and props floating on the solid {bg_color} background only, \
-no background scenery, no landscape, no environment, no sky, no ground, no underwater scene, \
-no gradients, no t-shirt, no clothing, no garment, no mockup, \
-just the graphic artwork on the solid {bg_color} background, \
-high contrast, screen print ready"""
+flat vector graphic style, isolated centered focal point, \
+the subject contained entirely within the frame with 15% negative space margin, \
+bold consistent line weights, maximum {max_colors} solid colors total, \
+limited color palette, solid {bg_color} background filling the entire frame, \
+high contrast, screen print ready, professional sticker aesthetic, \
+no gradients, no shading, no photographic textures, \
+strictly no elements touching the image borders"""
