@@ -381,19 +381,15 @@ async def finalize(
         await asyncio.to_thread(final_img.save, str(final_path), "PNG")
 
         prompt_path = final_path.with_suffix(".md")
-        prompt_path.write_text(
-            f"# Prompt — {theme}\n\n"
-            f"| Field | Value |\n"
-            f"|---|---|\n"
-            f"| Theme | {theme} |\n"
-            f"| Variant | {idx + 1} |\n"
-            f"| Resolution | {final_size} |\n"
-            f"| Aspect Ratio | {aspect_ratio} |\n"
-            f"| Generated | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} |\n\n"
-            f"## Prompt\n\n"
-            f"```\n{prompts[idx]}\n```\n",
-            encoding="utf-8",
+        sidecar = templates.get_template("prompt_sidecar.md").render(
+            theme=theme,
+            variant=idx + 1,
+            resolution=final_size,
+            aspect_ratio=aspect_ratio,
+            generated=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            prompt=prompts[idx],
         )
+        prompt_path.write_text(sidecar, encoding="utf-8")
 
         session["final_image"] = final_img
         session["final_path"] = str(final_path)
