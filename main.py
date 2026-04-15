@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth
 from fastapi import FastAPI, Form, Request
+from fastapi.responses import Response
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -46,7 +47,7 @@ from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
 from src.finalize import finalize_design
 from src.image import generate_image
-from src.output import safe_theme_name, save_variants, timestamp
+from src.output import archive_files, archive_theme, delete_files, load_image_to_session, rename_theme, safe_theme_name, save_variants, scan_output, timestamp
 from src.prompts import build_prompts
 
 app = FastAPI()
@@ -125,6 +126,14 @@ def sse(data: dict) -> str:
 def _no_bg_path(path: str) -> str:
     """Derive the no-background output path from a source image path."""
     return path.replace(".png", "_no_bg.png") if path else ""
+
+
+def _zip_response(data: bytes, filename: str) -> Response:
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def _has_transparency(img: Image.Image) -> bool:
@@ -601,6 +610,59 @@ async def get_preset(name: str):
         return JSONResponse({"error": "Not found"}, status_code=404)
 
 
+@app.get("/browse")
+async def browse_output():
+    """Return the structured output directory tree for the file browser drawer."""
+    return await asyncio.to_thread(scan_output)
+
+
+@app.delete("/browse/files")
+async def delete_output_files(request: Request):
+    body = await request.json()
+    paths = body.get("paths", [])
+    return await asyncio.to_thread(delete_files, paths)
+
+
+@app.get("/browse/archive/{dir_name}")
+async def archive_output_theme(dir_name: str):
+    data = await asyncio.to_thread(archive_theme, dir_name)
+    return _zip_response(data, f"{dir_name}.zip")
+
+
+@app.post("/browse/archive/selection")
+async def archive_output_selection(request: Request):
+    body = await request.json()
+    paths = body.get("paths", [])
+    data = await asyncio.to_thread(archive_files, paths)
+    return _zip_response(data, "selection.zip")
+
+
+@app.post("/session/load-image")
+async def session_load_image(request: Request):
+    """Load an existing output image into the session as a variant, bypassing generation."""
+    body = await request.json()
+    session_id = body.get("session_id", "")
+    image_url = body.get("image_url", "")
+    display_theme = body.get("display_theme", "")
+    try:
+        result = await asyncio.to_thread(load_image_to_session, get_session(session_id), image_url, display_theme)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return result
+
+
+@app.patch("/browse/rename")
+async def rename_output_theme(request: Request):
+    body = await request.json()
+    old_dir = body.get("dir_name", "")
+    new_name = body.get("new_name", "")
+    try:
+        result = await asyncio.to_thread(rename_theme, old_dir, new_name)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return result
+
+
 @app.post("/presets")
 async def save_preset_route(
     name: str = Form(...),
@@ -701,6 +763,7 @@ async def printify_publish(
     design_y: float = Form(0.5),
     design_scale: float = Form(0.8),
     final_url: str = Form(""),
+    override_min_res: bool = Form(False),
 ):
     """Upload the session's final image to Printify and create (optionally publish) a product."""
     async def stream():
@@ -724,8 +787,9 @@ async def printify_publish(
 
         # Enforce minimum resolution — open the file and check its actual dimensions
         # rather than trusting the session, so this holds even after a server restart.
+        # override_min_res bypasses this gate for local testing.
         min_px = SIZE_PX.get(PRINTIFY_MIN_SIZE, 0)
-        if min_px:
+        if min_px and not override_min_res:
             img_check = await asyncio.to_thread(Image.open, final_path)
             w, h = img_check.size
             if max(w, h) < min_px:

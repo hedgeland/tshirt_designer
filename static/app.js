@@ -52,7 +52,7 @@ function designer() {
 
         // ── Workflow state ─────────────────────────────────────────────────
         step: 1,               // controls which sections are visible
-        theme: "",
+        theme: "Funny shark in space",
         concepts: [],
         selectedConcept: null,
         editedConcept: "",
@@ -95,6 +95,23 @@ function designer() {
         variantsTemplate: cfg.variantsTemplate,
         styleTemplate: cfg.styleTemplate,
 
+        // ── Load-from-browser state ───────────────────────────────────────
+        loadedImageRes: null,   // {width, height} when variants came from the output browser; null otherwise
+
+        // ── Drag state (Printify placement preview) ───────────────────────
+        pDrag: null,            // null when idle; { startX, startY, startPX, startPY } while dragging
+
+        // ── Output browser ────────────────────────────────────────────────
+        showBrowser: false,
+        browserThemes: [],
+        browserFilter: "",
+        browserLoading: false,
+        manageMode: false,
+        selectedFiles: {},    // url → size_bytes; object for Alpine reactivity
+        storageStats: null,   // {totalBytes, themeCount}
+        renamingDir: "",      // dir_name of the theme currently being renamed
+        renameValue: "",      // current value of the rename input
+
         // ── Printify state ─────────────────────────────────────────────────
         cfg,                        // expose to template for printifyEnabled check
         showPrintify: false,
@@ -125,11 +142,14 @@ function designer() {
         pPrintWidth: 0,
         pPrintHeight: 0,
 
-        pPosition: "top",           // "top" or "center"
+        pXPx: 0,                    // left edge of design in print-area pixels (0 = flush left)
+        pYPx: 0,                    // top edge of image in print-area pixels (0 = flush top)
+        pTopAllowance: 10,          // px gap from print-area top for "Align to Top" preset; persists across opens
+        pIsTopPreset: true,         // true when X/Y match the "Align to Top" formula
         pScale: 0.8,                // fraction of print area width the design occupies
         pContentTop: 0,             // fraction of image height above first visible pixel (for gap correction)
 
-        pNeedsUpscale: false,   // true when finalizedSize is below cfg.printifyMinSize
+        pOverrideMinRes: false, // dev override: skip the resolution gate when testing
 
         pTitle: "",
         pDescription: "",
@@ -147,6 +167,22 @@ function designer() {
                     e.returnValue = '';
                 }
             });
+
+            // Bound drag handlers — stored so removeEventListener can reference them by identity.
+            this._boundDragMove = this._onDragMove.bind(this);
+            this._boundDragUp   = this._onDragUp.bind(this);
+
+            // Keep the "Align to Top" preset in sync when scale or allowance changes.
+            this.$watch('pScale', () => {
+                if (this.pIsTopPreset && this.pPrintWidth) this.applyTopPreset();
+            });
+            this.$watch('pTopAllowance', () => {
+                if (this.pIsTopPreset && this.pPrintWidth) this.applyTopPreset();
+            });
+            // pContentTop arrives async after modal open; re-calibrate preset if still active.
+            this.$watch('pContentTop', () => {
+                if (this.pIsTopPreset && this.pPrintWidth) this.applyTopPreset();
+            });
         },
 
         // ── Computed ───────────────────────────────────────────────────────
@@ -162,6 +198,35 @@ function designer() {
         // Derived from URL comparison — no separate flag needed.
         get finalBgRemoved() {
             return this._noBgFinalUrl !== null && this.finalUrl === this._noBgFinalUrl;
+        },
+
+        get filteredBrowserThemes() {
+            const q = this.browserFilter.trim().toLowerCase();
+            if (!q) return this.browserThemes;
+            return this.browserThemes.filter(t => t.theme.toLowerCase().includes(q));
+        },
+
+        get selectedCount() {
+            return Object.keys(this.selectedFiles).length;
+        },
+
+        get selectedBytes() {
+            return Object.values(this.selectedFiles).reduce((a, b) => a + b, 0);
+        },
+
+        get pDesignPx() {
+            return this.pScale * this.pPrintWidth;
+        },
+
+        get pNeedsUpscale() {
+            return (this.cfg.sizePx[this.finalizedSize] ?? 0) < this.cfg.sizePx[this.cfg.printifyMinSize];
+        },
+
+        get pImageOutOfBounds() {
+            if (!this.pPrintWidth || !this.pPrintHeight) return false;
+            const designPx = this.pDesignPx;
+            return this.pXPx < 0 || this.pXPx + designPx > this.pPrintWidth
+                || this.pYPx < 0 || this.pYPx + designPx > this.pPrintHeight;
         },
 
         get selectedVariantCount() {
@@ -197,6 +262,183 @@ function designer() {
             this.loadingStep = 0;
         },
 
+        async loadToVariants(url, width, height, displayTheme) {
+            // Only warn if the user has real work in progress — don't count the default theme text.
+            const hasWork = this.concepts.length || this.variants.length;
+            if (hasWork && !confirm("Load this image as a variant? Your current session will be cleared.")) return;
+
+            const res = await fetch("/session/load-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: this.sessionId, image_url: url, display_theme: displayTheme }),
+            });
+            if (!res.ok) { alert(`Failed to load image (${res.status})`); return; }
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+
+            // Reset workflow state to variant-only.
+            this.concepts = [];
+            this.selectedConcept = null;
+            this.editedConcept = "";
+            this.prompts = [];
+            this.finalUrl = null;
+            this._origFinalUrl = null;
+            this._noBgFinalUrl = null;
+            this.finalTs = 0;
+            this.finalizedSize = "";
+            this.error = "";
+            this.theme = displayTheme;
+            this.variants = [{ url, origUrl: url, noBgUrl: null, ts: Date.now() }];
+            this.selectedVariant = 0;
+            this.loadedImageRes = { width, height };
+
+            this.step = 4;
+            this.showBrowser = false;
+            this.$nextTick(() => this.$refs.step4?.scrollIntoView({ behavior: "smooth", block: "start" }));
+        },
+
+        async openBrowser() {
+            this.showBrowser = true;
+            if (this.browserThemes.length > 0) return; // already loaded
+            await this.reloadBrowser();
+        },
+
+        async reloadBrowser() {
+            this.browserLoading = true;
+            this.selectedFiles = {};
+            try {
+                const res = await fetch("/browse");
+                const data = await res.json();
+                this.browserThemes = data.map((t, ti) => ({
+                    ...t,
+                    expanded: ti === 0,
+                    concepts: t.concepts.map(c => ({ ...c, expanded: false })),
+                }));
+                this.storageStats = {
+                    totalBytes: data.reduce((s, t) => s + t.theme_size_bytes, 0),
+                    themeCount: data.length,
+                };
+            } finally {
+                this.browserLoading = false;
+            }
+        },
+
+        _fmtBytes(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        },
+
+        toggleManageMode() {
+            this.manageMode = !this.manageMode;
+            if (!this.manageMode) {
+                this.selectedFiles = {};
+                this.renamingDir = "";
+                this.renameValue = "";
+            }
+        },
+
+        toggleFile(url, sizeBytes) {
+            const updated = { ...this.selectedFiles };
+            if (updated[url] !== undefined) delete updated[url];
+            else updated[url] = sizeBytes;
+            this.selectedFiles = updated;
+        },
+
+        isSelected(url) {
+            return this.selectedFiles[url] !== undefined;
+        },
+
+        _themeFileList(theme) {
+            const files = [];
+            theme.finals.forEach(f => {
+                files.push([f.png_url, f.png_size]);
+                if (f.no_bg_url) files.push([f.no_bg_url, f.no_bg_size]);
+            });
+            theme.concepts.forEach(c => c.variants.forEach(v => {
+                files.push([v.url, v.size]);
+                if (v.no_bg_url) files.push([v.no_bg_url, v.no_bg_size]);
+            }));
+            return files;
+        },
+
+        toggleThemeFiles(theme) {
+            const files = this._themeFileList(theme);
+            const allSelected = files.every(([url]) => this.selectedFiles[url] !== undefined);
+            const updated = { ...this.selectedFiles };
+            if (allSelected) files.forEach(([url]) => delete updated[url]);
+            else files.forEach(([url, size]) => updated[url] = size);
+            this.selectedFiles = updated;
+        },
+
+        themeAllSelected(theme) {
+            const files = this._themeFileList(theme);
+            return files.length > 0 && files.every(([url]) => this.selectedFiles[url] !== undefined);
+        },
+
+        async deleteSelected() {
+            const paths = Object.keys(this.selectedFiles);
+            if (!paths.length) return;
+            const label = `${paths.length} file${paths.length > 1 ? 's' : ''} (${this._fmtBytes(this.selectedBytes)})`;
+            if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+            await fetch("/browse/files", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paths }),
+            });
+            this.manageMode = false;
+            await this.reloadBrowser();
+        },
+
+        downloadThemeZip(dirName) {
+            const a = document.createElement("a");
+            a.href = `/browse/archive/${encodeURIComponent(dirName)}`;
+            a.download = `${dirName}.zip`;
+            a.click();
+        },
+
+        async downloadSelectedZip() {
+            const paths = Object.keys(this.selectedFiles);
+            if (!paths.length) return;
+            const res = await fetch("/browse/archive/selection", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paths }),
+            });
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "selection.zip";
+            a.click();
+            URL.revokeObjectURL(url);
+        },
+
+        startRename(dirName, displayName) {
+            this.renamingDir = dirName;
+            this.renameValue = displayName;
+        },
+
+        cancelRename() {
+            this.renamingDir = "";
+            this.renameValue = "";
+        },
+
+        async commitRename() {
+            const newName = this.renameValue.trim();
+            if (!newName) return;
+            const res = await fetch("/browse/rename", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ dir_name: this.renamingDir, new_name: newName }),
+            });
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+            this.renamingDir = "";
+            this.renameValue = "";
+            await this.reloadBrowser();
+        },
+
         _bgFormData() {
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
@@ -228,6 +470,7 @@ function designer() {
             this.prompts = [];
             this.selectedVariant = null;
             this.finalUrl = null;
+            this.loadedImageRes = null;
             this.step = 1;
 
             const fd = new FormData();
@@ -257,6 +500,7 @@ function designer() {
             this.prompts = [];
             this.selectedVariant = null;
             this.finalUrl = null;
+            this.loadedImageRes = null;
             this.step = 2;  // step >= 2 satisfies the directMode badge condition; doGenerate() will advance to 3
             await this.doGenerate();
         },
@@ -270,6 +514,7 @@ function designer() {
             this.prompts = [];
             this.selectedVariant = null;
             this.finalUrl = null;
+            this.loadedImageRes = null;
             this.step = Math.max(this.step, 3);
 
             const fd = new FormData();
@@ -352,7 +597,6 @@ function designer() {
                     this.finalTs = Date.now();
                     this.finalizedSize = cfg.printifyMinSize;
                     this.step = 5;
-                    this.pNeedsUpscale = false;
                     this.printifyStatus = "";
                 },
                 error: (e) => { this.printifyError = e.message; },
@@ -509,7 +753,6 @@ function designer() {
             this.printifyError = "";
             this.printifyStatus = "";
             this.printifyDone = null;
-            this.pNeedsUpscale = (cfg.sizePx[this.finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize];
             this.pBlueprint = null;
             this.pProviders = [];
             this.pProviderId = "";
@@ -519,6 +762,9 @@ function designer() {
             this.pSelectedColors = [];
             this.pSelectedSizes = [];
             this.pContentTop = 0;
+            this.pXPx = 0;
+            this.pYPx = this.pTopAllowance;  // pTopAllowance intentionally not reset — persists
+            this.pIsTopPreset = true;
             this.pTitle = this.theme || "Custom T-Shirt";
             this.showPrintify = true;
 
@@ -630,6 +876,7 @@ function designer() {
                     break;
                 }
             }
+            if (this.pPrintWidth) this.applyTopPreset();
 
             // Extract unique colors and sizes, preserving natural order from the API.
             const colors = [], sizes = [], seenC = new Set(), seenS = new Set();
@@ -645,6 +892,76 @@ function designer() {
             this.pSelectedColors = [];
             const defaultSizes = new Set(["S", "M", "L", "XL", "2XL", "XXL"]);
             this.pSelectedSizes = sizes.filter(s => defaultSizes.has(s.toUpperCase()));
+        },
+
+        startDrag(e) {
+            const scale = 220 / this.pPrintWidth;  // preview px per print px
+            const designPx = this.pDesignPx;
+            // Cache all per-drag constants so _onDragMove (called on every mousemove)
+            // doesn't recompute them hundreds of times per second.
+            this.pDrag = {
+                startX: e.clientX,
+                startY: e.clientY,
+                startPX: this.pXPx,
+                startPY: this.pYPx,
+                scale,
+                designPx,
+                snapThreshold: 8 / scale,  // 8 screen px → print px; feels consistent across sizes
+                centerX: Math.round((this.pPrintWidth  - designPx) / 2),
+                centerY: Math.round((this.pPrintHeight - designPx) / 2),
+                minX: -(designPx - 1),
+                maxX: this.pPrintWidth - 1,
+                minY: -(designPx - 1),
+                maxY: this.pPrintHeight - 1,
+            };
+            document.addEventListener('mousemove', this._boundDragMove);
+            document.addEventListener('mouseup',   this._boundDragUp);
+        },
+
+        _onDragMove(e) {
+            if (!this.pDrag) return;
+            const { scale, snapThreshold, centerX, centerY, minX, maxX, minY, maxY } = this.pDrag;
+
+            const rawX = this.pDrag.startPX + (e.clientX - this.pDrag.startX) / scale;
+            const rawY = this.pDrag.startPY + (e.clientY - this.pDrag.startY) / scale;
+            // Clamp so at least 1 print-pixel of the image stays inside the print area.
+            let x = Math.round(Math.min(Math.max(rawX, minX), maxX));
+            let y = Math.round(Math.min(Math.max(rawY, minY), maxY));
+
+            // Snap to center when within threshold.
+            if (Math.abs(rawX - centerX) <= snapThreshold) x = centerX;
+            if (Math.abs(rawY - centerY) <= snapThreshold) y = centerY;
+
+            this.pXPx = x;
+            this.pYPx = y;
+            this.pIsTopPreset = false;
+        },
+
+        _onDragUp() {
+            this.pDrag = null;
+            document.removeEventListener('mousemove', this._boundDragMove);
+            document.removeEventListener('mouseup',   this._boundDragUp);
+        },
+
+        applyTopPreset() {
+            if (!this.pPrintWidth) return;
+            // Center horizontally; back out transparent padding so visible content
+            // lands at pTopAllowance from the top of the print area.
+            this.pXPx = Math.round((this.pPrintWidth - this.pDesignPx) / 2);
+            this.pYPx = Math.round(this.pTopAllowance - this.pContentTop * this.pDesignPx);
+            this.pIsTopPreset = true;
+        },
+
+        centerH() {
+            if (!this.pPrintWidth) return;
+            this.pXPx = Math.round((this.pPrintWidth - this.pDesignPx) / 2);
+            this.pIsTopPreset = false;
+        },
+
+        centerV() {
+            if (!this.pPrintWidth) return;
+            this.pYPx = Math.round((this.pPrintHeight - this.pDesignPx) / 2);
+            this.pIsTopPreset = false;
         },
 
         togglePColor(color) {
@@ -682,26 +999,17 @@ function designer() {
             const priceCents = Math.round(parseFloat(this.pPrice) * 100);
             if (!priceCents || priceCents < 1) { this.printifyError = "Enter a valid price."; return; }
 
-            // Calculate y so the design sits at the requested vertical position.
-            // x/y in Printify are the CENTER of the image as fractions of the print area.
-            // scale is the fraction of the print area WIDTH that the square design occupies.
-            // For a square design the displayed height = scale * printWidth pixels.
-            //
-            // Without transparency: y_center = (scale * W) / (2 * H) anchors image top at y=0.
-            // With transparency: pContentTop is the fraction of the image height above the first
-            // visible pixel. Shifting up by that amount anchors the SUBJECT top at y=0 instead,
-            // eliminating the visible gap from empty space at the top of the image.
-            //   y_center = scale * W * (0.5 - contentTop) / H
+            // Convert pixel coords to Printify normalized center coordinates (0–1).
+            // pXPx = left edge of design image; pYPx = top of visible content (transparent
+            // fringe excluded). pContentTop corrects for transparent padding above the subject.
+            //   design_x = (pXPx + designPx/2) / W
+            //   design_y = (pYPx + designPx*(0.5 - pContentTop)) / H
             const scale = this.pScale;
-            const contentTop = this.pContentTop;
-            let designY;
-            if (this.pPosition === "top" && this.pPrintWidth && this.pPrintHeight) {
-                designY = scale * this.pPrintWidth * (0.5 - contentTop) / this.pPrintHeight;
-                designY = Math.max(0.01, designY); // don't push the image fully off the top
-            } else {
-                designY = 0.5;
-            }
-
+            const W = this.pPrintWidth;
+            const H = this.pPrintHeight;
+            if (!W || !H) { this.printifyError = "Print dimensions not loaded."; return; }
+            const designX = (this.pXPx + this.pDesignPx / 2) / W;
+            const designY = (this.pYPx + this.pDesignPx / 2) / H;
             this.printifyBusy = true;
 
             const fd = new FormData();
@@ -714,10 +1022,11 @@ function designer() {
             fd.append("description", this.pDescription.trim());
             fd.append("price_cents", priceCents);
             fd.append("publish_now", publishNow);
-            fd.append("design_x", 0.5);
+            fd.append("design_x", designX.toFixed(4));
             fd.append("design_y", designY.toFixed(4));
             fd.append("design_scale", scale);
             fd.append("final_url", this.finalUrl ?? "");
+            fd.append("override_min_res", this.pOverrideMinRes);
 
             await streamSSE("/printify/publish", fd, {
                 status: (e) => { this.printifyStatus = e.message; },

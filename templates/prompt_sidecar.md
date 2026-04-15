@@ -1,6 +1,6 @@
 # Prompt — {{ theme }}
 
-| Field | Value |
+| | |
 |---|---|
 | Theme | {{ theme }} |
 | Variant | {{ variant }} |

@@ -81,6 +81,9 @@
                 <h1 class="text-base font-semibold leading-tight">T-Shirt Design Generator</h1>
                 <p class="text-xs text-slate-100">Brainstorm → Select → Generate · Gemini 3.1 Flash Image Preview</p>
             </div>
+            <button @click="openBrowser()" class="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
+                📁 Output Browser
+            </button>
         </header>
 
         <div class="flex flex-1 overflow-hidden">
@@ -240,7 +243,7 @@
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">1 · Enter a theme
                     </h2>
                     <div class="flex gap-3 items-start">
-                        <textarea x-model="theme" x-ref="themeInput" @keydown.enter.prevent="doBrainstorm()" rows="2"
+                        <textarea x-model="theme" x-ref="themeInput" @keydown.enter.prevent="doBrainstorm()" @focus="$el.select()" rows="2"
                             placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
                             class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
                         <button @click="doBrainstorm()" :disabled="isLoading"
@@ -255,7 +258,7 @@
                             🧠 Brainstorm
                         </button>
                         <button @click="doGenerateDirect()" :disabled="isLoading"
-                            class="flex items-center gap-2 px-4 py-2 bg-slate-500 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            class="flex items-center gap-2 px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             🎨 Generate Direct
                         </button>
                     </div>
@@ -341,11 +344,18 @@
                 </section>
 
                 <!-- Step 4: Gallery -->
-                <section x-show="step >= 4" x-transition
+                <section x-show="step >= 4 || loadedImageRes" x-transition x-ref="step4"
                     class="bg-slate-700 rounded-xl border border-slate-200 shadow-sm p-5">
                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">
                         4 · Variants — click one to select for finalization
                     </h2>
+                    <!-- Loaded-from-browser badge -->
+                    <div x-show="loadedImageRes" class="mb-3 flex items-center gap-2 text-xs text-amber-300">
+                        <span>📁 Loaded from output browser</span>
+                        <span class="font-mono bg-slate-600 px-1.5 py-0.5 rounded"
+                              x-text="loadedImageRes ? loadedImageRes.width + '×' + loadedImageRes.height : ''"></span>
+                        <span class="text-slate-400">— finalize at a higher resolution to upscale</span>
+                    </div>
 
                     <div class="grid gap-3" :class="{
                          'grid-cols-1 max-w-xs': variants.length === 1,
@@ -372,18 +382,27 @@
                     </div>
 
                     <div class="flex gap-3 mt-4 flex-wrap">
-                        <button @click="doFinalize()" :disabled="isLoading"
-                            x-text="`✨ Finalize selected at ${finalSize}`"
+                        <button @click="doFinalize()"
+                            :disabled="isLoading || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
+                            x-text="(loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
+                                ? `✨ ${finalSize} — already at this resolution`
+                                : `✨ Finalize selected at ${finalSize}`"
                             class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
                         <button @click="doRemoveVariantBg()" :disabled="isLoading"
                             x-show="!(selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl)"
-                            class="px-4 py-2 bg-slate-500 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            class="px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             ✂️ Remove BG from selected
                         </button>
                         <button @click="doRestoreVariantBg()" :disabled="isLoading"
                             x-show="selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl"
                             class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             ↩ Undo Remove BG
+                        </button>
+                        <button x-show="cfg.printifyEnabled" @click="openPrintify()"
+                            :disabled="isLoading || ((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes)"
+                            x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Send to Printify (override)' : '👕 Send to Printify'"
+                            :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                            class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                         </button>
                     </div>
                     <div class="mt-3" x-show="loadingStep === 4 && (isLoading || error)">
@@ -417,7 +436,7 @@
                             </a>
                             <button @click="doRemoveFinalBg()" :disabled="isLoading"
                                 x-show="!finalBgRemoved"
-                                class="px-4 py-2 bg-slate-500 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                class="px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                 ✂️ Remove BG
                             </button>
                             <button @click="doRestoreFinalBg()" :disabled="isLoading"
@@ -426,10 +445,18 @@
                                 ↩ Undo Remove BG
                             </button>
                             <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                :disabled="(cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize]"
-                                x-text="(cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] ? `🖨 Resolution Must Be at Least: ${cfg.printifyMinSize}` : '🖨 Publish to Printify'"
-                                class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                :disabled="(cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes"
+                                x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Publish to Printify (override)' : '👕 Publish to Printify'"
+                                :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                                class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             </button>
+                        </div>
+                        <!-- Printify testing override -->
+                        <div x-show="cfg.printifyEnabled" class="mt-2">
+                            <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
+                                <input type="checkbox" x-model="pOverrideMinRes" class="rounded">
+                                <span class="text-xs text-slate-400">Override <span x-text="cfg.printifyMinSize"></span> resolution minimum (testing only)</span>
+                            </label>
                         </div>
                         <!-- Re-finalize at a different resolution without scrolling back up -->
                         <div class="border-t border-slate-600 pt-3 flex gap-3 flex-wrap items-center">
@@ -467,15 +494,15 @@
 
             <!-- Modal header -->
             <div class="flex justify-between items-center px-6 py-4 border-b border-slate-200 flex-shrink-0">
-                <h2 class="text-base font-semibold">🖨 Publish to Printify</h2>
+                <h2 class="text-base font-semibold">👕 Publish to Printify</h2>
                 <button @click="showPrintify = false" class="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
             </div>
 
             <!-- Modal body (scrollable) -->
             <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
-                <!-- Resolution upgrade banner — shown when the finalized image is below the minimum -->
-                <div x-show="pNeedsUpscale" class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3">
+                <!-- Resolution upgrade banner — shown when below minimum and override is off -->
+                <div x-show="pNeedsUpscale && !pOverrideMinRes" class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3">
                     <span class="text-amber-500 text-lg flex-shrink-0">⚠️</span>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-amber-800">
@@ -583,17 +610,34 @@
 
                 <!-- Design placement -->
                 <div x-show="pSizes.length > 0">
-                    <div class="flex gap-4 items-start">
+                    <div class="flex gap-5 items-start">
 
                         <!-- Controls -->
                         <div class="flex-1 space-y-3">
+
+                            <!-- Preset button + allowance input -->
                             <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Vertical Position</label>
-                                <select x-model="pPosition" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                    <option value="top">Top (subject-aligned)</option>
-                                    <option value="center">Center</option>
-                                </select>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Vertical Preset</label>
+                                <div class="flex items-center gap-2">
+                                    <button @click="applyTopPreset()"
+                                            :class="pIsTopPreset
+                                                ? 'bg-indigo-600 border-indigo-600 text-white'
+                                                : 'bg-white border-slate-300 text-slate-700 hover:border-indigo-400'"
+                                            class="flex-1 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors">
+                                        Align to Top
+                                    </button>
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-xs text-slate-400">+</span>
+                                        <input type="number" x-model.number="pTopAllowance"
+                                               min="0" max="300" step="1"
+                                               @input="if (pIsTopPreset && pPrintWidth) applyTopPreset()"
+                                               class="w-16 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                        <span class="text-xs text-slate-400">px</span>
+                                    </div>
+                                </div>
                             </div>
+
+                            <!-- Scale slider -->
                             <div>
                                 <div class="flex justify-between items-baseline mb-1.5">
                                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Design Size</label>
@@ -602,38 +646,94 @@
                                 <input type="range" min="0.4" max="1.0" step="0.05" x-model.number="pScale"
                                        class="w-full">
                             </div>
+
+                            <!-- X/Y position — shown once print dimensions are known -->
+                            <div x-show="pPrintWidth && pPrintHeight" class="space-y-2">
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Position (px)</label>
+
+                                <!-- X -->
+                                <div>
+                                    <div class="flex justify-between items-baseline mb-0.5">
+                                        <label class="text-xs text-slate-400">X — left edge</label>
+                                        <button @click="centerH()" class="text-xs text-indigo-500 hover:text-indigo-700 font-medium">Center</button>
+                                    </div>
+                                    <div class="flex gap-2 items-center">
+                                        <input type="range" x-model.number="pXPx"
+                                               :min="-Math.round(pScale * pPrintWidth)" :max="pPrintWidth" step="1"
+                                               @input="pIsTopPreset = false"
+                                               @dblclick="centerH()"
+                                               class="flex-1">
+                                        <input type="number" x-model.number="pXPx"
+                                               :min="-Math.round(pScale * pPrintWidth)" :max="pPrintWidth" step="1"
+                                               @input="pIsTopPreset = false"
+                                               class="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                    </div>
+                                </div>
+
+                                <!-- Y -->
+                                <div>
+                                    <div class="flex justify-between items-baseline mb-0.5">
+                                        <label class="text-xs text-slate-400">Y — top edge</label>
+                                        <button @click="centerV()" class="text-xs text-indigo-500 hover:text-indigo-700 font-medium">Center</button>
+                                    </div>
+                                    <div class="flex gap-2 items-center">
+                                        <input type="range" x-model.number="pYPx"
+                                               :min="-Math.round(pScale * pPrintWidth)"
+                                               :max="pPrintHeight" step="1"
+                                               @input="pIsTopPreset = false"
+                                               @dblclick="centerV()"
+                                               class="flex-1">
+                                        <input type="number" x-model.number="pYPx"
+                                               :min="-Math.round(pScale * pPrintWidth)"
+                                               :max="pPrintHeight" step="1"
+                                               @input="pIsTopPreset = false"
+                                               class="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                    </div>
+                                </div>
+
+                                <p class="text-xs text-slate-400"
+                                   x-text="'Print area: ' + pPrintWidth + ' × ' + pPrintHeight + ' px'"></p>
+                            </div>
+
                         </div>
 
-                        <!-- Live placement preview -->
-                        <div x-show="finalUrl && pPrintWidth && pPrintHeight" class="flex-shrink-0">
-                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Placement Preview</label>
-                            <!--
-                                Print-area rectangle scaled to 140px wide.
-                                The design image is positioned absolutely within it using the same
-                                formula as doPublish() — so what you see here is what Printify gets.
-                                overflow:hidden clips any transparent fringe that spills above the top.
-                            -->
-                            <div class="relative overflow-hidden rounded border border-slate-300 bg-slate-100"
+                        <!-- Live placement preview — 220px wide
+                             Print-area rectangle scaled to 220px. Image top/left mirrors doPublish()
+                             math exactly: left = pXPx * scale, top = (pYPx - contentTop * designPx) * scale.
+                        -->
+                        <!-- Preview uses the finalized image when available, falls back to the
+                             selected variant — so it works even before Step 5 is run. -->
+                        <div x-show="(finalUrl || selectedVariantObj?.url) && pPrintWidth && pPrintHeight" class="flex-shrink-0">
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Preview</label>
+                            <div class="relative overflow-hidden rounded border border-slate-300 bg-slate-100 select-none"
                                  :style="{
-                                     width: '140px',
-                                     height: Math.round(140 * pPrintHeight / pPrintWidth) + 'px',
+                                     width: '220px',
+                                     height: Math.round(220 * pPrintHeight / pPrintWidth) + 'px',
                                  }">
-                                <!-- Faint centre line to orient the viewer -->
-                                <div class="absolute inset-x-0 top-1/2 border-t border-dashed border-slate-300 opacity-60"></div>
-                                <img :src="finalUrl + '?t=' + finalTs"
+                                <!-- Horizontal center line — visible while dragging; red+thick when vertically centered -->
+                                <div class="absolute inset-x-0 top-1/2 border-dashed transition-all duration-75"
+                                     :class="(pPrintHeight && Math.abs(pYPx + pScale*pPrintWidth/2 - pPrintHeight/2) <= 5)
+                                         ? 'border-t-2 border-red-500 opacity-90'
+                                         : pDrag ? 'border-t border-slate-400 opacity-50' : 'opacity-0'"></div>
+                                <!-- Vertical center line — visible while dragging; red+thick when horizontally centered -->
+                                <div class="absolute inset-y-0 left-1/2 border-dashed transition-all duration-75"
+                                     :class="(pPrintWidth && Math.abs(pXPx + pScale*pPrintWidth/2 - pPrintWidth/2) <= 5)
+                                         ? 'border-l-2 border-red-500 opacity-90'
+                                         : pDrag ? 'border-l border-slate-400 opacity-50' : 'opacity-0'"></div>
+                                <img :src="(finalUrl || selectedVariantObj?.url) ? (finalUrl || selectedVariantObj?.url) + '?t=' + finalTs : ''"
+                                     @mousedown.prevent="startDrag($event)"
                                      :style="{
                                          position: 'absolute',
-                                         width: Math.round(pScale * 140) + 'px',
-                                         left: '50%',
-                                         transform: 'translateX(-50%)',
-                                         top: (pPosition === 'top'
-                                             ? Math.round(-pContentTop * pScale * 140)
-                                             : Math.round(140 * pPrintHeight / (2 * pPrintWidth) - pScale * 70)
-                                         ) + 'px',
+                                         width: Math.round(pScale * 220) + 'px',
+                                         left: Math.round(pXPx * 220 / pPrintWidth) + 'px',
+                                         top: Math.round(pYPx * 220 / pPrintWidth) + 'px',
+                                         cursor: pDrag ? 'grabbing' : 'grab',
                                      }">
                             </div>
-                            <p class="text-xs text-slate-400 mt-1 text-center"
-                               x-text="pPrintWidth + ' × ' + pPrintHeight + ' px'"></p>
+                            <p :class="pImageOutOfBounds ? 'visible' : 'invisible'"
+                               class="mt-1.5 text-xs font-semibold text-red-600">
+                                ⚠ Image outside of print area!
+                            </p>
                         </div>
 
                     </div>
@@ -685,16 +785,229 @@
                 </div>
                 <!-- Action buttons -->
                 <div x-show="pSizes.length > 0" class="flex gap-3 px-6 py-4">
-                    <button @click="doPublish(false)" :disabled="printifyBusy || selectedVariantCount === 0 || pNeedsUpscale"
-                            class="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            x-text="pNeedsUpscale ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Save as Draft'">
+                    <button @click="doPublish(false)" :disabled="printifyBusy || selectedVariantCount === 0 || (pNeedsUpscale && !pOverrideMinRes)"
+                            :class="pOverrideMinRes ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                            class="flex-1 px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            x-text="(pNeedsUpscale && !pOverrideMinRes) ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : pOverrideMinRes ? 'Save as Draft (override)' : 'Save as Draft'">
                     </button>
-                    <button @click="doPublish(true)" :disabled="printifyBusy || selectedVariantCount === 0 || pNeedsUpscale"
-                            class="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            x-text="pNeedsUpscale ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Publish to Store'">
+                    <button @click="doPublish(true)" :disabled="printifyBusy || selectedVariantCount === 0 || (pNeedsUpscale && !pOverrideMinRes)"
+                            :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                            class="flex-1 px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            x-text="(pNeedsUpscale && !pOverrideMinRes) ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : pOverrideMinRes ? 'Publish to Store (override)' : 'Publish to Store'">
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ── Output Browser Drawer ──────────────────────────────────────────────── -->
+    <div x-show="showBrowser" class="fixed inset-0 z-50 flex justify-end" x-cloak>
+
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/50" @click="showBrowser = false"></div>
+
+        <!-- Drawer panel -->
+        <div class="relative flex flex-col w-96 h-full bg-slate-800 border-l border-slate-600 shadow-2xl"
+             x-show="showBrowser"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="translate-x-0"
+             x-transition:leave-end="translate-x-full">
+
+            <!-- Drawer header -->
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-600 flex-shrink-0">
+                <span class="text-base">📁</span>
+                <h2 class="text-sm font-semibold flex-1">Output Browser</h2>
+                <button @click="toggleManageMode()"
+                        :class="manageMode ? 'bg-amber-500 text-white' : 'text-slate-400 hover:text-slate-200'"
+                        class="text-xs font-medium px-2 py-1 rounded transition-colors"
+                        x-text="manageMode ? 'Done' : 'Manage'"></button>
+                <button @click="reloadBrowser()" :disabled="browserLoading" title="Refresh"
+                        class="text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-colors text-xs px-1.5">↺</button>
+                <button @click="showBrowser = false" class="text-slate-400 hover:text-slate-200 transition-colors text-lg leading-none">✕</button>
+            </div>
+
+            <!-- Storage stats bar -->
+            <div x-show="storageStats" class="px-4 py-1.5 bg-slate-900/50 border-b border-slate-700 flex-shrink-0">
+                <p class="text-xs text-slate-500"
+                   x-text="storageStats ? `${_fmtBytes(storageStats.totalBytes)} · ${storageStats.themeCount} theme${storageStats.themeCount !== 1 ? 's' : ''}` : ''"></p>
+            </div>
+
+            <!-- Search -->
+            <div class="px-4 py-2 border-b border-slate-600 flex-shrink-0">
+                <input type="text" x-model="browserFilter" placeholder="Filter by theme…"
+                       class="w-full text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto">
+
+                <!-- Loading -->
+                <div x-show="browserLoading" class="flex items-center justify-center py-12 text-slate-400 text-sm gap-2">
+                    <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    Loading…
+                </div>
+
+                <!-- Empty state -->
+                <div x-show="!browserLoading && filteredBrowserThemes.length === 0"
+                     class="flex flex-col items-center justify-center py-12 text-slate-500 text-sm gap-1">
+                    <span class="text-2xl">🗂</span>
+                    <span x-text="browserFilter ? 'No matching themes' : 'No output yet'"></span>
+                </div>
+
+                <!-- Theme list -->
+                <template x-for="(theme, ti) in filteredBrowserThemes" :key="theme.theme">
+                    <div class="border-b border-slate-700">
+
+                        <!-- Theme header -->
+                        <div class="flex items-center gap-1 px-3 py-2 hover:bg-slate-700 transition-colors">
+                            <!-- Manage-mode: select-all checkbox -->
+                            <input x-show="manageMode" type="checkbox"
+                                   :checked="themeAllSelected(theme)"
+                                   @change="toggleThemeFiles(theme)"
+                                   class="flex-shrink-0 accent-indigo-500">
+                            <!-- Inline rename form — shown when renaming this theme -->
+                            <template x-if="manageMode && renamingDir === theme.dir_name">
+                                <div class="flex items-center gap-1 flex-1 min-w-0">
+                                    <input type="text" x-model="renameValue"
+                                           @keydown.enter="commitRename()"
+                                           @keydown.escape="cancelRename()"
+                                           x-init="$el.focus()"
+                                           class="flex-1 text-xs rounded px-2 py-1 bg-slate-600 text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 min-w-0">
+                                    <button @click.stop="commitRename()" title="Save"
+                                            class="flex-shrink-0 text-xs text-green-400 hover:text-green-200 px-1">✓</button>
+                                    <button @click.stop="cancelRename()" title="Cancel"
+                                            class="flex-shrink-0 text-xs text-slate-400 hover:text-slate-200 px-1">✕</button>
+                                </div>
+                            </template>
+                            <!-- Normal title row -->
+                            <template x-if="!(manageMode && renamingDir === theme.dir_name)">
+                                <button @click="theme.expanded = !theme.expanded"
+                                        class="flex items-center gap-2 flex-1 text-left min-w-0">
+                                    <span class="text-slate-400 text-xs w-3 flex-shrink-0" x-text="theme.expanded ? '▼' : '▶'"></span>
+                                    <span class="text-sm font-medium flex-1 truncate" x-text="theme.theme"></span>
+                                    <span class="text-xs text-slate-500 flex-shrink-0"
+                                          x-text="_fmtBytes(theme.theme_size_bytes)"></span>
+                                </button>
+                            </template>
+                            <!-- Manage-mode: rename button -->
+                            <button x-show="manageMode && renamingDir !== theme.dir_name"
+                                    @click.stop="startRename(theme.dir_name, theme.theme)"
+                                    title="Rename theme"
+                                    class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">✏</button>
+                            <!-- ZIP download button -->
+                            <button @click.stop="downloadThemeZip(theme.dir_name)" title="Download ZIP"
+                                    class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">⬇ ZIP</button>
+                        </div>
+
+                        <div x-show="theme.expanded" class="px-4 pb-3 space-y-3">
+
+                            <!-- Finals -->
+                            <template x-if="theme.finals.length > 0">
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Finals</p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <template x-for="(f, fi) in theme.finals" :key="fi">
+                                            <div class="bg-slate-700 rounded-lg overflow-hidden relative"
+                                                 :class="isSelected(f.png_url) ? 'ring-2 ring-indigo-400' : ''"
+                                                 @click="if (manageMode) toggleFile(f.png_url, f.png_size)"
+                                                 :style="manageMode ? 'cursor:pointer' : ''">
+                                                <!-- Manage-mode: full-image selection overlay -->
+                                                <div x-show="manageMode && isSelected(f.png_url)"
+                                                     class="absolute inset-0 z-10 bg-indigo-500/30 flex items-center justify-center pointer-events-none">
+                                                    <span class="text-white text-3xl drop-shadow-lg font-bold">✓</span>
+                                                </div>
+                                                <a :href="f.png_url" target="_blank"
+                                                   :class="manageMode ? 'pointer-events-none' : ''">
+                                                    <img :src="f.png_url" class="w-full aspect-square object-contain bg-slate-900 block">
+                                                </a>
+                                                <div class="px-2 py-1.5 space-y-1">
+                                                    <p class="text-xs text-slate-400"
+                                                       x-text="f.ts + ' · ' + f.width + '×' + f.height"></p>
+                                                    <div class="flex gap-2 flex-wrap items-center">
+                                                        <a :href="f.png_url" download class="text-xs text-indigo-400 hover:text-indigo-300">⬇ PNG</a>
+                                                        <a x-show="f.md_url" :href="f.md_url" download class="text-xs text-slate-400 hover:text-slate-200">📄 MD</a>
+                                                        <a x-show="f.no_bg_url" :href="f.no_bg_url" download class="text-xs text-slate-400 hover:text-slate-200">⬇ No BG</a>
+                                                        <button x-show="!manageMode"
+                                                                @click.stop="loadToVariants(f.png_url, f.width, f.height, theme.theme)"
+                                                                class="text-xs text-emerald-400 hover:text-emerald-200 font-medium transition-colors">↑ Load</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Concepts -->
+                            <template x-for="(concept, ci) in theme.concepts" :key="ci">
+                                <div>
+                                    <button @click="concept.expanded = !concept.expanded"
+                                            class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 hover:text-slate-200 transition-colors">
+                                        <span x-text="concept.expanded ? '▼' : '▶'"></span>
+                                        <span x-text="`${concept.name} (${concept.variants.length})`"></span>
+                                    </button>
+                                    <div x-show="concept.expanded" class="grid grid-cols-3 gap-1.5">
+                                        <template x-for="(v, vi) in concept.variants" :key="vi">
+                                            <div class="bg-slate-700 rounded overflow-hidden relative"
+                                                 :class="isSelected(v.url) ? 'ring-2 ring-indigo-400' : ''"
+                                                 @click="if (manageMode) toggleFile(v.url, v.size)"
+                                                 :style="manageMode ? 'cursor:pointer' : ''">
+                                                <!-- Manage-mode: full-image selection overlay -->
+                                                <div x-show="manageMode && isSelected(v.url)"
+                                                     class="absolute inset-0 z-10 bg-indigo-500/30 flex items-center justify-center pointer-events-none">
+                                                    <span class="text-white text-2xl drop-shadow-lg font-bold">✓</span>
+                                                </div>
+                                                <a :href="v.url" target="_blank"
+                                                   :class="manageMode ? 'pointer-events-none' : ''">
+                                                    <img :src="v.url" class="w-full aspect-square object-contain bg-slate-900 block">
+                                                </a>
+                                                <div class="px-1.5 py-1">
+                                                    <p class="text-xs text-slate-500 mb-0.5"
+                                                       x-text="v.width + '×' + v.height"></p>
+                                                    <div class="flex gap-1.5 flex-wrap items-center">
+                                                        <a :href="v.url" download class="text-xs text-indigo-400 hover:text-indigo-300">⬇</a>
+                                                        <a x-show="v.no_bg_url" :href="v.no_bg_url" download class="text-xs text-slate-400 hover:text-slate-200">no bg</a>
+                                                        <button x-show="!manageMode"
+                                                                @click.stop="loadToVariants(v.url, v.width, v.height, theme.theme)"
+                                                                class="text-xs text-emerald-400 hover:text-emerald-200 font-medium transition-colors">↑ Load</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Manage-mode sticky footer -->
+            <div x-show="manageMode" class="flex-shrink-0 border-t border-slate-600 px-4 py-3 bg-slate-800">
+                <div x-show="selectedCount === 0" class="text-xs text-slate-500 text-center">
+                    Click images or use theme checkboxes to select files
+                </div>
+                <div x-show="selectedCount > 0" class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400 flex-1"
+                          x-text="`${selectedCount} file${selectedCount > 1 ? 's' : ''} · ${_fmtBytes(selectedBytes)}`"></span>
+                    <button @click="downloadSelectedZip()"
+                            class="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs font-semibold rounded-lg transition-colors">
+                        ⬇ ZIP
+                    </button>
+                    <button @click="deleteSelected()"
+                            class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                        🗑 Delete
+                    </button>
+                </div>
+            </div>
+
         </div>
     </div>
 
