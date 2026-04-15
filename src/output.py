@@ -214,10 +214,14 @@ def load_image_to_session(session: dict, image_url: str, display_theme: str) -> 
     session["theme"] = display_theme
     session["concepts"] = []
     session["prompts"] = []
+    # Use the URL-relative path (strip leading /) so it matches the format
+    # save_variants produces — downstream code like _no_bg_path() and URL
+    # construction all expect a relative path, not an absolute one.
+    rel_path = image_url.lstrip("/")
     session["images"] = [img]
-    session["image_paths"] = [str(p)]
+    session["image_paths"] = [rel_path]
     session["original_images"] = [img]
-    session["original_image_paths"] = [str(p)]
+    session["original_image_paths"] = [rel_path]
     session["no_bg_variant_cache"] = {}
     session["selected_idx"] = 0
     session["final_image"] = None
