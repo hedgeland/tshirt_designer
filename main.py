@@ -6,9 +6,8 @@ from urllib.parse import urlencode
 
 from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import Response
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
@@ -39,15 +38,25 @@ from config import (
     PRINTIFY_SHOP_ID,
     PRINTIFY_SHOP_NAME,
     PRINTIFY_TOKEN,
-    SIZE_PX,
     SECRET_KEY,
+    SIZE_PX,
 )
 from src import presets, printify
 from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
 from src.finalize import finalize_design
 from src.image import generate_image
-from src.output import archive_files, archive_theme, delete_files, load_image_to_session, rename_theme, safe_theme_name, save_variants, scan_output, timestamp
+from src.output import (
+    archive_files,
+    archive_theme,
+    delete_files,
+    load_image_to_session,
+    rename_theme,
+    safe_theme_name,
+    save_variants,
+    scan_output,
+    timestamp,
+)
 from src.prompts import build_prompts
 
 app = FastAPI()
@@ -109,8 +118,8 @@ def get_session(session_id: str) -> dict:
             "theme": "",
             "concepts": [],
             "prompts": [],
-            "images": [],        # PIL Images kept in memory for bg removal + finalize
-            "image_paths": [],   # on-disk paths, used to build static URLs
+            "images": [],  # PIL Images kept in memory for bg removal + finalize
+            "image_paths": [],  # on-disk paths, used to build static URLs
             "selected_idx": None,
             "final_image": None,
             "final_path": None,
@@ -142,8 +151,8 @@ def _has_transparency(img: Image.Image) -> bool:
     return img.split()[3].getextrema()[0] == 0
 
 
-
 # ── Auth routes ───────────────────────────────────────────────────────────────
+
 
 @app.get("/login")
 async def login_page(request: Request, error: str = ""):
@@ -182,35 +191,40 @@ async def logout(request: Request):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @app.get("/")
 async def index(request: Request):
     builtin = presets.load_builtin()
-    return templates.TemplateResponse(request, "index.html", {
-        "num_variants": NUM_VARIANTS,
-        "bg_color": DEFAULT_BG_COLOR,
-        "bg_color_name": DEFAULT_BG_COLOR_NAME,
-        "bg_tolerance": BG_REMOVAL_TOLERANCE,
-        "edge_erode": EDGE_ERODE_PX,
-        "decontaminate": EDGE_DECONTAMINATE,
-        "max_colors": MAX_COLORS,
-        "output_dir": OUTPUT_DIR,
-        "preset_names": presets.all_preset_names(),
-        "builtin_name": presets.BUILTIN_NAME,
-        "concepts_template": builtin["concepts_prompt"],
-        "variants_template": builtin["variants_prompt"],
-        "style_template": builtin["style_suffix"],
-        "printify_enabled": bool(PRINTIFY_TOKEN),
-        "printify_shop_id": PRINTIFY_SHOP_ID,
-        "printify_shop_name": PRINTIFY_SHOP_NAME,
-        "printify_min_size": PRINTIFY_MIN_SIZE,
-        "size_px": SIZE_PX,
-        "aspect_ratios": ASPECT_RATIOS,
-        "default_aspect_ratio": DEFAULT_ASPECT_RATIO,
-        "brainstorm_sizes": BRAINSTORM_SIZES,
-        "brainstorm_size": BRAINSTORM_SIZE,
-        "final_sizes": FINAL_SIZES,
-        "final_size": FINAL_SIZE,
-    })
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "num_variants": NUM_VARIANTS,
+            "bg_color": DEFAULT_BG_COLOR,
+            "bg_color_name": DEFAULT_BG_COLOR_NAME,
+            "bg_tolerance": BG_REMOVAL_TOLERANCE,
+            "edge_erode": EDGE_ERODE_PX,
+            "decontaminate": EDGE_DECONTAMINATE,
+            "max_colors": MAX_COLORS,
+            "output_dir": OUTPUT_DIR,
+            "preset_names": presets.all_preset_names(),
+            "builtin_name": presets.BUILTIN_NAME,
+            "concepts_template": builtin["concepts_prompt"],
+            "variants_template": builtin["variants_prompt"],
+            "style_template": builtin["style_suffix"],
+            "printify_enabled": bool(PRINTIFY_TOKEN),
+            "printify_shop_id": PRINTIFY_SHOP_ID,
+            "printify_shop_name": PRINTIFY_SHOP_NAME,
+            "printify_min_size": PRINTIFY_MIN_SIZE,
+            "size_px": SIZE_PX,
+            "aspect_ratios": ASPECT_RATIOS,
+            "default_aspect_ratio": DEFAULT_ASPECT_RATIO,
+            "brainstorm_sizes": BRAINSTORM_SIZES,
+            "brainstorm_size": BRAINSTORM_SIZE,
+            "final_sizes": FINAL_SIZES,
+            "final_size": FINAL_SIZE,
+        },
+    )
 
 
 @app.post("/brainstorm")
@@ -221,7 +235,9 @@ async def brainstorm(
 ):
     async def stream():
         if not GOOGLE_API_KEY:
-            yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set. Add it to your .env file."})
+            yield sse(
+                {"type": "error", "message": "GOOGLE_API_KEY is not set. Add it to your .env file."}
+            )
             return
         if not theme.strip():
             yield sse({"type": "error", "message": "Enter a theme first."})
@@ -238,16 +254,18 @@ async def brainstorm(
             return
 
         session = get_session(session_id)
-        session.update({
-            "theme": theme.strip(),
-            "concepts": concepts,
-            "prompts": [],
-            "images": [],
-            "image_paths": [],
-            "selected_idx": None,
-            "final_image": None,
-            "final_path": None,
-        })
+        session.update(
+            {
+                "theme": theme.strip(),
+                "concepts": concepts,
+                "prompts": [],
+                "images": [],
+                "image_paths": [],
+                "selected_idx": None,
+                "final_image": None,
+                "final_path": None,
+            }
+        )
 
         yield sse({"type": "concepts", "concepts": concepts})
 
@@ -257,8 +275,8 @@ async def brainstorm(
 @app.post("/generate")
 async def generate(
     session_id: str = Form(...),
-    concept: str = Form(...),           # edited concept text → goes to build_prompts
-    original_concept: str = Form(""),   # radio selection → used to find concept_idx
+    concept: str = Form(...),  # edited concept text → goes to build_prompts
+    original_concept: str = Form(""),  # radio selection → used to find concept_idx
     bg_color: str = Form(...),
     num_variants: int = Form(...),
     max_colors: int = Form(...),
@@ -266,6 +284,7 @@ async def generate(
     style_template: str = Form(...),
     variant_size: str = Form(BRAINSTORM_SIZE),
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
+    reference_mode: str = Form("style"),
 ):
     async def stream():
         if not GOOGLE_API_KEY:
@@ -276,6 +295,7 @@ async def generate(
             return
 
         session = get_session(session_id)
+        ref_image = session.get("reference_image")  # PIL Image or None
         yield sse({"type": "status", "message": "Building prompts..."})
 
         try:
@@ -294,14 +314,33 @@ async def generate(
             return
 
         yield sse({"type": "prompts", "prompts": prompts})
-        yield sse({"type": "status", "message": f"Generating variant 1 of {num_variants} at {variant_size} ({aspect_ratio})..."})
+        ref_note = " with reference image" if ref_image is not None else ""
+        yield sse(
+            {
+                "type": "status",
+                "message": f"Generating variant 1 of {num_variants} at {variant_size} ({aspect_ratio}){ref_note}...",
+            }
+        )
 
         images: list[Image.Image] = []
         for i, prompt in enumerate(prompts):
             if i > 0:
-                yield sse({"type": "status", "message": f"Generating variant {i + 1} of {num_variants} at {variant_size} ({aspect_ratio})..."})
+                yield sse(
+                    {
+                        "type": "status",
+                        "message": f"Generating variant {i + 1} of {num_variants} at {variant_size} ({aspect_ratio}){ref_note}...",
+                    }
+                )
             try:
-                img = await asyncio.to_thread(generate_image, prompt, GOOGLE_API_KEY, size=variant_size, aspect_ratio=aspect_ratio)
+                img = await asyncio.to_thread(
+                    generate_image,
+                    prompt,
+                    GOOGLE_API_KEY,
+                    size=variant_size,
+                    aspect_ratio=aspect_ratio,
+                    reference_image=ref_image,
+                    reference_mode=reference_mode,
+                )
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
                 return
@@ -315,24 +354,24 @@ async def generate(
         except ValueError:
             concept_idx = 0
 
-        paths = await asyncio.to_thread(
-            save_variants, theme, concept_idx, images
-        )
+        paths = await asyncio.to_thread(save_variants, theme, concept_idx, images)
 
-        session.update({
-            "prompts": prompts,
-            "images": images,
-            "image_paths": paths,
-            "original_images": list(images),       # preserved so bg removal is undoable
-            "original_image_paths": list(paths),
-            "no_bg_variant_cache": {},             # cleared on each new generate
-            "selected_idx": 0 if num_variants == 1 else None,
-            "final_image": None,
-            "final_path": None,
-            "original_final": None,
-            "original_final_path": None,
-            "no_bg_final_cache": None,
-        })
+        session.update(
+            {
+                "prompts": prompts,
+                "images": images,
+                "image_paths": paths,
+                "original_images": list(images),  # preserved so bg removal is undoable
+                "original_image_paths": list(paths),
+                "no_bg_variant_cache": {},  # cleared on each new generate
+                "selected_idx": 0 if num_variants == 1 else None,
+                "final_image": None,
+                "final_path": None,
+                "original_final": None,
+                "original_final_path": None,
+                "no_bg_final_cache": None,
+            }
+        )
 
         # paths are like "output/theme/concept_1/variant_1.png" — prepend / for URL
         urls = [f"/{p}" for p in paths]
@@ -370,18 +409,28 @@ async def finalize(
 
         try:
             final_img = await asyncio.to_thread(
-                finalize_design, prompts[idx], variant, GOOGLE_API_KEY,
-                size=final_size, aspect_ratio=aspect_ratio,
+                finalize_design,
+                prompts[idx],
+                variant,
+                GOOGLE_API_KEY,
+                size=final_size,
+                aspect_ratio=aspect_ratio,
             )
         except Exception as e:
             yield sse({"type": "error", "message": str(e)})
             return
 
         if bg_was_removed:
-            yield sse({"type": "status", "message": f"Removing background from {final_size} image..."})
+            yield sse(
+                {"type": "status", "message": f"Removing background from {final_size} image..."}
+            )
             final_img = await asyncio.to_thread(
-                remove_background_color, final_img, bg_color,
-                tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
+                remove_background_color,
+                final_img,
+                bg_color,
+                tolerance=bg_tolerance,
+                erode_px=edge_erode,
+                decontaminate=decontaminate,
             )
 
         ts = timestamp()
@@ -402,9 +451,9 @@ async def finalize(
 
         session["final_image"] = final_img
         session["final_path"] = str(final_path)
-        session["original_final"] = final_img          # preserved so bg removal is undoable
+        session["original_final"] = final_img  # preserved so bg removal is undoable
         session["original_final_path"] = str(final_path)
-        session["no_bg_final_cache"] = None            # stale on each new finalize
+        session["no_bg_final_cache"] = None  # stale on each new finalize
 
         yield sse({"type": "final", "url": f"/{final_path}"})
 
@@ -439,8 +488,12 @@ async def remove_variant_bg(
             yield sse({"type": "status", "message": "Removing background..."})
             try:
                 result = await asyncio.to_thread(
-                    remove_background_color, images[idx], bg_color,
-                    tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
+                    remove_background_color,
+                    images[idx],
+                    bg_color,
+                    tolerance=bg_tolerance,
+                    erode_px=edge_erode,
+                    decontaminate=decontaminate,
                 )
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
@@ -490,8 +543,12 @@ async def remove_final_bg(
             yield sse({"type": "status", "message": "Removing background..."})
             try:
                 result = await asyncio.to_thread(
-                    remove_background_color, final_img, bg_color,
-                    tolerance=bg_tolerance, erode_px=edge_erode, decontaminate=decontaminate,
+                    remove_background_color,
+                    final_img,
+                    bg_color,
+                    tolerance=bg_tolerance,
+                    erode_px=edge_erode,
+                    decontaminate=decontaminate,
                 )
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
@@ -551,6 +608,7 @@ async def restore_final_bg(session_id: str = Form(...)):
 
 # ── BG state sync endpoints (plain JSON, no algorithm — used by client cache-hit paths) ──
 
+
 @app.post("/apply-cached-bg/variant")
 async def apply_cached_variant_bg(session_id: str = Form(...), selected_idx: int = Form(...)):
     """Swap session to the cached no-bg variant without re-running the algorithm."""
@@ -585,6 +643,7 @@ async def apply_cached_final_bg(session_id: str = Form(...)):
 
 # ── Image analysis endpoints ──────────────────────────────────────────────────
 
+
 @app.get("/analysis/final")
 async def analyze_final(session_id: str):
     """Return content bounding box of the final image for Printify placement.
@@ -601,6 +660,7 @@ async def analyze_final(session_id: str):
 
 
 # ── Preset endpoints ──────────────────────────────────────────────────────────
+
 
 @app.get("/presets/{name}")
 async def get_preset(name: str):
@@ -645,10 +705,66 @@ async def session_load_image(request: Request):
     image_url = body.get("image_url", "")
     display_theme = body.get("display_theme", "")
     try:
-        result = await asyncio.to_thread(load_image_to_session, get_session(session_id), image_url, display_theme)
+        result = await asyncio.to_thread(
+            load_image_to_session, get_session(session_id), image_url, display_theme
+        )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     return result
+
+
+@app.post("/session/set-reference-image")
+async def session_set_reference_image(
+    session_id: str = Form(...),
+    reference_path: str = Form(""),
+    reference_file: UploadFile = File(None),
+):
+    """Store a reference image in session for use during variant generation.
+
+    Accepts either a path to an existing output file or an uploaded file — not both.
+    """
+    session = get_session(session_id)
+
+    if reference_file is not None:
+        data = await reference_file.read()
+        import io as _io
+
+        img = Image.open(_io.BytesIO(data)).convert("RGBA")
+    elif reference_path:
+        # Reuse the same safety check as load_image_to_session: path must be within OUTPUT_DIR.
+        clean = reference_path.lstrip("/")
+        abs_path = Path(clean).resolve()
+        if not str(abs_path).startswith(str(Path(OUTPUT_DIR).resolve())):
+            return JSONResponse({"error": "Invalid path"}, status_code=400)
+        img = Image.open(abs_path).convert("RGBA")
+    else:
+        return JSONResponse({"error": "No image provided"}, status_code=400)
+
+    session["reference_image"] = img
+    return JSONResponse({"ok": True})
+
+
+@app.get("/session/reference-image-preview")
+async def session_reference_image_preview(session_id: str):
+    """Return the stored reference image as a PNG for thumbnail display."""
+    import io as _io
+
+    session = get_session(session_id)
+    img: Image.Image | None = session.get("reference_image")
+    if img is None:
+        return Response(status_code=204)
+    buf = _io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
+@app.post("/session/clear-reference-image")
+async def session_clear_reference_image(request: Request):
+    """Remove the reference image from session."""
+    body = await request.json()
+    session = get_session(body.get("session_id", ""))
+    session["reference_image"] = None
+    return JSONResponse({"ok": True})
 
 
 @app.patch("/browse/rename")
@@ -672,7 +788,10 @@ async def save_preset_route(
 ):
     name = name.strip()
     if not name or name == presets.BUILTIN_NAME:
-        return {"error": "Name required (cannot overwrite built-in).", "names": presets.all_preset_names()}
+        return {
+            "error": "Name required (cannot overwrite built-in).",
+            "names": presets.all_preset_names(),
+        }
     try:
         presets.save_preset(name, concepts, variants, style)
     except ValueError as e:
@@ -689,6 +808,7 @@ async def delete_preset_route(name: str):
 # ── Printify endpoints ────────────────────────────────────────────────────────
 # These routes are only useful when PRINTIFY_TOKEN is set. Callers should check
 # the `printify_enabled` flag from /config before hitting these.
+
 
 @app.get("/printify/shops")
 async def printify_shops():
@@ -715,7 +835,12 @@ async def printify_blueprints(q: str = ""):
     search = q.strip().lower() if q.strip() else "shirt tee"
     terms = search.split()
     filtered = [
-        {"id": bp["id"], "title": bp["title"], "brand": bp.get("brand", ""), "model": bp.get("model", "")}
+        {
+            "id": bp["id"],
+            "title": bp["title"],
+            "brand": bp.get("brand", ""),
+            "model": bp.get("model", ""),
+        }
         for bp in all_bps
         if any(t in bp.get("title", "").lower() for t in terms)
     ]
@@ -754,7 +879,7 @@ async def printify_publish(
     shop_id: str = Form(...),
     blueprint_id: int = Form(...),
     provider_id: int = Form(...),
-    variant_ids: str = Form(...),   # JSON array of ints
+    variant_ids: str = Form(...),  # JSON array of ints
     title: str = Form(...),
     description: str = Form(""),
     price_cents: int = Form(...),
@@ -766,6 +891,7 @@ async def printify_publish(
     override_min_res: bool = Form(False),
 ):
     """Upload the session's final image to Printify and create (optionally publish) a product."""
+
     async def stream():
         if not PRINTIFY_TOKEN:
             yield sse({"type": "error", "message": "PRINTIFY_TOKEN not configured."})
@@ -793,7 +919,12 @@ async def printify_publish(
             img_check = await asyncio.to_thread(Image.open, final_path)
             w, h = img_check.size
             if max(w, h) < min_px:
-                yield sse({"type": "error", "message": f"Image must be at least {PRINTIFY_MIN_SIZE} ({min_px}px) to publish. Re-finalize at a higher resolution."})
+                yield sse(
+                    {
+                        "type": "error",
+                        "message": f"Image must be at least {PRINTIFY_MIN_SIZE} ({min_px}px) to publish. Re-finalize at a higher resolution.",
+                    }
+                )
                 return
 
         try:
@@ -809,9 +940,7 @@ async def printify_publish(
         # Step 1: Upload image
         yield sse({"type": "status", "message": "Uploading image to Printify..."})
         try:
-            image_id = await asyncio.to_thread(
-                printify.upload_image, PRINTIFY_TOKEN, final_path
-            )
+            image_id = await asyncio.to_thread(printify.upload_image, PRINTIFY_TOKEN, final_path)
         except Exception as e:
             yield sse({"type": "error", "message": f"Image upload failed: {e}"})
             return
@@ -850,16 +979,19 @@ async def printify_publish(
                 return
 
         product_url = f"https://printify.com/app/editor/{product_id}"
-        yield sse({
-            "type": "done",
-            "product_id": product_id,
-            "product_url": product_url,
-            "published": publish_now,
-        })
+        yield sse(
+            {
+                "type": "done",
+                "product_id": product_id,
+                "product_url": product_url,
+                "published": publish_now,
+            }
+        )
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

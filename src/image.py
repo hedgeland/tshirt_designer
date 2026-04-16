@@ -20,12 +20,52 @@ def _extract_image(response) -> Image.Image:
     raise RuntimeError("No image returned from model")
 
 
-def generate_image(prompt: str, api_key: str, size: str = BRAINSTORM_SIZE, aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> Image.Image:
+def generate_image(
+    prompt: str,
+    api_key: str,
+    size: str = BRAINSTORM_SIZE,
+    aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+    reference_image: Image.Image | None = None,
+    reference_mode: str = "style",
+) -> Image.Image:
     client = get_client(api_key)
+
+    if reference_image is not None:
+        # Flatten transparency before sending — same reason as finalize_image().
+        ref = reference_image.convert("RGBA")
+        if ref.getextrema()[3][0] == 0:
+            background = Image.new("RGBA", ref.size, (255, 255, 255, 255))
+            background.paste(ref, mask=ref.split()[3])
+            ref = background.convert("RGB")
+        buf = io.BytesIO()
+        ref.save(buf, format="PNG")
+
+        # Prepend a mode-specific instruction so the model knows whether to borrow
+        # only the visual style or to replicate the composition and subject matter.
+        if reference_mode == "copy":
+            instruction = (
+                "Use the provided image as a compositional reference — "
+                "recreate a similar layout, subject placement, and design structure. "
+                "Apply it to this design: "
+            )
+        else:  # "style"
+            instruction = (
+                "Use the provided image as a visual style reference only. "
+                "Do not reproduce its subject matter or composition. "
+                "Match its color palette, line weight, and graphic aesthetic, "
+                "then apply that style to this design: "
+            )
+
+        contents = [
+            types.Part(inline_data=types.Blob(data=buf.getvalue(), mime_type="image/png")),
+            types.Part(text=instruction + prompt),
+        ]
+    else:
+        contents = prompt
 
     response = client.models.generate_content(
         model=MODEL,
-        contents=prompt,
+        contents=contents,
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE"],  # text-only response modality is excluded
             image_config=types.ImageConfig(

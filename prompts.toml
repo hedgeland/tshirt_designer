@@ -42,10 +42,11 @@ Example: ["prompt 1", "prompt 2", "prompt 3"]"""
 # Line-ending backslashes here trim newlines so it stays one line at runtime.
 style_suffix = """\
 flat vector graphic style, isolated centered focal point, \
-the subject contained entirely within the frame with 15% negative space margin, \
+the subject contained entirely within the frame and filling up the frame as much \
+as possible while maintaining a 5% negative space margin, \
 bold consistent line weights, maximum {max_colors} solid colors total, \
 limited color palette, solid {bg_color} background filling the entire frame, \
-high contrast, screen print ready, professional sticker aesthetic, \
+high contrast, screen print ready, professional sticker-like aesthetic, \
 no gradients, no shading, no photographic textures, \
 strictly no elements touching the image borders, \
 anatomically accurate to the subject's real-world form"""

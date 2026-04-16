@@ -95,6 +95,10 @@ function designer() {
         variantsTemplate: cfg.variantsTemplate,
         styleTemplate: cfg.styleTemplate,
 
+        // ── Reference image state ─────────────────────────────────────────
+        refImageUrl: null,      // preview URL when a reference image is set; null otherwise
+        referenceMode: "style", // "style" = borrow aesthetic only; "copy" = replicate composition
+
         // ── Load-from-browser state ───────────────────────────────────────
         loadedImageRes: null,   // {width, height} when variants came from the output browser; null otherwise
 
@@ -103,6 +107,7 @@ function designer() {
 
         // ── Output browser ────────────────────────────────────────────────
         showBrowser: false,
+        browserMode: null,      // null = normal, "reference" = picking a reference image
         browserThemes: [],
         browserFilter: "",
         browserLoading: false,
@@ -297,9 +302,46 @@ function designer() {
             this.$nextTick(() => this.$refs.step4?.scrollIntoView({ behavior: "smooth", block: "start" }));
         },
 
+        async setReferenceFromBrowser(imageUrl) {
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("reference_path", imageUrl);
+            const res = await fetch("/session/set-reference-image", { method: "POST", body: fd });
+            if (!res.ok) { alert(`Failed to set reference image (${res.status})`); return; }
+            // Bust the cache with a timestamp so the thumbnail refreshes if the ref changes.
+            this.refImageUrl = `/session/reference-image-preview?session_id=${encodeURIComponent(this.sessionId)}&ts=${Date.now()}`;
+        },
+
+        async setReferenceFromFile(file) {
+            if (!file) return;
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("reference_file", file);
+            const res = await fetch("/session/set-reference-image", { method: "POST", body: fd });
+            if (!res.ok) { alert(`Failed to set reference image (${res.status})`); return; }
+            this.refImageUrl = `/session/reference-image-preview?session_id=${encodeURIComponent(this.sessionId)}&ts=${Date.now()}`;
+        },
+
+        async clearReference() {
+            await fetch("/session/clear-reference-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: this.sessionId }),
+            });
+            this.refImageUrl = null;
+        },
+
         async openBrowser() {
+            this.browserMode = null;
             this.showBrowser = true;
             if (this.browserThemes.length > 0) return; // already loaded
+            await this.reloadBrowser();
+        },
+
+        async openBrowserForReference() {
+            this.browserMode = "reference";
+            this.showBrowser = true;
+            if (this.browserThemes.length > 0) return;
             await this.reloadBrowser();
         },
 
@@ -528,6 +570,7 @@ function designer() {
             fd.append("style_template", this.styleTemplate);
             fd.append("aspect_ratio", this.aspectRatio);
             fd.append("variant_size", this.variantSize);
+            fd.append("reference_mode", this.referenceMode);
 
             await streamSSE("/generate", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
@@ -941,6 +984,18 @@ function designer() {
             this.pDrag = null;
             document.removeEventListener('mousemove', this._boundDragMove);
             document.removeEventListener('mouseup', this._boundDragUp);
+        },
+
+        // Keyboard nudge for the placement preview image. dx/dy are in print pixels.
+        // Called by arrow-key handlers on the preview img element.
+        nudgeDrag(dx, dy) {
+            if (!this.pPrintWidth || !this.pPrintHeight) return;
+            const designPx = this.pDesignPx;
+            const minX = -(designPx - 1), maxX = this.pPrintWidth - 1;
+            const minY = -(designPx - 1), maxY = this.pPrintHeight - 1;
+            this.pXPx = Math.round(Math.min(Math.max(this.pXPx + dx, minX), maxX));
+            this.pYPx = Math.round(Math.min(Math.max(this.pYPx + dy, minY), maxY));
+            this.pIsTopPreset = false;
         },
 
         applyTopPreset() {
