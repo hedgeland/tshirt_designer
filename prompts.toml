@@ -29,6 +29,7 @@ Create {num_variants} distinct prompt variations for this concept. Each should:
   (e.g. variant 1: vintage/retro, variant 2: bold/minimal, variant 3: illustrative/detailed)
 - Be a single descriptive sentence (no bullet points)
 - Stay strictly faithful to the concept — do NOT invent elements, props, symbols, or details not implied by the concept. Every visual element must earn its place logically. If it wouldn't make sense to a viewer, cut it.
+- Preserve the subject's natural anatomy — do not add limbs, appendages, or physical features the subject does not naturally possess (e.g. a shark has fins, not legs).
 - Focus only on the subject and any props — do NOT describe a background scene or environment
 - NOT include style instructions — those will be appended automatically
 - If the concept includes text or a slogan, render it SHORT — 5 words or fewer, exactly as specified. Do not expand, subtitle, or add extra text to the design.
@@ -46,4 +47,5 @@ bold consistent line weights, maximum {max_colors} solid colors total, \
 limited color palette, solid {bg_color} background filling the entire frame, \
 high contrast, screen print ready, professional sticker aesthetic, \
 no gradients, no shading, no photographic textures, \
-strictly no elements touching the image borders"""
+strictly no elements touching the image borders, \
+anatomically accurate to the subject's real-world form"""

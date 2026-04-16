@@ -146,7 +146,7 @@ function designer() {
         pYPx: 0,                    // top edge of image in print-area pixels (0 = flush top)
         pTopAllowance: 10,          // px gap from print-area top for "Align to Top" preset; persists across opens
         pIsTopPreset: true,         // true when X/Y match the "Align to Top" formula
-        pScale: 0.8,                // fraction of print area width the design occupies
+        pScale: 1.0,                // fraction of print area width the design occupies
         pContentTop: 0,             // fraction of image height above first visible pixel (for gap correction)
 
         pOverrideMinRes: false, // dev override: skip the resolution gate when testing
@@ -170,7 +170,7 @@ function designer() {
 
             // Bound drag handlers — stored so removeEventListener can reference them by identity.
             this._boundDragMove = this._onDragMove.bind(this);
-            this._boundDragUp   = this._onDragUp.bind(this);
+            this._boundDragUp = this._onDragUp.bind(this);
 
             // Keep the "Align to Top" preset in sync when scale or allowance changes.
             this.$watch('pScale', () => {
@@ -775,7 +775,7 @@ function designer() {
                 fetch(`/analysis/final?session_id=${encodeURIComponent(this.sessionId)}`)
                     .then(r => r.json())
                     .then(data => { this.pContentTop = data.content_top ?? 0; })
-                    .catch(() => {});
+                    .catch(() => { });
             }
 
             // Load shops (skip if shop ID already configured server-side).
@@ -907,7 +907,7 @@ function designer() {
                 scale,
                 designPx,
                 snapThreshold: 8 / scale,  // 8 screen px → print px; feels consistent across sizes
-                centerX: Math.round((this.pPrintWidth  - designPx) / 2),
+                centerX: Math.round((this.pPrintWidth - designPx) / 2),
                 centerY: Math.round((this.pPrintHeight - designPx) / 2),
                 minX: -(designPx - 1),
                 maxX: this.pPrintWidth - 1,
@@ -915,7 +915,7 @@ function designer() {
                 maxY: this.pPrintHeight - 1,
             };
             document.addEventListener('mousemove', this._boundDragMove);
-            document.addEventListener('mouseup',   this._boundDragUp);
+            document.addEventListener('mouseup', this._boundDragUp);
         },
 
         _onDragMove(e) {
@@ -940,7 +940,7 @@ function designer() {
         _onDragUp() {
             this.pDrag = null;
             document.removeEventListener('mousemove', this._boundDragMove);
-            document.removeEventListener('mouseup',   this._boundDragUp);
+            document.removeEventListener('mouseup', this._boundDragUp);
         },
 
         applyTopPreset() {
