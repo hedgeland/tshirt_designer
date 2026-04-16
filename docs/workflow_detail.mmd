@@ -11,7 +11,10 @@ graph TD
 
     %% 2. Ideation
     subgraph Ideation [2. Ideation]
-        EnterTheme([Enter theme]) --> IdeationMode{Mode?}
+        EnterTheme([Enter theme]) --> OptRefImage{Set reference image? optional}
+        OptRefImage -- "Upload / pick from browser" --> SetRefImage[POST /session/set-reference-image Stored in session used by both paths]
+        OptRefImage -- "Skip" --> IdeationMode{Mode?}
+        SetRefImage --> IdeationMode
         IdeationMode -- "Brainstorm" --> Brainstorm[POST /brainstorm Gemini generates text concepts]
         IdeationMode -- "Generate directly" --> DirectConcept([Theme used as concept skip brainstorm])
         Brainstorm --> ViewConcepts(View concept list)
@@ -89,6 +92,7 @@ graph TD
     %% Decision nodes - amber
     style AuthEnabled fill:#fff3cd,stroke:#ffc107
     style AllowlistCheck fill:#fff3cd,stroke:#ffc107
+    style OptRefImage fill:#fff3cd,stroke:#ffc107
     style IdeationMode fill:#fff3cd,stroke:#ffc107
     style IdeationChoice fill:#fff3cd,stroke:#ffc107
     style LoadPreset fill:#fff3cd,stroke:#ffc107
@@ -111,6 +115,7 @@ graph TD
     style SelectProvider fill:#cfe2ff,stroke:#0d6efd
     style SelectVariants fill:#cfe2ff,stroke:#0d6efd
     style AnalyzeFinal fill:#cfe2ff,stroke:#0d6efd
+    style SetRefImage fill:#cfe2ff,stroke:#0d6efd
     style SetDetails fill:#cfe2ff,stroke:#0d6efd
     style PublishNow fill:#cfe2ff,stroke:#0d6efd
     style SaveDraft fill:#cfe2ff,stroke:#0d6efd
