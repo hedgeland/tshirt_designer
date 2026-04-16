@@ -32,6 +32,7 @@ from config import (
     GOOGLE_CLIENT_SECRET,
     HTTPS_ONLY,
     MAX_COLORS,
+    MAX_COLUMNS,
     NUM_VARIANTS,
     OUTPUT_DIR,
     PRINTIFY_MIN_SIZE,
@@ -108,23 +109,50 @@ templates = Jinja2Templates(directory="templates")
 
 # ── Session store ─────────────────────────────────────────────────────────────
 # Simple in-memory store keyed by a UUID the client generates on page load.
+# Each session holds N independent column workflow states rather than one flat dict.
 # Good enough for a single-user local tool; replace with Redis or a DB for multi-user.
 sessions: dict[str, dict] = {}
 
 
+def init_column_state() -> dict:
+    """Return a fresh per-column workflow state dict."""
+    return {
+        "theme": "",
+        "concepts": [],
+        "prompts": [],
+        "images": [],           # PIL Images kept in memory for bg removal + finalize
+        "image_paths": [],      # on-disk paths, used to build static URLs
+        "selected_idx": None,
+        "final_image": None,
+        "final_path": None,
+        "reference_image": None,
+    }
+
+
 def get_session(session_id: str) -> dict:
+    """Return the session-level dict (columns list + max_columns). Creates if missing."""
     if session_id not in sessions:
         sessions[session_id] = {
-            "theme": "",
-            "concepts": [],
-            "prompts": [],
-            "images": [],  # PIL Images kept in memory for bg removal + finalize
-            "image_paths": [],  # on-disk paths, used to build static URLs
-            "selected_idx": None,
-            "final_image": None,
-            "final_path": None,
+            "columns": [init_column_state()],   # start with one column
+            "max_columns": MAX_COLUMNS,
         }
     return sessions[session_id]
+
+
+def get_column(session_id: str, column_id: int) -> dict:
+    """Return the state dict for a specific column.
+
+    Auto-extends the columns list if column_id is within the session's max_columns cap.
+    Falls back to column 0 if column_id is out of range — prevents KeyError on stale clients.
+    """
+    sess = get_session(session_id)
+    columns = sess["columns"]
+    # Grow the list to accommodate column_id if the cap allows it
+    while len(columns) <= column_id and len(columns) < sess["max_columns"]:
+        columns.append(init_column_state())
+    if column_id >= len(columns):
+        return columns[0]
+    return columns[column_id]
 
 
 def sse(data: dict) -> str:
@@ -223,6 +251,7 @@ async def index(request: Request):
             "brainstorm_size": BRAINSTORM_SIZE,
             "final_sizes": FINAL_SIZES,
             "final_size": FINAL_SIZE,
+            "max_columns": MAX_COLUMNS,
         },
     )
 
@@ -230,6 +259,7 @@ async def index(request: Request):
 @app.post("/brainstorm")
 async def brainstorm(
     session_id: str = Form(...),
+    column_id: int = Form(0),
     theme: str = Form(...),
     concepts_template: str = Form(...),
 ):
@@ -253,7 +283,7 @@ async def brainstorm(
             yield sse({"type": "error", "message": str(e)})
             return
 
-        session = get_session(session_id)
+        session = get_column(session_id, column_id)
         session.update(
             {
                 "theme": theme.strip(),
@@ -275,6 +305,7 @@ async def brainstorm(
 @app.post("/generate")
 async def generate(
     session_id: str = Form(...),
+    column_id: int = Form(0),
     concept: str = Form(...),  # edited concept text → goes to build_prompts
     original_concept: str = Form(""),  # radio selection → used to find concept_idx
     bg_color: str = Form(...),
@@ -285,6 +316,7 @@ async def generate(
     variant_size: str = Form(BRAINSTORM_SIZE),
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
     reference_mode: str = Form("style"),
+    direct_mode: bool = Form(False),
 ):
     async def stream():
         if not GOOGLE_API_KEY:
@@ -294,8 +326,11 @@ async def generate(
             yield sse({"type": "error", "message": "No concept to generate from."})
             return
 
-        session = get_session(session_id)
-        ref_image = session.get("reference_image")  # PIL Image or None
+        session = get_column(session_id, column_id)
+        # Reference image is only applied in Direct mode — when brainstorming, the
+        # reference would pull the generated images toward its aesthetics before the
+        # user has even chosen a concept, which is rarely the desired outcome.
+        ref_image = session.get("reference_image") if direct_mode else None
         yield sse({"type": "status", "message": "Building prompts..."})
 
         try:
@@ -383,6 +418,7 @@ async def generate(
 @app.post("/finalize")
 async def finalize(
     session_id: str = Form(...),
+    column_id: int = Form(0),
     selected_idx: int = Form(...),
     bg_color: str = Form(...),
     bg_tolerance: int = Form(...),
@@ -392,7 +428,7 @@ async def finalize(
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
 ):
     async def stream():
-        session = get_session(session_id)
+        session = get_column(session_id, column_id)
         images = session.get("images", [])
         prompts = session.get("prompts", [])
         theme = session.get("theme", "unknown")
@@ -463,6 +499,7 @@ async def finalize(
 @app.post("/remove-bg/variant")
 async def remove_variant_bg(
     session_id: str = Form(...),
+    column_id: int = Form(0),
     selected_idx: int = Form(...),
     bg_color: str = Form(...),
     bg_tolerance: int = Form(...),
@@ -470,7 +507,7 @@ async def remove_variant_bg(
     decontaminate: int = Form(...),
 ):
     async def stream():
-        session = get_session(session_id)
+        session = get_column(session_id, column_id)
         images = session.get("images", [])
         paths = session.get("image_paths", [])
 
@@ -521,13 +558,14 @@ async def remove_variant_bg(
 @app.post("/remove-bg/final")
 async def remove_final_bg(
     session_id: str = Form(...),
+    column_id: int = Form(0),
     bg_color: str = Form(...),
     bg_tolerance: int = Form(...),
     edge_erode: int = Form(...),
     decontaminate: int = Form(...),
 ):
     async def stream():
-        session = get_session(session_id)
+        session = get_column(session_id, column_id)
         final_img = session.get("final_image")
         final_path = session.get("final_path")
 
@@ -568,8 +606,8 @@ async def remove_final_bg(
 
 
 @app.post("/restore-bg/variant")
-async def restore_variant_bg(session_id: str = Form(...), selected_idx: int = Form(...)):
-    session = get_session(session_id)
+async def restore_variant_bg(session_id: str = Form(...), column_id: int = Form(0), selected_idx: int = Form(...)):
+    session = get_column(session_id, column_id)
     originals = session.get("original_images", [])
     orig_paths = session.get("original_image_paths", [])
     images = session.get("images", [])
@@ -591,8 +629,8 @@ async def restore_variant_bg(session_id: str = Form(...), selected_idx: int = Fo
 
 
 @app.post("/restore-bg/final")
-async def restore_final_bg(session_id: str = Form(...)):
-    session = get_session(session_id)
+async def restore_final_bg(session_id: str = Form(...), column_id: int = Form(0)):
+    session = get_column(session_id, column_id)
     original = session.get("original_final")
     orig_path = session.get("original_final_path")
 
@@ -610,9 +648,9 @@ async def restore_final_bg(session_id: str = Form(...)):
 
 
 @app.post("/apply-cached-bg/variant")
-async def apply_cached_variant_bg(session_id: str = Form(...), selected_idx: int = Form(...)):
+async def apply_cached_variant_bg(session_id: str = Form(...), column_id: int = Form(0), selected_idx: int = Form(...)):
     """Swap session to the cached no-bg variant without re-running the algorithm."""
-    session = get_session(session_id)
+    session = get_column(session_id, column_id)
     cache = session.get("no_bg_variant_cache", {})
     if selected_idx not in cache:
         return {"error": "No cached result for this variant."}
@@ -629,9 +667,9 @@ async def apply_cached_variant_bg(session_id: str = Form(...), selected_idx: int
 
 
 @app.post("/apply-cached-bg/final")
-async def apply_cached_final_bg(session_id: str = Form(...)):
+async def apply_cached_final_bg(session_id: str = Form(...), column_id: int = Form(0)):
     """Swap session to the cached no-bg final image without re-running the algorithm."""
-    session = get_session(session_id)
+    session = get_column(session_id, column_id)
     cached = session.get("no_bg_final_cache")
     if not cached:
         return {"error": "No cached result for final image."}
@@ -645,13 +683,13 @@ async def apply_cached_final_bg(session_id: str = Form(...)):
 
 
 @app.get("/analysis/final")
-async def analyze_final(session_id: str):
+async def analyze_final(session_id: str, column_id: int = 0):
     """Return content bounding box of the final image for Printify placement.
 
     Fractions of image height: content_top is the first row with a visible pixel,
     content_bottom is the last. A fully opaque image returns (0.0, 1.0).
     """
-    session = get_session(session_id)
+    session = get_column(session_id, column_id)
     final_img = session.get("final_image")
     if final_img is None:
         return {"content_top": 0.0, "content_bottom": 1.0}
@@ -702,11 +740,12 @@ async def session_load_image(request: Request):
     """Load an existing output image into the session as a variant, bypassing generation."""
     body = await request.json()
     session_id = body.get("session_id", "")
+    column_id = int(body.get("column_id", 0))
     image_url = body.get("image_url", "")
     display_theme = body.get("display_theme", "")
     try:
         result = await asyncio.to_thread(
-            load_image_to_session, get_session(session_id), image_url, display_theme
+            load_image_to_session, get_column(session_id, column_id), image_url, display_theme
         )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
@@ -716,6 +755,7 @@ async def session_load_image(request: Request):
 @app.post("/session/set-reference-image")
 async def session_set_reference_image(
     session_id: str = Form(...),
+    column_id: int = Form(0),
     reference_path: str = Form(""),
     reference_file: UploadFile = File(None),
 ):
@@ -723,7 +763,7 @@ async def session_set_reference_image(
 
     Accepts either a path to an existing output file or an uploaded file — not both.
     """
-    session = get_session(session_id)
+    session = get_column(session_id, column_id)
 
     if reference_file is not None:
         data = await reference_file.read()
@@ -745,11 +785,11 @@ async def session_set_reference_image(
 
 
 @app.get("/session/reference-image-preview")
-async def session_reference_image_preview(session_id: str):
+async def session_reference_image_preview(session_id: str, column_id: int = 0):
     """Return the stored reference image as a PNG for thumbnail display."""
     import io as _io
 
-    session = get_session(session_id)
+    session = get_column(session_id, column_id)
     img: Image.Image | None = session.get("reference_image")
     if img is None:
         return Response(status_code=204)
@@ -762,7 +802,8 @@ async def session_reference_image_preview(session_id: str):
 async def session_clear_reference_image(request: Request):
     """Remove the reference image from session."""
     body = await request.json()
-    session = get_session(body.get("session_id", ""))
+    column_id = int(body.get("column_id", 0))
+    session = get_column(body.get("session_id", ""), column_id)
     session["reference_image"] = None
     return JSONResponse({"ok": True})
 
@@ -876,6 +917,7 @@ async def printify_variants(blueprint_id: int, provider_id: int):
 @app.post("/printify/publish")
 async def printify_publish(
     session_id: str = Form(...),
+    column_id: int = Form(0),
     shop_id: str = Form(...),
     blueprint_id: int = Form(...),
     provider_id: int = Form(...),
@@ -897,7 +939,7 @@ async def printify_publish(
             yield sse({"type": "error", "message": "PRINTIFY_TOKEN not configured."})
             return
 
-        session = get_session(session_id)
+        session = get_column(session_id, column_id)
         final_path = session.get("final_path")
 
         # Session may have been wiped by a server restart. Recover the path from the
@@ -989,6 +1031,68 @@ async def printify_publish(
         )
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ── Column management endpoints ───────────────────────────────────────────────
+
+
+@app.post("/columns")
+async def add_column(session_id: str = Form(...)):
+    """Append a new column to the session up to the session's max_columns limit."""
+    sess = get_session(session_id)
+    columns = sess["columns"]
+    if len(columns) >= sess["max_columns"]:
+        return JSONResponse(
+            {"error": f"Maximum of {sess['max_columns']} columns reached."},
+            status_code=400,
+        )
+    columns.append(init_column_state())
+    return {"column_id": len(columns) - 1, "count": len(columns)}
+
+
+@app.get("/session/columns")
+async def session_columns(session_id: str):
+    """Return serializable column states for page-load restore.
+
+    PIL Image objects are not JSON-serializable and are excluded — only text and
+    path fields are returned. Images will need to be re-generated after a page reload.
+    """
+    sess = get_session(session_id)
+    serializable_keys = {"theme", "concepts", "prompts", "image_paths", "selected_idx", "final_path"}
+    cols = [
+        {k: col.get(k) for k in serializable_keys}
+        for col in sess["columns"]
+    ]
+    return {"columns": cols, "max_columns": sess["max_columns"]}
+
+
+@app.post("/session/remove-column")
+async def remove_column(session_id: str = Form(...), column_id: int = Form(...)):
+    """Remove a column from the session and compact the array.
+
+    Returns the updated column list so the client can rebuild its columns array
+    with stable indices — avoids a second round-trip to GET /session/columns.
+    """
+    sess = get_session(session_id)
+    columns = sess["columns"]
+    if len(columns) <= 1:
+        return JSONResponse({"error": "Cannot remove the last column."}, status_code=400)
+    if column_id < 0 or column_id >= len(columns):
+        return JSONResponse({"error": "Column not found."}, status_code=404)
+    columns.pop(column_id)
+    # Return the compacted list so the client can reassign indices in one step
+    serializable_keys = {"theme", "concepts", "prompts", "image_paths", "selected_idx", "final_path"}
+    cols = [{k: col.get(k) for k in serializable_keys} for col in columns]
+    return {"columns": cols, "max_columns": sess["max_columns"]}
+
+
+@app.post("/session/max-columns")
+async def set_max_columns(session_id: str = Form(...), max_columns: int = Form(...)):
+    """Update the user's self-imposed column limit, clamped to the server-side MAX_COLUMNS cap."""
+    sess = get_session(session_id)
+    clamped = max(1, min(max_columns, MAX_COLUMNS))
+    sess["max_columns"] = clamped
+    return {"max_columns": clamped}
 
 
 if __name__ == "__main__":

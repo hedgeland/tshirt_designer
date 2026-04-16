@@ -1,3 +1,16 @@
+// ── Alpine global stores ──────────────────────────────────────────────────────
+// Declare stores before Alpine processes the DOM so $store.* refs in templates
+// never see undefined on first render. Values are updated by designer.init().
+document.addEventListener('alpine:init', () => {
+    Alpine.store('columnCount', 1); // updated to actual count after session restore
+    // Tracks whether the output browser is open — combined with activeColIdx in templates
+    // to highlight the targeted column header without a separate colIdx in the store.
+    Alpine.store('browserOpen', false);
+    // Tracks which column was last clicked — drives the active-column visual
+    Alpine.store('activeColIdx', 0);
+});
+
+
 // ── SSE helper ────────────────────────────────────────────────────────────────
 // Streams a POST request as Server-Sent Events and dispatches each parsed event
 // to the matching handler in `handlers`. Uses fetch + ReadableStream rather than
@@ -40,19 +53,17 @@ async function streamSSE(url, formData, handlers) {
 }
 
 
-// ── Alpine component ──────────────────────────────────────────────────────────
-function designer() {
-    const cfg = JSON.parse(document.getElementById('app-config').textContent);
-
+// ── Per-column Alpine component ───────────────────────────────────────────────
+// Each column rendered in the UI gets its own columnDesigner instance.
+// colIdx scopes all API calls to the correct server-side column state.
+function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
     return {
-        // ── Session ────────────────────────────────────────────────────────
-        // Generate a UUID once per page load so the server can associate state
-        // (PIL images in memory) with this browser tab.
-        sessionId: crypto.randomUUID(),
+        colIdx,      // index into the session's columns array
+        sessionId,   // shared UUID from parent designer()
 
         // ── Workflow state ─────────────────────────────────────────────────
         step: 1,               // controls which sections are visible
-        theme: "Funny shark in space",
+        theme: "",
         concepts: [],
         selectedConcept: null,
         editedConcept: "",
@@ -61,7 +72,7 @@ function designer() {
         selectedVariant: null,
         finalUrl: null,
         finalTs: 0,
-        finalizedSize: "",  // resolution the final image was actually generated at
+        finalizedSize: "",     // resolution the final image was actually generated at
         _origFinalUrl: null,
         _noBgFinalUrl: null,
         directMode: false,     // true when user skips brainstorm and generates directly
@@ -87,6 +98,8 @@ function designer() {
         finalSize: cfg.defaultFinalSize,
 
         // ── Preset management ──────────────────────────────────────────────
+        // presetNames is a local copy — save/delete update it for this column only.
+        // Other columns discover new presets on next page load (acceptable for single-user tool).
         presetNames: cfg.presetNames,
         activePreset: cfg.builtinName,
         newPresetName: "",
@@ -99,26 +112,16 @@ function designer() {
         refImageUrl: null,      // preview URL when a reference image is set; null otherwise
         referenceMode: "style", // "style" = borrow aesthetic only; "copy" = replicate composition
 
+        // ── Settings panel state ──────────────────────────────────────────
+        settingsOpen: false,    // controls collapsible per-column settings panel
+
         // ── Load-from-browser state ───────────────────────────────────────
-        loadedImageRes: null,   // {width, height} when variants came from the output browser; null otherwise
+        loadedImageRes: null,   // {width, height} when variants came from the output browser
 
         // ── Drag state (Printify placement preview) ───────────────────────
         pDrag: null,            // null when idle; { startX, startY, startPX, startPY } while dragging
 
-        // ── Output browser ────────────────────────────────────────────────
-        showBrowser: false,
-        browserMode: null,      // null = normal, "reference" = picking a reference image
-        browserThemes: [],
-        browserFilter: "",
-        browserLoading: false,
-        manageMode: false,
-        selectedFiles: {},    // url → size_bytes; object for Alpine reactivity
-        storageStats: null,   // {totalBytes, themeCount}
-        renamingDir: "",      // dir_name of the theme currently being renamed
-        renameValue: "",      // current value of the rename input
-
         // ── Printify state ─────────────────────────────────────────────────
-        cfg,                        // expose to template for printifyEnabled check
         showPrintify: false,
         printifyBusy: false,
         printifyStatus: "",
@@ -128,7 +131,7 @@ function designer() {
         pShops: [],
         pShopId: cfg.printifyShopId || "",
 
-        pAllBlueprints: [],         // full catalog (fetched once)
+        pAllBlueprints: [],         // full catalog (fetched once per column)
         pFilteredBlueprints: [],    // filtered by search term
         pBlueprintSearch: "",
         pBlueprint: null,
@@ -142,19 +145,18 @@ function designer() {
         pSelectedColors: [],
         pSelectedSizes: [],
 
-        // Print area dimensions — extracted from the variant placeholder data.
-        // Used to calculate the correct y offset for top/center positioning.
+        // Print area dimensions — extracted from the variant placeholder data
         pPrintWidth: 0,
         pPrintHeight: 0,
 
-        pXPx: 0,                    // left edge of design in print-area pixels (0 = flush left)
-        pYPx: 0,                    // top edge of image in print-area pixels (0 = flush top)
-        pTopAllowance: 10,          // px gap from print-area top for "Align to Top" preset; persists across opens
+        pXPx: 0,                    // left edge of design in print-area pixels
+        pYPx: 0,                    // top edge of image in print-area pixels
+        pTopAllowance: 10,          // px gap from print-area top for "Align to Top" preset
         pIsTopPreset: true,         // true when X/Y match the "Align to Top" formula
         pScale: 1.0,                // fraction of print area width the design occupies
-        pContentTop: 0,             // fraction of image height above first visible pixel (for gap correction)
+        pContentTop: 0,             // fraction of image height above first visible pixel
 
-        pOverrideMinRes: false, // dev override: skip the resolution gate when testing
+        pOverrideMinRes: false,     // dev override: skip the resolution gate when testing
 
         pTitle: "",
         pDescription: "",
@@ -162,32 +164,42 @@ function designer() {
 
         // ── Lifecycle ──────────────────────────────────────────────────────
         init() {
-            this.$nextTick(() => this.$refs.themeInput.focus());
+            // Restore server-persisted state from a prior session (e.g. after page refresh).
+            // The server returns serializable fields only — PIL images are gone and must be
+            // re-generated, but text state and saved file paths survive the reload.
+            this._restoreInitialState(initialState);
 
-            // Warn before unload if the user has typed a theme — reloading would
-            // clear both the textarea and all server-side session state (images, concepts).
-            window.addEventListener('beforeunload', (e) => {
-                if (this.theme.trim()) {
-                    e.preventDefault();
-                    e.returnValue = '';
-                }
-            });
+            // Focus the theme input only for the first column to avoid competing focus
+            if (this.colIdx === 0) {
+                this.$nextTick(() => this.$refs.themeInput?.focus());
+            }
 
-            // Bound drag handlers — stored so removeEventListener can reference them by identity.
+            // Bound drag handlers — stored so removeEventListener can match by identity
             this._boundDragMove = this._onDragMove.bind(this);
             this._boundDragUp = this._onDragUp.bind(this);
 
-            // Keep the "Align to Top" preset in sync when scale or allowance changes.
+            // Keep "Align to Top" preset in sync when scale or allowance changes
             this.$watch('pScale', () => {
                 if (this.pIsTopPreset && this.pPrintWidth) this.applyTopPreset();
             });
             this.$watch('pTopAllowance', () => {
                 if (this.pIsTopPreset && this.pPrintWidth) this.applyTopPreset();
             });
-            // pContentTop arrives async after modal open; re-calibrate preset if still active.
+            // pContentTop arrives async after modal open; re-calibrate preset if still active
             this.$watch('pContentTop', () => {
                 if (this.pIsTopPreset && this.pPrintWidth) this.applyTopPreset();
             });
+
+            // Receive "load image as variant" events dispatched by the output browser
+            window.addEventListener('col-load-image', (e) => {
+                if (e.detail.colIdx === this.colIdx) this._applyLoadedImage(e.detail);
+            });
+
+            // Receive "set reference image" events dispatched by the output browser
+            window.addEventListener('col-set-reference', (e) => {
+                if (e.detail.colIdx === this.colIdx) this._doSetReferenceFromBrowser(e.detail.imageUrl);
+            });
+
         },
 
         // ── Computed ───────────────────────────────────────────────────────
@@ -200,23 +212,9 @@ function designer() {
             return this.variants[this.selectedVariant ?? 0];
         },
 
-        // Derived from URL comparison — no separate flag needed.
+        // Derived from URL comparison — no separate flag needed
         get finalBgRemoved() {
             return this._noBgFinalUrl !== null && this.finalUrl === this._noBgFinalUrl;
-        },
-
-        get filteredBrowserThemes() {
-            const q = this.browserFilter.trim().toLowerCase();
-            if (!q) return this.browserThemes;
-            return this.browserThemes.filter(t => t.theme.toLowerCase().includes(q));
-        },
-
-        get selectedCount() {
-            return Object.keys(this.selectedFiles).length;
-        },
-
-        get selectedBytes() {
-            return Object.values(this.selectedFiles).reduce((a, b) => a + b, 0);
         },
 
         get pDesignPx() {
@@ -224,7 +222,7 @@ function designer() {
         },
 
         get pNeedsUpscale() {
-            return (this.cfg.sizePx[this.finalizedSize] ?? 0) < this.cfg.sizePx[this.cfg.printifyMinSize];
+            return (cfg.sizePx[this.finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize];
         },
 
         get pImageOutOfBounds() {
@@ -235,7 +233,7 @@ function designer() {
         },
 
         get selectedVariantCount() {
-            // Count variants whose color AND size are both selected.
+            // Count variants whose color AND size are both selected
             return this.pAllVariants.filter(v => {
                 const color = v.options?.color ?? "";
                 const size = v.options?.size ?? "";
@@ -253,8 +251,8 @@ function designer() {
         _stopLoading() {
             this.isLoading = false;
             this.loadingMsg = "";
-            // loadingStep is intentionally NOT cleared here — errors need it to know
-            // which section to display in. Clear it only when the error is dismissed.
+            // loadingStep intentionally NOT cleared here — errors need it to know
+            // which section to display in. Clear only when the error is dismissed.
         },
 
         _onError(msg) {
@@ -267,21 +265,83 @@ function designer() {
             this.loadingStep = 0;
         },
 
-        async loadToVariants(url, width, height, displayTheme) {
-            // Only warn if the user has real work in progress — don't count the default theme text.
+        // Apply server-persisted column state on init.  Determines which workflow
+        // step to show based on what data is available (final > variants > concepts > theme).
+        _restoreInitialState(state) {
+            if (!state || typeof state !== 'object') return;
+
+            // Restore text state unconditionally
+            if (state.theme)    this.theme    = state.theme;
+            if (state.concepts) this.concepts = state.concepts;
+            if (state.prompts)  this.prompts  = state.prompts;
+
+            // Restore variant thumbnails from saved paths (PIL images are gone after reload;
+            // the static files are still on disk so the URLs remain valid).
+            if (Array.isArray(state.image_paths) && state.image_paths.length) {
+                this.variants = state.image_paths.map(p => ({
+                    url: p, origUrl: p, noBgUrl: null, ts: 0,
+                }));
+                if (state.selected_idx != null) this.selectedVariant = state.selected_idx;
+            }
+
+            // Restore final image if one was saved
+            if (state.final_path) {
+                this.finalUrl       = state.final_path;
+                this._origFinalUrl  = state.final_path;
+            }
+
+            // Advance the step indicator to match the most progressed phase
+            if (state.final_path) {
+                this.step = 5;
+            } else if (this.variants.length) {
+                this.step = 4;
+            } else if (this.concepts.length) {
+                // If a concept was previously selected, pre-populate editedConcept
+                if (state.selected_idx != null && this.concepts[state.selected_idx]) {
+                    this.selectedConcept = state.selected_idx;
+                    this.editedConcept   = this.concepts[state.selected_idx];
+                    this.step = 3;
+                } else {
+                    this.step = 2;
+                }
+            } else if (state.theme) {
+                this.step = 1; // theme present but no concepts yet — stay at step 1
+            }
+        },
+
+        // Builds FormData with session/column identity and BG settings.
+        // Every streaming workflow route expects these base fields.
+        _bgFormData() {
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fd.append("bg_color", this.bgColor);
+            fd.append("bg_tolerance", this.bgTolerance);
+            fd.append("edge_erode", this.edgeErode);
+            fd.append("decontaminate", this.decontaminate);
+            return fd;
+        },
+
+        // Apply an image loaded from the output browser — resets workflow to variant-only step
+        async _applyLoadedImage({ url, width, height, displayTheme }) {
             const hasWork = this.concepts.length || this.variants.length;
-            if (hasWork && !confirm("Load this image as a variant? Your current session will be cleared.")) return;
+            if (hasWork && !confirm("Load this image as a variant? Your current column session will be cleared.")) return;
 
             const res = await fetch("/session/load-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ session_id: this.sessionId, image_url: url, display_theme: displayTheme }),
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    column_id: this.colIdx,
+                    image_url: url,
+                    display_theme: displayTheme,
+                }),
             });
             if (!res.ok) { alert(`Failed to load image (${res.status})`); return; }
             const data = await res.json();
             if (data.error) { alert(data.error); return; }
 
-            // Reset workflow state to variant-only.
+            // Reset workflow state to variant-only
             this.concepts = [];
             this.selectedConcept = null;
             this.editedConcept = "";
@@ -296,53 +356,837 @@ function designer() {
             this.variants = [{ url, origUrl: url, noBgUrl: null, ts: Date.now() }];
             this.selectedVariant = 0;
             this.loadedImageRes = { width, height };
-
             this.step = 4;
-            this.showBrowser = false;
             this.$nextTick(() => this.$refs.step4?.scrollIntoView({ behavior: "smooth", block: "start" }));
         },
 
-        async setReferenceFromBrowser(imageUrl) {
+        // Set a reference image picked from the output browser (dispatched via custom event)
+        async _doSetReferenceFromBrowser(imageUrl) {
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
             fd.append("reference_path", imageUrl);
             const res = await fetch("/session/set-reference-image", { method: "POST", body: fd });
             if (!res.ok) { alert(`Failed to set reference image (${res.status})`); return; }
-            // Bust the cache with a timestamp so the thumbnail refreshes if the ref changes.
-            this.refImageUrl = `/session/reference-image-preview?session_id=${encodeURIComponent(this.sessionId)}&ts=${Date.now()}`;
+            // Bust cache with timestamp so the thumbnail refreshes if the ref changes
+            this.refImageUrl = `/session/reference-image-preview?session_id=${encodeURIComponent(this.sessionId)}&column_id=${this.colIdx}&ts=${Date.now()}`;
         },
 
         async setReferenceFromFile(file) {
             if (!file) return;
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
             fd.append("reference_file", file);
             const res = await fetch("/session/set-reference-image", { method: "POST", body: fd });
             if (!res.ok) { alert(`Failed to set reference image (${res.status})`); return; }
-            this.refImageUrl = `/session/reference-image-preview?session_id=${encodeURIComponent(this.sessionId)}&ts=${Date.now()}`;
+            this.refImageUrl = `/session/reference-image-preview?session_id=${encodeURIComponent(this.sessionId)}&column_id=${this.colIdx}&ts=${Date.now()}`;
+        },
+
+        // Dispatch browser-open events to the parent designer() which owns the browser
+        // Ask the parent designer() to close this column.
+        // Guard here prevents the event from firing at all while loading — the button
+        // should be disabled too, but this is a belt-and-suspenders check.
+        requestClose() {
+            if (this.isLoading) return;
+            window.dispatchEvent(new CustomEvent('designer-close-column', { detail: { colIdx: this.colIdx } }));
+        },
+
+        openMyBrowser() {
+            window.dispatchEvent(new CustomEvent('designer-open-browser', { detail: { colIdx: this.colIdx } }));
+        },
+
+        openMyBrowserForRef() {
+            window.dispatchEvent(new CustomEvent('designer-open-browser-for-ref', { detail: { colIdx: this.colIdx } }));
         },
 
         async clearReference() {
             await fetch("/session/clear-reference-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ session_id: this.sessionId }),
+                body: JSON.stringify({ session_id: this.sessionId, column_id: this.colIdx }),
             });
             this.refImageUrl = null;
         },
 
-        async openBrowser() {
-            this.browserMode = null;
-            this.showBrowser = true;
-            if (this.browserThemes.length > 0) return; // already loaded
-            await this.reloadBrowser();
+        // ── Workflow actions ───────────────────────────────────────────────
+        selectConcept(concept) {
+            this.selectedConcept = concept;
+            this.editedConcept = concept;
+            this.step = Math.max(this.step, 3);
         },
 
-        async openBrowserForReference() {
+        async doBrainstorm() {
+            if (this.isLoading || !this.theme.trim()) return;
+            this.loadingStep = 1;
+            this._startLoading("Generating concepts...");
+
+            // Reset everything below step 1
+            this.directMode = false;
+            this.concepts = [];
+            this.selectedConcept = null;
+            this.editedConcept = "";
+            this.variants = [];
+            this.prompts = [];
+            this.selectedVariant = null;
+            this.finalUrl = null;
+            this.loadedImageRes = null;
+            this.step = 1;
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fd.append("theme", this.theme);
+            fd.append("concepts_template", this.conceptsTemplate);
+
+            await streamSSE("/brainstorm", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                concepts: (e) => {
+                    this.concepts = e.concepts;
+                    this.step = 2;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doGenerateDirect() {
+            if (this.isLoading || !this.theme.trim()) return;
+            // Skip brainstorm — use the theme text as the concept directly
+            this.directMode = true;
+            this.concepts = [];
+            this.selectedConcept = null;
+            this.editedConcept = this.theme.trim();
+            this.variants = [];
+            this.prompts = [];
+            this.selectedVariant = null;
+            this.finalUrl = null;
+            this.loadedImageRes = null;
+            this.step = 2;  // step >= 2 satisfies the directMode badge condition; doGenerate() advances to 3
+            await this.doGenerate();
+        },
+
+        async doGenerate() {
+            if (this.isLoading || !this.editedConcept.trim()) return;
+            this.loadingStep = 3;
+            this._startLoading("Building prompts...");
+
+            this.variants = [];
+            this.prompts = [];
+            this.selectedVariant = null;
+            this.finalUrl = null;
+            this.loadedImageRes = null;
+            this.step = Math.max(this.step, 3);
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fd.append("concept", this.editedConcept);
+            fd.append("original_concept", this.selectedConcept ?? this.editedConcept);
+            fd.append("bg_color", this.bgColor);
+            fd.append("num_variants", this.numVariants);
+            fd.append("max_colors", this.maxColors);
+            fd.append("variants_template", this.variantsTemplate);
+            fd.append("style_template", this.styleTemplate);
+            fd.append("aspect_ratio", this.aspectRatio);
+            fd.append("variant_size", this.variantSize);
+            fd.append("reference_mode", this.referenceMode);
+            fd.append("direct_mode", this.directMode);
+
+            await streamSSE("/generate", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                prompts: (e) => {
+                    this.prompts = e.prompts;
+                    this.promptLog = e.prompts
+                        .map((p, i) => `── Variant ${i + 1} ──\n${p}`)
+                        .join("\n\n");
+                },
+                variants: (e) => {
+                    const ts = Date.now();
+                    this.variants = e.urls.map((url) => ({ url, origUrl: url, noBgUrl: null, ts }));
+                    this.selectedVariant = e.urls.length === 1 ? 0 : null;
+                    this.step = 4;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doFinalize() {
+            if (this.isLoading) return;
+            const idx = this.selectedVariant ?? 0;
+            // If already at step 5, keep the loading indicator anchored there
+            this.loadingStep = this.step >= 5 ? 5 : 4;
+            this._startLoading(`Generating ${this.finalSize} design...`);
+
+            const fd = this._bgFormData();
+            fd.append("selected_idx", idx);
+            fd.append("aspect_ratio", this.aspectRatio);
+            fd.append("final_size", this.finalSize);
+
+            await streamSSE("/finalize", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                final: (e) => {
+                    this.finalUrl = e.url;
+                    this._origFinalUrl = e.url;
+                    this._noBgFinalUrl = null;
+                    this.finalTs = Date.now();
+                    this.finalizedSize = this.finalSize;
+                    this.step = 5;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doFinalizeForPrintify() {
+            if (this.printifyBusy) return;
+            this.printifyBusy = true;
+            this.printifyError = "";
+            this.printifyStatus = `Re-finalizing at ${cfg.printifyMinSize}…`;
+
+            const idx = this.selectedVariant ?? 0;
+            const fd = this._bgFormData();
+            fd.append("selected_idx", idx);
+            fd.append("aspect_ratio", this.aspectRatio);
+            fd.append("final_size", cfg.printifyMinSize);
+
+            await streamSSE("/finalize", fd, {
+                status: (e) => { this.printifyStatus = e.message; },
+                final: (e) => {
+                    this.finalUrl = e.url;
+                    this._origFinalUrl = e.url;
+                    this._noBgFinalUrl = null;
+                    this.finalTs = Date.now();
+                    this.finalizedSize = cfg.printifyMinSize;
+                    this.step = 5;
+                    this.printifyStatus = "";
+                },
+                error: (e) => { this.printifyError = e.message; },
+            });
+
+            this.printifyBusy = false;
+        },
+
+        async doRemoveVariantBg() {
+            if (this.isLoading) return;
+            const idx = this.selectedVariant ?? 0;
+            const v = this.variants[idx];
+            if (v?.noBgUrl) {
+                // Cache hit — instant UI swap; sync server state in background
+                const updated = [...this.variants];
+                updated[idx] = { ...v, url: v.noBgUrl, ts: Date.now() };
+                this.variants = updated;
+                const fd = new FormData();
+                fd.append("session_id", this.sessionId);
+                fd.append("column_id", this.colIdx);
+                fd.append("selected_idx", idx);
+                fetch("/apply-cached-bg/variant", { method: "POST", body: fd })
+                    .catch(() => this._onError("Failed to sync variant state."));
+                return;
+            }
+
+            this.loadingStep = 4;
+            this._startLoading("Removing background...");
+
+            const fd = this._bgFormData();
+            fd.append("selected_idx", idx);
+
+            await streamSSE("/remove-bg/variant", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                variant_updated: (e) => {
+                    const updated = [...this.variants];
+                    const prev = updated[e.index] ?? {};
+                    updated[e.index] = {
+                        ...prev,
+                        url: e.url,
+                        ts: Date.now(),
+                        noBgUrl: e.bg_removed ? e.url : prev.noBgUrl,
+                    };
+                    this.variants = updated;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doRestoreVariantBg() {
+            if (this.isLoading) return;
+            const idx = this.selectedVariant ?? 0;
+            const v = this.variants[idx];
+            // Instant UI swap — both URLs are already known after first removal
+            const updated = [...this.variants];
+            updated[idx] = { ...v, url: v.origUrl, ts: Date.now() };
+            this.variants = updated;
+            // Sync server session in background so finalize uses the correct image
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fd.append("selected_idx", idx);
+            fetch("/restore-bg/variant", { method: "POST", body: fd })
+                .catch(() => this._onError("Failed to sync variant state."));
+        },
+
+        async doRestoreFinalBg() {
+            if (this.isLoading) return;
+            // Instant UI swap
+            this.finalUrl = this._origFinalUrl;
+            this.finalTs = Date.now();
+            // Sync server session in background
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fetch("/restore-bg/final", { method: "POST", body: fd })
+                .catch(() => this._onError("Failed to sync final state."));
+        },
+
+        async doRemoveFinalBg() {
+            if (this.isLoading) return;
+            // Instant swap if we've already removed bg for this final image before
+            if (this._noBgFinalUrl) {
+                this.finalUrl = this._noBgFinalUrl;
+                this.finalTs = Date.now();
+                const fd = new FormData();
+                fd.append("session_id", this.sessionId);
+                fd.append("column_id", this.colIdx);
+                fetch("/apply-cached-bg/final", { method: "POST", body: fd })
+                    .catch(() => this._onError("Failed to sync final state."));
+                return;
+            }
+            this.loadingStep = 5;
+            this._startLoading("Removing background...");
+
+            await streamSSE("/remove-bg/final", this._bgFormData(), {
+                status: (e) => { this.loadingMsg = e.message; },
+                final_updated: (e) => {
+                    this.finalUrl = e.url;
+                    this.finalTs = Date.now();
+                    if (e.bg_removed) this._noBgFinalUrl = e.url;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        // ── Preset actions ─────────────────────────────────────────────────
+        async loadPreset(name) {
+            if (!name) return;
+            const res = await fetch(`/presets/${encodeURIComponent(name)}`);
+            const data = await res.json();
+            if (!data.error) {
+                this.conceptsTemplate = data.concepts_prompt;
+                this.variantsTemplate = data.variants_prompt;
+                this.styleTemplate = data.style_suffix;
+            }
+        },
+
+        async savePreset() {
+            const name = this.newPresetName.trim();
+            if (!name) { this.presetStatus = "Enter a preset name."; return; }
+
+            const fd = new FormData();
+            fd.append("name", name);
+            fd.append("concepts", this.conceptsTemplate);
+            fd.append("variants", this.variantsTemplate);
+            fd.append("style", this.styleTemplate);
+
+            const res = await fetch("/presets", { method: "POST", body: fd });
+            const data = await res.json();
+            if (data.error) {
+                this.presetStatus = data.error;
+            } else {
+                this.presetNames = data.names;
+                this.activePreset = data.saved;
+                this.newPresetName = "";
+                this.presetStatus = `Saved "${name}".`;
+            }
+        },
+
+        async deletePreset() {
+            const name = this.activePreset;
+            if (name === cfg.builtinName) { this.presetStatus = "Cannot delete the built-in preset."; return; }
+
+            const res = await fetch(`/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
+            const data = await res.json();
+            this.presetNames = data.names;
+            this.activePreset = cfg.builtinName;
+            await this.loadPreset(cfg.builtinName);
+            this.presetStatus = `Deleted "${name}".`;
+        },
+
+        // ── Printify actions ───────────────────────────────────────────────
+
+        async openPrintify() {
+            // Reset publish result each time the modal opens
+            this.printifyError = "";
+            this.printifyStatus = "";
+            this.printifyDone = null;
+            this.pBlueprint = null;
+            this.pProviders = [];
+            this.pProviderId = "";
+            this.pAllVariants = [];
+            this.pColors = [];
+            this.pSizes = [];
+            this.pSelectedColors = [];
+            this.pSelectedSizes = [];
+            this.pContentTop = 0;
+            this.pXPx = 0;
+            this.pYPx = this.pTopAllowance;  // pTopAllowance intentionally not reset — persists
+            this.pIsTopPreset = true;
+            this.pTitle = this.theme || "Custom T-Shirt";
+            this.showPrintify = true;
+
+            // Fetch content bounds from the final image alpha channel for Y placement
+            if (this.finalUrl) {
+                fetch(`/analysis/final?session_id=${encodeURIComponent(this.sessionId)}&column_id=${this.colIdx}`)
+                    .then(r => r.json())
+                    .then(data => { this.pContentTop = data.content_top ?? 0; })
+                    .catch(() => { });
+            }
+
+            // Load shops (skip if shop ID already configured server-side)
+            if (!cfg.printifyShopId && this.pShops.length === 0) {
+                const res = await fetch("/printify/shops");
+                const data = await res.json();
+                if (data.error) { this.printifyError = data.error; return; }
+                this.pShops = data;
+                // Auto-select by configured name then fall back to selecting the only shop
+                const preferredName = (cfg.printifyShopName || "").toLowerCase();
+                const match = preferredName && data.find(s => s.title.toLowerCase() === preferredName);
+                if (match) this.pShopId = String(match.id);
+                else if (data.length === 1) this.pShopId = String(data[0].id);
+            }
+
+            // Load blueprint catalog (fetched once per column; subsequent opens reuse cache)
+            if (this.pAllBlueprints.length === 0) {
+                this.printifyStatus = "Loading catalog…";
+                const res = await fetch("/printify/blueprints");
+                const data = await res.json();
+                this.printifyStatus = "";
+                if (data.error) { this.printifyError = data.error; return; }
+                this.pAllBlueprints = data;
+            }
+
+            this.pBlueprintSearch = "shirt";
+            this.filterBlueprints();
+        },
+
+        filterBlueprints() {
+            const q = this.pBlueprintSearch.trim().toLowerCase();
+            const pool = q ? (() => {
+                const terms = q.split(/\s+/);
+                return this.pAllBlueprints.filter(bp =>
+                    terms.every(t => bp.title.toLowerCase().includes(t) || (bp.brand || "").toLowerCase().includes(t))
+                );
+            })() : this.pAllBlueprints;
+            // Sort by blueprint ID ascending — lower IDs are older, more established products
+            this.pFilteredBlueprints = pool.slice().sort((a, b) => a.id - b.id).slice(0, 50);
+        },
+
+        async selectBlueprint(bp) {
+            this.pBlueprint = bp;
+            this.pProviders = [];
+            this.pProviderId = "";
+            this.pAllVariants = [];
+            this.pColors = [];
+            this.pSizes = [];
+            this.pSelectedColors = [];
+            this.pSelectedSizes = [];
+            this.pPrintWidth = 0;
+            this.pPrintHeight = 0;
+            this.printifyError = "";
+
+            this.printifyStatus = "Loading print providers…";
+            const res = await fetch(`/printify/blueprints/${bp.id}/providers`);
+            const data = await res.json();
+            this.printifyStatus = "";
+
+            if (data.error) { this.printifyError = data.error; return; }
+            this.pProviders = data;
+            if (data.length > 0) {
+                this.pProviderId = String(data[0].id);
+                await this.loadVariants();
+            }
+        },
+
+        async loadVariants() {
+            if (!this.pBlueprint || !this.pProviderId) return;
+            this.pAllVariants = [];
+            this.pColors = [];
+            this.pSizes = [];
+            this.pSelectedColors = [];
+            this.pSelectedSizes = [];
+            this.pPrintWidth = 0;
+            this.pPrintHeight = 0;
+            this.printifyError = "";
+
+            this.printifyStatus = "Loading variants…";
+            const url = `/printify/blueprints/${this.pBlueprint.id}/providers/${this.pProviderId}/variants`;
+            const res = await fetch(url);
+            const data = await res.json();
+            this.printifyStatus = "";
+
+            if (data.error) { this.printifyError = data.error; return; }
+            this.pAllVariants = data;
+
+            // Extract the front print area dimensions from the first variant that has them
+            for (const v of data) {
+                const front = (v.placeholders ?? []).find(p => p.position === "front");
+                if (front?.width && front?.height) {
+                    this.pPrintWidth = front.width;
+                    this.pPrintHeight = front.height;
+                    break;
+                }
+            }
+            if (this.pPrintWidth) this.applyTopPreset();
+
+            // Extract unique colors and sizes, preserving natural order from the API
+            const colors = [], sizes = [], seenC = new Set(), seenS = new Set();
+            for (const v of data) {
+                const c = v.options?.color ?? "";
+                const s = v.options?.size ?? "";
+                if (c && !seenC.has(c)) { seenC.add(c); colors.push(c); }
+                if (s && !seenS.has(s)) { seenS.add(s); sizes.push(s); }
+            }
+            this.pColors = colors;
+            this.pSizes = sizes;
+            this.pSelectedColors = [];
+            // Default sizes: no colors selected; sizes default to S–2XL only
+            const defaultSizes = new Set(["S", "M", "L", "XL", "2XL", "XXL"]);
+            this.pSelectedSizes = sizes.filter(s => defaultSizes.has(s.toUpperCase()));
+        },
+
+        startDrag(e) {
+            const scale = 220 / this.pPrintWidth;  // preview px per print px
+            const designPx = this.pDesignPx;
+            // Cache all per-drag constants so _onDragMove doesn't recompute on every mousemove
+            this.pDrag = {
+                startX: e.clientX,
+                startY: e.clientY,
+                startPX: this.pXPx,
+                startPY: this.pYPx,
+                scale,
+                designPx,
+                snapThreshold: 8 / scale,  // 8 screen px → print px; feels consistent across sizes
+                centerX: Math.round((this.pPrintWidth - designPx) / 2),
+                centerY: Math.round((this.pPrintHeight - designPx) / 2),
+                minX: -(designPx - 1),
+                maxX: this.pPrintWidth - 1,
+                minY: -(designPx - 1),
+                maxY: this.pPrintHeight - 1,
+            };
+            document.addEventListener('mousemove', this._boundDragMove);
+            document.addEventListener('mouseup', this._boundDragUp);
+        },
+
+        _onDragMove(e) {
+            if (!this.pDrag) return;
+            const { scale, snapThreshold, centerX, centerY, minX, maxX, minY, maxY } = this.pDrag;
+
+            const rawX = this.pDrag.startPX + (e.clientX - this.pDrag.startX) / scale;
+            const rawY = this.pDrag.startPY + (e.clientY - this.pDrag.startY) / scale;
+            // Clamp so at least 1 print-pixel of the image stays inside the print area
+            let x = Math.round(Math.min(Math.max(rawX, minX), maxX));
+            let y = Math.round(Math.min(Math.max(rawY, minY), maxY));
+
+            // Snap to center when within threshold
+            if (Math.abs(rawX - centerX) <= snapThreshold) x = centerX;
+            if (Math.abs(rawY - centerY) <= snapThreshold) y = centerY;
+
+            this.pXPx = x;
+            this.pYPx = y;
+            this.pIsTopPreset = false;
+        },
+
+        _onDragUp() {
+            this.pDrag = null;
+            document.removeEventListener('mousemove', this._boundDragMove);
+            document.removeEventListener('mouseup', this._boundDragUp);
+        },
+
+        // Keyboard nudge for the placement preview image; dx/dy in print pixels
+        nudgeDrag(dx, dy) {
+            if (!this.pPrintWidth || !this.pPrintHeight) return;
+            const designPx = this.pDesignPx;
+            const minX = -(designPx - 1), maxX = this.pPrintWidth - 1;
+            const minY = -(designPx - 1), maxY = this.pPrintHeight - 1;
+            this.pXPx = Math.round(Math.min(Math.max(this.pXPx + dx, minX), maxX));
+            this.pYPx = Math.round(Math.min(Math.max(this.pYPx + dy, minY), maxY));
+            this.pIsTopPreset = false;
+        },
+
+        applyTopPreset() {
+            if (!this.pPrintWidth) return;
+            // Center horizontally; back out transparent padding so visible content
+            // lands at pTopAllowance from the top of the print area
+            this.pXPx = Math.round((this.pPrintWidth - this.pDesignPx) / 2);
+            this.pYPx = Math.round(this.pTopAllowance - this.pContentTop * this.pDesignPx);
+            this.pIsTopPreset = true;
+        },
+
+        centerH() {
+            if (!this.pPrintWidth) return;
+            this.pXPx = Math.round((this.pPrintWidth - this.pDesignPx) / 2);
+            this.pIsTopPreset = false;
+        },
+
+        centerV() {
+            if (!this.pPrintWidth) return;
+            this.pYPx = Math.round((this.pPrintHeight - this.pDesignPx) / 2);
+            this.pIsTopPreset = false;
+        },
+
+        togglePColor(color) {
+            const i = this.pSelectedColors.indexOf(color);
+            if (i === -1) this.pSelectedColors.push(color);
+            else this.pSelectedColors.splice(i, 1);
+        },
+
+        togglePSize(size) {
+            const i = this.pSelectedSizes.indexOf(size);
+            if (i === -1) this.pSelectedSizes.push(size);
+            else this.pSelectedSizes.splice(i, 1);
+        },
+
+        async doPublish(publishNow) {
+            if (this.printifyBusy) return;
+            this.printifyError = "";
+            this.printifyDone = null;
+
+            const shopId = cfg.printifyShopId || this.pShopId;
+            if (!shopId) { this.printifyError = "Select a shop first."; return; }
+            if (!this.pBlueprint) { this.printifyError = "Select a t-shirt style first."; return; }
+            if (!this.pProviderId) { this.printifyError = "Select a print provider first."; return; }
+            if (this.selectedVariantCount === 0) { this.printifyError = "Select at least one color and size."; return; }
+            if (!this.pTitle.trim()) { this.printifyError = "Enter a product title."; return; }
+
+            // Gather the variant IDs matching the selected color+size combinations
+            const variantIds = this.pAllVariants
+                .filter(v =>
+                    this.pSelectedColors.includes(v.options?.color ?? "") &&
+                    this.pSelectedSizes.includes(v.options?.size ?? "")
+                )
+                .map(v => v.id);
+
+            const priceCents = Math.round(parseFloat(this.pPrice) * 100);
+            if (!priceCents || priceCents < 1) { this.printifyError = "Enter a valid price."; return; }
+
+            // Convert pixel coords to Printify normalized center coordinates (0–1)
+            const scale = this.pScale;
+            const W = this.pPrintWidth;
+            const H = this.pPrintHeight;
+            if (!W || !H) { this.printifyError = "Print dimensions not loaded."; return; }
+            const designX = (this.pXPx + this.pDesignPx / 2) / W;
+            const designY = (this.pYPx + this.pDesignPx / 2) / H;
+            this.printifyBusy = true;
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fd.append("shop_id", shopId);
+            fd.append("blueprint_id", this.pBlueprint.id);
+            fd.append("provider_id", this.pProviderId);
+            fd.append("variant_ids", JSON.stringify(variantIds));
+            fd.append("title", this.pTitle.trim());
+            fd.append("description", this.pDescription.trim());
+            fd.append("price_cents", priceCents);
+            fd.append("publish_now", publishNow);
+            fd.append("design_x", designX.toFixed(4));
+            fd.append("design_y", designY.toFixed(4));
+            fd.append("design_scale", scale);
+            fd.append("final_url", this.finalUrl ?? "");
+            fd.append("override_min_res", this.pOverrideMinRes);
+
+            await streamSSE("/printify/publish", fd, {
+                status: (e) => { this.printifyStatus = e.message; },
+                done: (e) => {
+                    this.printifyStatus = "";
+                    this.printifyDone = e;
+                },
+                error: (e) => {
+                    this.printifyStatus = "";
+                    this.printifyError = e.message;
+                },
+            });
+
+            this.printifyBusy = false;
+        },
+    };
+}
+
+
+// ── Session / column-manager Alpine component ─────────────────────────────────
+// designer() owns session identity, column list, max-columns setting, and the
+// output browser drawer. Per-column workflow state lives in columnDesigner().
+function designer() {
+    const cfg = JSON.parse(document.getElementById('app-config').textContent);
+
+    // Reuse the tab's session ID across soft refreshes so server-side state
+    // (concepts, image paths, column count) survives a reload. sessionStorage is
+    // cleared when the tab closes, matching the server's in-memory lifetime.
+    const storedId = sessionStorage.getItem('designer_session_id');
+    const sessionId = storedId || crypto.randomUUID();
+    if (!storedId) sessionStorage.setItem('designer_session_id', sessionId);
+
+    return {
+        // ── Session ────────────────────────────────────────────────────────
+        sessionId,
+
+        // Expose cfg so the template can read printifyEnabled, etc.
+        cfg,
+
+        // ── Column management ──────────────────────────────────────────────
+        // Each entry is { id } — actual workflow state lives in columnDesigner instances.
+        // Starts with one column; user adds more via addColumn().
+        columns: [{ id: 0 }],
+        maxColumns: cfg.maxColumns,
+
+        // ── Output browser ────────────────────────────────────────────────
+        showBrowser: false,
+        browserMode: null,      // null = normal, "reference" = picking a reference image
+        browserTargetColIdx: 0, // which column's button triggered this browser open
+        browserThemes: [],
+        browserFilter: "",
+        browserLoading: false,
+        manageMode: false,
+        selectedFiles: {},      // url → size_bytes; object for Alpine reactivity
+        storageStats: null,     // {totalBytes, themeCount}
+        renamingDir: "",        // dir_name of the theme currently being renamed
+        renameValue: "",        // current value of the rename input
+
+        // ── Lifecycle ──────────────────────────────────────────────────────
+        async init() {
+            // Route browser-open requests dispatched by column components
+            window.addEventListener('designer-open-browser', (e) => this.openBrowser(e.detail.colIdx));
+            window.addEventListener('designer-open-browser-for-ref', (e) => this.openBrowserForReference(e.detail.colIdx));
+            window.addEventListener('designer-close-column', (e) => this.closeColumn(e.detail.colIdx));
+
+            // Warn before unload if any column has started work — reloading clears
+            // server-side PIL images, but text state and paths survive via session restore.
+            window.addEventListener('beforeunload', (e) => {
+                // Check live Alpine state for active columns; fall back to columns array length
+                const anyWork = this.columns.some((col) => {
+                    const el = document.querySelector(`[data-col-idx="${col.id}"]`);
+                    const data = el?._x_dataStack?.[0];
+                    // Consider a column "in progress" if it has a theme, concepts, variants, or final image
+                    return data?.theme?.trim() || data?.concepts?.length || data?.variants?.length || data?.finalUrl;
+                });
+                if (anyWork) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
+
+            // Restore prior session state (survives soft refresh because sessionId is
+            // persisted in sessionStorage). On a fresh tab, the server returns one empty column.
+            try {
+                const res = await fetch(`/session/columns?session_id=${encodeURIComponent(this.sessionId)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    // Clamp to the configured hard cap in case server state differs
+                    this.maxColumns = data.max_columns ?? cfg.maxColumns;
+                    // Re-create the column list from persisted server state; each entry
+                    // carries its initialState so columnDesigner can restore the workflow step.
+                    if (Array.isArray(data.columns) && data.columns.length > 0) {
+                        this.columns = data.columns.map((state, i) => ({
+                            id: i,
+                            initialState: state,
+                        }));
+                    }
+                }
+            } catch {
+                // Network or parse error — start fresh with the default single column
+            }
+
+            // Publish column count to a global Alpine store so column components can
+            // disable the close button reactively without needing parent scope access.
+            Alpine.store('columnCount', this.columns.length);
+
+            // Keep browserOpen store in sync — column headers combine it with activeColIdx
+            // to highlight the active column whenever the browser is open.
+            this.$watch('showBrowser', (v) => Alpine.store('browserOpen', v));
+        },
+
+        // ── Computed ───────────────────────────────────────────────────────
+        get filteredBrowserThemes() {
+            const q = this.browserFilter.trim().toLowerCase();
+            if (!q) return this.browserThemes;
+            return this.browserThemes.filter(t => t.theme.toLowerCase().includes(q));
+        },
+
+        get selectedCount() {
+            return Object.keys(this.selectedFiles).length;
+        },
+
+        get selectedBytes() {
+            return Object.values(this.selectedFiles).reduce((a, b) => a + b, 0);
+        },
+
+        // ── Column management ──────────────────────────────────────────────
+        async addColumn() {
+            if (this.columns.length >= this.maxColumns) return;
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            const res = await fetch("/columns", { method: "POST", body: fd });
+            const data = await res.json();
+            if (data.error) return;
+            this.columns.push({ id: data.column_id });
+            Alpine.store('columnCount', this.columns.length);
+        },
+
+        // Remove a column — blocked while the column is loading or it's the last one.
+        // Rebuilds the columns array from the server's compacted response so indices
+        // stay in sync after the gap is closed.
+        async closeColumn(colIdx) {
+            if (this.columns.length <= 1) return; // guard — button should already be disabled
+            // Read live Alpine state from the column DOM to decide whether to confirm
+            const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
+            const colData = el?._x_dataStack?.[0];
+            const hasWork = colData?.theme?.trim() || colData?.concepts?.length
+                         || colData?.variants?.length || colData?.finalUrl;
+            const label = `Design ${colIdx + 1}`;
+            if (hasWork && !confirm(`Close ${label}? Work in this column will be lost.`)) return;
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", colIdx);
+            const res = await fetch("/session/remove-column", { method: "POST", body: fd });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.error) return;
+            // Rebuild from the server's compacted array — surviving columns get new indices
+            // starting at 0; _restoreInitialState in each columnDesigner handles the re-mount.
+            this.columns = data.columns.map((state, i) => ({ id: i, initialState: state }));
+            Alpine.store('columnCount', this.columns.length);
+        },
+
+        // Persist the user's max-columns preference to the server
+        async updateMaxColumns() {
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("max_columns", this.maxColumns);
+            await fetch("/session/max-columns", { method: "POST", body: fd });
+        },
+
+        // ── Output browser ─────────────────────────────────────────────────
+        openBrowser(colIdx) {
+            // Toggle closed if this column's browser button is clicked while already open
+            if (this.showBrowser && this.browserMode === null && this.browserTargetColIdx === (colIdx ?? 0)) {
+                this.showBrowser = false;
+                return;
+            }
+            this.browserMode = null;
+            this.browserTargetColIdx = colIdx ?? 0;
+            this.showBrowser = true;
+            if (this.browserThemes.length > 0) return; // already loaded
+            this.reloadBrowser();
+        },
+
+        openBrowserForReference(colIdx) {
             this.browserMode = "reference";
+            this.browserTargetColIdx = colIdx ?? 0;
             this.showBrowser = true;
             if (this.browserThemes.length > 0) return;
-            await this.reloadBrowser();
+            this.reloadBrowser();
         },
 
         async reloadBrowser() {
@@ -481,621 +1325,20 @@ function designer() {
             await this.reloadBrowser();
         },
 
-        _bgFormData() {
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fd.append("bg_color", this.bgColor);
-            fd.append("bg_tolerance", this.bgTolerance);
-            fd.append("edge_erode", this.edgeErode);
-            fd.append("decontaminate", this.decontaminate);
-            return fd;
+        // Dispatch a load-image event to the currently active column
+        loadToVariants(url, width, height, displayTheme) {
+            window.dispatchEvent(new CustomEvent('col-load-image', {
+                detail: { colIdx: Alpine.store('activeColIdx'), url, width, height, displayTheme },
+            }));
+            this.showBrowser = false;
         },
 
-        // ── Workflow actions ───────────────────────────────────────────────
-        selectConcept(concept) {
-            this.selectedConcept = concept;
-            this.editedConcept = concept;
-            this.step = Math.max(this.step, 3);
-        },
-
-        async doBrainstorm() {
-            if (this.isLoading || !this.theme.trim()) return;
-            this.loadingStep = 1;
-            this._startLoading("Generating concepts...");
-
-            // Reset everything below step 1
-            this.directMode = false;
-            this.concepts = [];
-            this.selectedConcept = null;
-            this.editedConcept = "";
-            this.variants = [];
-            this.prompts = [];
-            this.selectedVariant = null;
-            this.finalUrl = null;
-            this.loadedImageRes = null;
-            this.step = 1;
-
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fd.append("theme", this.theme);
-            fd.append("concepts_template", this.conceptsTemplate);
-
-            await streamSSE("/brainstorm", fd, {
-                status: (e) => { this.loadingMsg = e.message; },
-                concepts: (e) => {
-                    this.concepts = e.concepts;
-                    this.step = 2;
-                    this._stopLoading();
-                },
-                error: (e) => { this._onError(e.message); },
-            });
-        },
-
-        async doGenerateDirect() {
-            if (this.isLoading || !this.theme.trim()) return;
-            // Skip brainstorm — use the theme text as the concept directly
-            this.directMode = true;
-            this.concepts = [];
-            this.selectedConcept = null;
-            this.editedConcept = this.theme.trim();
-            this.variants = [];
-            this.prompts = [];
-            this.selectedVariant = null;
-            this.finalUrl = null;
-            this.loadedImageRes = null;
-            this.step = 2;  // step >= 2 satisfies the directMode badge condition; doGenerate() will advance to 3
-            await this.doGenerate();
-        },
-
-        async doGenerate() {
-            if (this.isLoading || !this.editedConcept.trim()) return;
-            this.loadingStep = 3;
-            this._startLoading("Building prompts...");
-
-            this.variants = [];
-            this.prompts = [];
-            this.selectedVariant = null;
-            this.finalUrl = null;
-            this.loadedImageRes = null;
-            this.step = Math.max(this.step, 3);
-
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fd.append("concept", this.editedConcept);
-            fd.append("original_concept", this.selectedConcept ?? this.editedConcept);
-            fd.append("bg_color", this.bgColor);
-            fd.append("num_variants", this.numVariants);
-            fd.append("max_colors", this.maxColors);
-            fd.append("variants_template", this.variantsTemplate);
-            fd.append("style_template", this.styleTemplate);
-            fd.append("aspect_ratio", this.aspectRatio);
-            fd.append("variant_size", this.variantSize);
-            fd.append("reference_mode", this.referenceMode);
-
-            await streamSSE("/generate", fd, {
-                status: (e) => { this.loadingMsg = e.message; },
-                prompts: (e) => {
-                    this.prompts = e.prompts;
-                    this.promptLog = e.prompts
-                        .map((p, i) => `── Variant ${i + 1} ──\n${p}`)
-                        .join("\n\n");
-                },
-                variants: (e) => {
-                    const ts = Date.now();
-                    this.variants = e.urls.map((url) => ({ url, origUrl: url, noBgUrl: null, ts }));
-                    this.selectedVariant = e.urls.length === 1 ? 0 : null;
-                    this.step = 4;
-                    this._stopLoading();
-                },
-                error: (e) => { this._onError(e.message); },
-            });
-        },
-
-        async doFinalize() {
-            if (this.isLoading) return;
-            const idx = this.selectedVariant ?? 0;
-            // If already at step 5, keep the loading indicator anchored there so
-            // the user sees feedback without scrolling back up to step 4.
-            this.loadingStep = this.step >= 5 ? 5 : 4;
-            this._startLoading(`Generating ${this.finalSize} design...`);
-
-            const fd = this._bgFormData();
-            fd.append("selected_idx", idx);
-            fd.append("aspect_ratio", this.aspectRatio);
-            fd.append("final_size", this.finalSize);
-
-            await streamSSE("/finalize", fd, {
-                status: (e) => { this.loadingMsg = e.message; },
-                final: (e) => {
-                    this.finalUrl = e.url;
-                    this._origFinalUrl = e.url;
-                    this._noBgFinalUrl = null;
-                    this.finalTs = Date.now();
-                    this.finalizedSize = this.finalSize;
-                    this.step = 5;
-                    this._stopLoading();
-                },
-                error: (e) => { this._onError(e.message); },
-            });
-        },
-
-        async doFinalizeForPrintify() {
-            if (this.printifyBusy) return;
-            this.printifyBusy = true;
-            this.printifyError = "";
-            this.printifyStatus = `Re-finalizing at ${cfg.printifyMinSize}…`;
-
-            const idx = this.selectedVariant ?? 0;
-            const fd = this._bgFormData();
-            fd.append("selected_idx", idx);
-            fd.append("aspect_ratio", this.aspectRatio);
-            fd.append("final_size", cfg.printifyMinSize);
-
-            await streamSSE("/finalize", fd, {
-                status: (e) => { this.printifyStatus = e.message; },
-                final: (e) => {
-                    this.finalUrl = e.url;
-                    this._origFinalUrl = e.url;
-                    this._noBgFinalUrl = null;
-                    this.finalTs = Date.now();
-                    this.finalizedSize = cfg.printifyMinSize;
-                    this.step = 5;
-                    this.printifyStatus = "";
-                },
-                error: (e) => { this.printifyError = e.message; },
-            });
-
-            this.printifyBusy = false;
-        },
-
-        async doRemoveVariantBg() {
-            if (this.isLoading) return;
-            const idx = this.selectedVariant ?? 0;
-            const v = this.variants[idx];
-            if (v?.noBgUrl) {
-                const updated = [...this.variants];
-                updated[idx] = { ...v, url: v.noBgUrl, ts: Date.now() };
-                this.variants = updated;
-                const fd = new FormData();
-                fd.append("session_id", this.sessionId);
-                fd.append("selected_idx", idx);
-                fetch("/apply-cached-bg/variant", { method: "POST", body: fd })
-                    .catch(() => this._onError("Failed to sync variant state."));
-                return;
-            }
-
-            this.loadingStep = 4;
-            this._startLoading("Removing background...");
-
-            const fd = this._bgFormData();
-            fd.append("selected_idx", idx);
-
-            await streamSSE("/remove-bg/variant", fd, {
-                status: (e) => { this.loadingMsg = e.message; },
-                variant_updated: (e) => {
-                    const updated = [...this.variants];
-                    const prev = updated[e.index] ?? {};
-                    updated[e.index] = {
-                        ...prev,
-                        url: e.url,
-                        ts: Date.now(),
-                        noBgUrl: e.bg_removed ? e.url : prev.noBgUrl,
-                    };
-                    this.variants = updated;
-                    this._stopLoading();
-                },
-                error: (e) => { this._onError(e.message); },
-            });
-        },
-
-        async doRestoreVariantBg() {
-            if (this.isLoading) return;
-            const idx = this.selectedVariant ?? 0;
-            const v = this.variants[idx];
-            // Instant UI swap — both URLs are already known after first removal.
-            const updated = [...this.variants];
-            updated[idx] = { ...v, url: v.origUrl, ts: Date.now() };
-            this.variants = updated;
-            // Sync server session in background so finalize uses the correct image.
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fd.append("selected_idx", idx);
-            fetch("/restore-bg/variant", { method: "POST", body: fd })
-                .catch(() => this._onError("Failed to sync variant state."));
-        },
-
-        async doRestoreFinalBg() {
-            if (this.isLoading) return;
-            // Instant UI swap.
-            this.finalUrl = this._origFinalUrl;
-            this.finalTs = Date.now();
-            // Sync server session in background.
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fetch("/restore-bg/final", { method: "POST", body: fd })
-                .catch(() => this._onError("Failed to sync final state."));
-        },
-
-        async doRemoveFinalBg() {
-            if (this.isLoading) return;
-            // Instant swap if we've already removed bg for this final image before.
-            if (this._noBgFinalUrl) {
-                this.finalUrl = this._noBgFinalUrl;
-                this.finalTs = Date.now();
-                const fd = new FormData();
-                fd.append("session_id", this.sessionId);
-                fetch("/apply-cached-bg/final", { method: "POST", body: fd })
-                    .catch(() => this._onError("Failed to sync final state."));
-                return;
-            }
-            this.loadingStep = 5;
-            this._startLoading("Removing background...");
-
-            await streamSSE("/remove-bg/final", this._bgFormData(), {
-                status: (e) => { this.loadingMsg = e.message; },
-                final_updated: (e) => {
-                    this.finalUrl = e.url;
-                    this.finalTs = Date.now();
-                    if (e.bg_removed) this._noBgFinalUrl = e.url;
-                    this._stopLoading();
-                },
-                error: (e) => { this._onError(e.message); },
-            });
-        },
-
-        // ── Preset actions ─────────────────────────────────────────────────
-        async loadPreset(name) {
-            if (!name) return;
-            const res = await fetch(`/presets/${encodeURIComponent(name)}`);
-            const data = await res.json();
-            if (!data.error) {
-                this.conceptsTemplate = data.concepts_prompt;
-                this.variantsTemplate = data.variants_prompt;
-                this.styleTemplate = data.style_suffix;
-            }
-        },
-
-        async savePreset() {
-            const name = this.newPresetName.trim();
-            if (!name) { this.presetStatus = "Enter a preset name."; return; }
-
-            const fd = new FormData();
-            fd.append("name", name);
-            fd.append("concepts", this.conceptsTemplate);
-            fd.append("variants", this.variantsTemplate);
-            fd.append("style", this.styleTemplate);
-
-            const res = await fetch("/presets", { method: "POST", body: fd });
-            const data = await res.json();
-            if (data.error) {
-                this.presetStatus = data.error;
-            } else {
-                this.presetNames = data.names;
-                this.activePreset = data.saved;
-                this.newPresetName = "";
-                this.presetStatus = `Saved "${name}".`;
-            }
-        },
-
-        async deletePreset() {
-            const name = this.activePreset;
-            if (name === cfg.builtinName) { this.presetStatus = "Cannot delete the built-in preset."; return; }
-
-            const res = await fetch(`/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
-            const data = await res.json();
-            this.presetNames = data.names;
-            this.activePreset = cfg.builtinName;
-            await this.loadPreset(cfg.builtinName);
-            this.presetStatus = `Deleted "${name}".`;
-        },
-
-        // ── Printify actions ───────────────────────────────────────────────
-
-        async openPrintify() {
-            // Reset publish result each time the modal opens.
-            this.printifyError = "";
-            this.printifyStatus = "";
-            this.printifyDone = null;
-            this.pBlueprint = null;
-            this.pProviders = [];
-            this.pProviderId = "";
-            this.pAllVariants = [];
-            this.pColors = [];
-            this.pSizes = [];
-            this.pSelectedColors = [];
-            this.pSelectedSizes = [];
-            this.pContentTop = 0;
-            this.pXPx = 0;
-            this.pYPx = this.pTopAllowance;  // pTopAllowance intentionally not reset — persists
-            this.pIsTopPreset = true;
-            this.pTitle = this.theme || "Custom T-Shirt";
-            this.showPrintify = true;
-
-            // Fetch content bounds from the final image alpha channel so we can
-            // shift the Y position to align the subject's top with the print area top.
-            // Non-critical — runs in parallel, falls back to 0 on any error.
-            if (this.finalUrl) {
-                fetch(`/analysis/final?session_id=${encodeURIComponent(this.sessionId)}`)
-                    .then(r => r.json())
-                    .then(data => { this.pContentTop = data.content_top ?? 0; })
-                    .catch(() => { });
-            }
-
-            // Load shops (skip if shop ID already configured server-side).
-            if (!cfg.printifyShopId && this.pShops.length === 0) {
-                const res = await fetch("/printify/shops");
-                const data = await res.json();
-                if (data.error) { this.printifyError = data.error; return; }
-                this.pShops = data;
-                // Auto-select by configured name (case-insensitive), then fall back to
-                // selecting the only shop if there's just one.
-                const preferredName = (cfg.printifyShopName || "").toLowerCase();
-                const match = preferredName && data.find(s => s.title.toLowerCase() === preferredName);
-                if (match) this.pShopId = String(match.id);
-                else if (data.length === 1) this.pShopId = String(data[0].id);
-            }
-
-            // Load blueprint catalog (fetched once; subsequent opens reuse cache).
-            if (this.pAllBlueprints.length === 0) {
-                this.printifyStatus = "Loading catalog…";
-                const res = await fetch("/printify/blueprints");
-                const data = await res.json();
-                this.printifyStatus = "";
-                if (data.error) { this.printifyError = data.error; return; }
-                this.pAllBlueprints = data;
-            }
-
-            // Default search to show common shirt styles on open.
-            this.pBlueprintSearch = "shirt";
-            this.filterBlueprints();
-        },
-
-        filterBlueprints() {
-            const q = this.pBlueprintSearch.trim().toLowerCase();
-            const pool = q ? (() => {
-                const terms = q.split(/\s+/);
-                return this.pAllBlueprints.filter(bp =>
-                    terms.every(t => bp.title.toLowerCase().includes(t) || (bp.brand || "").toLowerCase().includes(t))
-                );
-            })() : this.pAllBlueprints;
-            // Sort by blueprint ID ascending — lower IDs are older, more established products,
-            // which is the closest proxy to popularity the Printify API exposes.
-            this.pFilteredBlueprints = pool.slice().sort((a, b) => a.id - b.id).slice(0, 50);
-        },
-
-        async selectBlueprint(bp) {
-            this.pBlueprint = bp;
-            this.pProviders = [];
-            this.pProviderId = "";
-            this.pAllVariants = [];
-            this.pColors = [];
-            this.pSizes = [];
-            this.pSelectedColors = [];
-            this.pSelectedSizes = [];
-            this.pPrintWidth = 0;
-            this.pPrintHeight = 0;
-            this.printifyError = "";
-
-            this.printifyStatus = "Loading print providers…";
-            const res = await fetch(`/printify/blueprints/${bp.id}/providers`);
-            const data = await res.json();
-            this.printifyStatus = "";
-
-            if (data.error) { this.printifyError = data.error; return; }
-            this.pProviders = data;
-            if (data.length > 0) {
-                this.pProviderId = String(data[0].id);
-                await this.loadVariants();
-            }
-        },
-
-        async loadVariants() {
-            if (!this.pBlueprint || !this.pProviderId) return;
-            this.pAllVariants = [];
-            this.pColors = [];
-            this.pSizes = [];
-            this.pSelectedColors = [];
-            this.pSelectedSizes = [];
-            this.pPrintWidth = 0;
-            this.pPrintHeight = 0;
-            this.printifyError = "";
-
-            this.printifyStatus = "Loading variants…";
-            const url = `/printify/blueprints/${this.pBlueprint.id}/providers/${this.pProviderId}/variants`;
-            const res = await fetch(url);
-            const data = await res.json();
-            this.printifyStatus = "";
-
-            if (data.error) { this.printifyError = data.error; return; }
-            this.pAllVariants = data;
-
-            // Extract the front print area dimensions from the first variant that has them.
-            // All variants for a blueprint+provider share the same print area dimensions.
-            for (const v of data) {
-                const front = (v.placeholders ?? []).find(p => p.position === "front");
-                if (front?.width && front?.height) {
-                    this.pPrintWidth = front.width;
-                    this.pPrintHeight = front.height;
-                    break;
-                }
-            }
-            if (this.pPrintWidth) this.applyTopPreset();
-
-            // Extract unique colors and sizes, preserving natural order from the API.
-            const colors = [], sizes = [], seenC = new Set(), seenS = new Set();
-            for (const v of data) {
-                const c = v.options?.color ?? "";
-                const s = v.options?.size ?? "";
-                if (c && !seenC.has(c)) { seenC.add(c); colors.push(c); }
-                if (s && !seenS.has(s)) { seenS.add(s); sizes.push(s); }
-            }
-            this.pColors = colors;
-            this.pSizes = sizes;
-            // Default: no colors selected; sizes default to S–2XL only.
-            this.pSelectedColors = [];
-            const defaultSizes = new Set(["S", "M", "L", "XL", "2XL", "XXL"]);
-            this.pSelectedSizes = sizes.filter(s => defaultSizes.has(s.toUpperCase()));
-        },
-
-        startDrag(e) {
-            const scale = 220 / this.pPrintWidth;  // preview px per print px
-            const designPx = this.pDesignPx;
-            // Cache all per-drag constants so _onDragMove (called on every mousemove)
-            // doesn't recompute them hundreds of times per second.
-            this.pDrag = {
-                startX: e.clientX,
-                startY: e.clientY,
-                startPX: this.pXPx,
-                startPY: this.pYPx,
-                scale,
-                designPx,
-                snapThreshold: 8 / scale,  // 8 screen px → print px; feels consistent across sizes
-                centerX: Math.round((this.pPrintWidth - designPx) / 2),
-                centerY: Math.round((this.pPrintHeight - designPx) / 2),
-                minX: -(designPx - 1),
-                maxX: this.pPrintWidth - 1,
-                minY: -(designPx - 1),
-                maxY: this.pPrintHeight - 1,
-            };
-            document.addEventListener('mousemove', this._boundDragMove);
-            document.addEventListener('mouseup', this._boundDragUp);
-        },
-
-        _onDragMove(e) {
-            if (!this.pDrag) return;
-            const { scale, snapThreshold, centerX, centerY, minX, maxX, minY, maxY } = this.pDrag;
-
-            const rawX = this.pDrag.startPX + (e.clientX - this.pDrag.startX) / scale;
-            const rawY = this.pDrag.startPY + (e.clientY - this.pDrag.startY) / scale;
-            // Clamp so at least 1 print-pixel of the image stays inside the print area.
-            let x = Math.round(Math.min(Math.max(rawX, minX), maxX));
-            let y = Math.round(Math.min(Math.max(rawY, minY), maxY));
-
-            // Snap to center when within threshold.
-            if (Math.abs(rawX - centerX) <= snapThreshold) x = centerX;
-            if (Math.abs(rawY - centerY) <= snapThreshold) y = centerY;
-
-            this.pXPx = x;
-            this.pYPx = y;
-            this.pIsTopPreset = false;
-        },
-
-        _onDragUp() {
-            this.pDrag = null;
-            document.removeEventListener('mousemove', this._boundDragMove);
-            document.removeEventListener('mouseup', this._boundDragUp);
-        },
-
-        // Keyboard nudge for the placement preview image. dx/dy are in print pixels.
-        // Called by arrow-key handlers on the preview img element.
-        nudgeDrag(dx, dy) {
-            if (!this.pPrintWidth || !this.pPrintHeight) return;
-            const designPx = this.pDesignPx;
-            const minX = -(designPx - 1), maxX = this.pPrintWidth - 1;
-            const minY = -(designPx - 1), maxY = this.pPrintHeight - 1;
-            this.pXPx = Math.round(Math.min(Math.max(this.pXPx + dx, minX), maxX));
-            this.pYPx = Math.round(Math.min(Math.max(this.pYPx + dy, minY), maxY));
-            this.pIsTopPreset = false;
-        },
-
-        applyTopPreset() {
-            if (!this.pPrintWidth) return;
-            // Center horizontally; back out transparent padding so visible content
-            // lands at pTopAllowance from the top of the print area.
-            this.pXPx = Math.round((this.pPrintWidth - this.pDesignPx) / 2);
-            this.pYPx = Math.round(this.pTopAllowance - this.pContentTop * this.pDesignPx);
-            this.pIsTopPreset = true;
-        },
-
-        centerH() {
-            if (!this.pPrintWidth) return;
-            this.pXPx = Math.round((this.pPrintWidth - this.pDesignPx) / 2);
-            this.pIsTopPreset = false;
-        },
-
-        centerV() {
-            if (!this.pPrintWidth) return;
-            this.pYPx = Math.round((this.pPrintHeight - this.pDesignPx) / 2);
-            this.pIsTopPreset = false;
-        },
-
-        togglePColor(color) {
-            const i = this.pSelectedColors.indexOf(color);
-            if (i === -1) this.pSelectedColors.push(color);
-            else this.pSelectedColors.splice(i, 1);
-        },
-
-        togglePSize(size) {
-            const i = this.pSelectedSizes.indexOf(size);
-            if (i === -1) this.pSelectedSizes.push(size);
-            else this.pSelectedSizes.splice(i, 1);
-        },
-
-        async doPublish(publishNow) {
-            if (this.printifyBusy) return;
-            this.printifyError = "";
-            this.printifyDone = null;
-
-            const shopId = cfg.printifyShopId || this.pShopId;
-            if (!shopId) { this.printifyError = "Select a shop first."; return; }
-            if (!this.pBlueprint) { this.printifyError = "Select a t-shirt style first."; return; }
-            if (!this.pProviderId) { this.printifyError = "Select a print provider first."; return; }
-            if (this.selectedVariantCount === 0) { this.printifyError = "Select at least one color and size."; return; }
-            if (!this.pTitle.trim()) { this.printifyError = "Enter a product title."; return; }
-
-            // Gather the variant IDs that match the selected color+size combinations.
-            const variantIds = this.pAllVariants
-                .filter(v =>
-                    this.pSelectedColors.includes(v.options?.color ?? "") &&
-                    this.pSelectedSizes.includes(v.options?.size ?? "")
-                )
-                .map(v => v.id);
-
-            const priceCents = Math.round(parseFloat(this.pPrice) * 100);
-            if (!priceCents || priceCents < 1) { this.printifyError = "Enter a valid price."; return; }
-
-            // Convert pixel coords to Printify normalized center coordinates (0–1).
-            // pXPx = left edge of design image; pYPx = top of visible content (transparent
-            // fringe excluded). pContentTop corrects for transparent padding above the subject.
-            //   design_x = (pXPx + designPx/2) / W
-            //   design_y = (pYPx + designPx*(0.5 - pContentTop)) / H
-            const scale = this.pScale;
-            const W = this.pPrintWidth;
-            const H = this.pPrintHeight;
-            if (!W || !H) { this.printifyError = "Print dimensions not loaded."; return; }
-            const designX = (this.pXPx + this.pDesignPx / 2) / W;
-            const designY = (this.pYPx + this.pDesignPx / 2) / H;
-            this.printifyBusy = true;
-
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fd.append("shop_id", shopId);
-            fd.append("blueprint_id", this.pBlueprint.id);
-            fd.append("provider_id", this.pProviderId);
-            fd.append("variant_ids", JSON.stringify(variantIds));
-            fd.append("title", this.pTitle.trim());
-            fd.append("description", this.pDescription.trim());
-            fd.append("price_cents", priceCents);
-            fd.append("publish_now", publishNow);
-            fd.append("design_x", designX.toFixed(4));
-            fd.append("design_y", designY.toFixed(4));
-            fd.append("design_scale", scale);
-            fd.append("final_url", this.finalUrl ?? "");
-            fd.append("override_min_res", this.pOverrideMinRes);
-
-            await streamSSE("/printify/publish", fd, {
-                status: (e) => { this.printifyStatus = e.message; },
-                done: (e) => {
-                    this.printifyStatus = "";
-                    this.printifyDone = e;
-                },
-                error: (e) => {
-                    this.printifyStatus = "";
-                    this.printifyError = e.message;
-                },
-            });
-
-            this.printifyBusy = false;
+        // Dispatch a set-reference event to the currently active column
+        setReferenceFromBrowser(imageUrl) {
+            window.dispatchEvent(new CustomEvent('col-set-reference', {
+                detail: { colIdx: Alpine.store('activeColIdx'), imageUrl },
+            }));
+            this.showBrowser = false;
         },
     };
 }

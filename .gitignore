@@ -26,3 +26,4 @@ prompt_presets.json
 # Gemini CLI config (not part of this codebase)
 .gemini/
 gemini.md
+.vscode/sessions.json

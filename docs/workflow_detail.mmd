@@ -9,13 +9,32 @@ graph TD
         AllowlistCheck -- Yes --> AppHome
     end
 
-    %% 2. Ideation
-    subgraph Ideation [2. Ideation]
+    %% 2. Session and Column Management
+    subgraph ColMgmt [2. Session and Column Management]
+        SessionInit([Session init - UUID per tab]) --> RestoreState[GET /session/columns Restore column states and maxColumns on page load]
+        RestoreState --> ColView(Column area - horizontal layout one panel per column)
+        ColView --> AddColBtn{Add Column button}
+        AddColBtn -- "Below maxColumns limit" --> AddCol[POST /columns Append new column state to session]
+        AddColBtn -- "At maxColumns limit" --> ColLimitMsg([Button disabled])
+        AddCol --> ColView
+        ColView --> SetMaxCols[POST /session/max-columns User updates maxColumns via header input]
+        SetMaxCols --> ColView
+        ColView --> CloseColBtn{Close column ×}
+        CloseColBtn -- "isLoading=true OR last column" --> ColView
+        CloseColBtn -- "isLoading=false AND not last column" --> ConfirmClose{Has work?}
+        ConfirmClose -- "No" --> RemoveCol[POST /session/remove-column Compact session columns array]
+        ConfirmClose -- "Yes confirmed" --> RemoveCol
+        ConfirmClose -- "Cancelled" --> ColView
+        RemoveCol --> ColView
+    end
+
+    %% 3. Ideation - runs independently per column (column_id scopes all calls)
+    subgraph Ideation [3. Ideation - per column]
         EnterTheme([Enter theme]) --> OptRefImage{Set reference image? optional}
-        OptRefImage -- "Upload / pick from browser" --> SetRefImage[POST /session/set-reference-image Stored in session used by both paths]
+        OptRefImage -- "Upload / pick from browser" --> SetRefImage[POST /session/set-reference-image column_id scoped stored per column]
         OptRefImage -- "Skip" --> IdeationMode{Mode?}
         SetRefImage --> IdeationMode
-        IdeationMode -- "Brainstorm" --> Brainstorm[POST /brainstorm Gemini generates text concepts]
+        IdeationMode -- "Brainstorm" --> Brainstorm[POST /brainstorm column_id scoped Gemini generates text concepts]
         IdeationMode -- "Generate directly" --> DirectConcept([Theme used as concept skip brainstorm])
         Brainstorm --> ViewConcepts(View concept list)
         ViewConcepts --> IdeationChoice{Action?}
@@ -23,66 +42,68 @@ graph TD
         IdeationChoice -- "New theme" --> EnterTheme
     end
 
-    %% 3. Prompt Building
-    subgraph PromptBuild [3. Prompt Building]
+    %% 4. Prompt Building - per column
+    subgraph PromptBuild [4. Prompt Building - per column]
         ConceptIn([Concept ready]) --> LoadPreset{Load preset?}
         LoadPreset -- Yes --> ApplyPreset[GET /presets/:name Replace template fields]
         LoadPreset -- No --> BuildPrompts
-        ApplyPreset --> BuildPrompts[POST /generate Build N variant prompts]
-        BuildPrompts --> GenImages([Generate N low-res images])
+        ApplyPreset --> BuildPrompts[POST /generate column_id scoped Build N variant prompts]
+        BuildPrompts --> GenImages([Generate N low-res images in parallel across columns])
     end
 
-    %% 4. Variant Generation
-    subgraph VariantGen [4. Variant Generation]
+    %% 5. Variant Generation - per column
+    subgraph VariantGen [5. Variant Generation - per column]
         ViewVariants(View N low-res variants) --> PickVariant[Pick a variant]
         PickVariant --> VariantChoice{Action?}
-        VariantChoice -- "Remove BG" --> RemoveBGVariant[POST /remove-bg/variant Save _no_bg copy cache result]
+        VariantChoice -- "Remove BG" --> RemoveBGVariant[POST /remove-bg/variant column_id scoped Save _no_bg copy cache result]
         RemoveBGVariant --> ViewVariants
-        VariantChoice -- "Undo Remove BG" --> RestoreBGVariant[POST /restore-bg/variant Restore original from session cache]
+        VariantChoice -- "Undo Remove BG" --> RestoreBGVariant[POST /restore-bg/variant column_id scoped Restore original from session cache]
         RestoreBGVariant --> ViewVariants
         VariantChoice -- "Rerender" --> RerenderVariants([Back to Prompt Building])
         VariantChoice -- "Finalize" --> ReadyToFinalize([Proceed to Finalization])
     end
 
-    %% 5. Finalization
-    subgraph Finalization [5. Finalization]
-        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize Upscale to selected resolution Auto-remove BG if variant had BG removed]
+    %% 6. Finalization - per column
+    subgraph Finalization [6. Finalization - per column]
+        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize column_id scoped Upscale to selected resolution Auto-remove BG if variant had BG removed]
         Gen4K --> ViewFinal(View final image)
         ViewFinal --> FinalChoice{Action?}
-        FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final Save _no_bg copy cache result]
+        FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final column_id scoped Save _no_bg copy cache result]
         RemoveBGFinal --> ViewFinal
-        FinalChoice -- "Undo Remove BG" --> RestoreBGFinal[POST /restore-bg/final Restore original from session cache]
+        FinalChoice -- "Undo Remove BG" --> RestoreBGFinal[POST /restore-bg/final column_id scoped Restore original from session cache]
         RestoreBGFinal --> ViewFinal
         FinalChoice -- "Re-finalize at new resolution" --> ClickFinalize
         FinalChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
     end
 
-    %% 6. Publish
-    subgraph Publish [6. Publish - Printify]
+    %% 7. Publish - per column
+    subgraph Publish [7. Publish - Printify - per column]
         OpenPrintify([Open Printify panel]) --> SelectShop[GET /printify/shops Select shop]
         SelectShop --> SelectBlueprint[GET /printify/blueprints Select blueprint]
         SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers Select provider]
         SelectProvider --> SelectVariants[GET /printify/blueprints/:id/providers/:provider_id/variants Select colors and sizes]
-        SelectVariants --> AnalyzeFinal[GET /analysis/final Get content bounds for vertical placement]
+        SelectVariants --> AnalyzeFinal[GET /analysis/final column_id scoped Get content bounds for vertical placement]
         AnalyzeFinal --> SetDetails[Set details Adjust position and scale]
         SetDetails --> PublishChoice{Publish now?}
-        PublishChoice -- Yes --> PublishNow[POST /printify/publish Upload and publish]
-        PublishChoice -- No --> SaveDraft[POST /printify/publish Upload and draft]
+        PublishChoice -- Yes --> PublishNow[POST /printify/publish column_id scoped Upload and publish]
+        PublishChoice -- No --> SaveDraft[POST /printify/publish column_id scoped Upload and draft]
         PublishNow --> Done([Product live in store])
         SaveDraft --> Done2([Product saved as draft])
     end
 
     %% Phase transitions
-    AppHome --> EnterTheme
+    AppHome --> SessionInit
     ConceptSelected --> ConceptIn
     DirectConcept --> ConceptIn
     GenImages --> ViewVariants
     RerenderVariants -.-> ConceptIn
     ReadyToFinalize --> ClickFinalize
     ReadyToPublish --> OpenPrintify
+    ColView -.-> EnterTheme
 
     %% Subgraph styling
     style Auth fill:#fff3cd,stroke:#ffc107,stroke-dasharray: 5 5
+    style ColMgmt fill:#f8d7da,stroke:#dc3545
     style Ideation fill:#d1e7dd,stroke:#198754
     style PromptBuild fill:#d1ecf1,stroke:#0dcaf0
     style VariantGen fill:#cfe2ff,stroke:#0d6efd
@@ -92,6 +113,10 @@ graph TD
     %% Decision nodes - amber
     style AuthEnabled fill:#fff3cd,stroke:#ffc107
     style AllowlistCheck fill:#fff3cd,stroke:#ffc107
+    style AddColBtn fill:#fff3cd,stroke:#ffc107
+    style CloseColBtn fill:#fff3cd,stroke:#ffc107
+    style ConfirmClose fill:#fff3cd,stroke:#ffc107
+    style RemoveCol fill:#cfe2ff,stroke:#0d6efd
     style OptRefImage fill:#fff3cd,stroke:#ffc107
     style IdeationMode fill:#fff3cd,stroke:#ffc107
     style IdeationChoice fill:#fff3cd,stroke:#ffc107
@@ -102,6 +127,9 @@ graph TD
 
     %% API call nodes - blue
     style OAuthRedirect fill:#cfe2ff,stroke:#0d6efd
+    style RestoreState fill:#cfe2ff,stroke:#0d6efd
+    style AddCol fill:#cfe2ff,stroke:#0d6efd
+    style SetMaxCols fill:#cfe2ff,stroke:#0d6efd
     style Brainstorm fill:#cfe2ff,stroke:#0d6efd
     style ApplyPreset fill:#cfe2ff,stroke:#0d6efd
     style BuildPrompts fill:#cfe2ff,stroke:#0d6efd
@@ -121,6 +149,7 @@ graph TD
     style SaveDraft fill:#cfe2ff,stroke:#0d6efd
 
     %% View/state nodes - gray
+    style ColView fill:#f8f9fa,stroke:#6c757d
     style ViewConcepts fill:#f8f9fa,stroke:#6c757d
     style ViewVariants fill:#f8f9fa,stroke:#6c757d
     style ViewFinal fill:#f8f9fa,stroke:#6c757d
@@ -128,6 +157,7 @@ graph TD
     %% Terminal nodes - green
     style PageLoad fill:#d1e7dd,stroke:#198754
     style AppHome fill:#d1e7dd,stroke:#198754
+    style SessionInit fill:#d1e7dd,stroke:#198754
     style EnterTheme fill:#d1e7dd,stroke:#198754
     style DirectConcept fill:#d1e7dd,stroke:#198754
     style ConceptSelected fill:#d1e7dd,stroke:#198754
@@ -140,6 +170,7 @@ graph TD
     style OpenPrintify fill:#d1e7dd,stroke:#198754
     style Done fill:#d1e7dd,stroke:#198754
     style Done2 fill:#d1e7dd,stroke:#198754
+    style ColLimitMsg fill:#d1e7dd,stroke:#198754
 
     %% Error nodes - red
     style LoginError fill:#f8d7da,stroke:#dc3545

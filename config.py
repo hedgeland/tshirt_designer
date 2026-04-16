@@ -31,6 +31,7 @@ EDGE_ERODE_PX = 1       # shrink alpha mask inward after removal to clip fringe 
 EDGE_DECONTAMINATE = 50 # 0–100; subtracts background color spill from boundary pixels
 MAX_COLORS = 6          # max distinct colors in generated image; 1–8
 MAX_PRESETS = 20        # max number of saved user presets (excludes built-in default)
+MAX_COLUMNS = 6         # hard server-side cap on columns per session; user sets their own limit up to this value
 
 # Printify integration — leave PRINTIFY_TOKEN unset to hide publishing features.
 PRINTIFY_TOKEN = os.getenv("PRINTIFY_TOKEN", "")
