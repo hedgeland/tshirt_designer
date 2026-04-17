@@ -234,18 +234,13 @@ def load_image_to_session(session: dict, image_url: str, display_theme: str) -> 
 
 
 def safe_theme_name(theme: str) -> str:
-    """Return a short, filesystem-safe directory name: first 10 sanitized chars + YYYYMMDD.
-
-    The date suffix keeps same-theme runs from different days in separate folders
-    while ensuring variants and finals generated in the same session (same day) share
-    one directory.
-    """
+    """Return a short, filesystem-safe directory name: first 10 sanitized chars + YYYYMMDD_HHMMSS."""
     sanitized = "".join(
         c if c.isalnum() or c in ("-", "_") else "_"
         for c in theme.strip().replace(" ", "_")
     )
-    date = datetime.now().strftime("%Y%m%d")
-    return f"{sanitized[:10]}_{date}"
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{sanitized[:10]}_{ts}"
 
 
 def timestamp() -> str:
