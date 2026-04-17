@@ -780,15 +780,6 @@
                                             <span>🎨</span>
                                             <span>Direct mode — generating from your prompt as-is.</span>
                                         </div>
-                                        <div class="flex items-center gap-2 mt-3">
-                                            <label class="text-xs text-slate-400 flex-shrink-0">Aspect ratio</label>
-                                            <select x-model="aspectRatio"
-                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                <template x-for="r in cfg.aspectRatios" :key="r">
-                                                    <option :value="r" x-text="r"></option>
-                                                </template>
-                                            </select>
-                                        </div>
                                     </div><!-- /collapse step 2 -->
                                 </section>
 
@@ -852,6 +843,12 @@
                                                 </div>
                                             </div>
                                             <div class="flex items-center gap-2">
+                                            <select x-model="aspectRatio"
+                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                <template x-for="r in cfg.aspectRatios" :key="r">
+                                                    <option :value="r" x-text="r"></option>
+                                                </template>
+                                            </select>
                                             <select x-model="variantSize"
                                                 class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                 {% for s in brainstorm_sizes %}
