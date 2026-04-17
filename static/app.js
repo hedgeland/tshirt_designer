@@ -538,7 +538,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             const idx = this.selectedVariant ?? 0;
             // If already at step 5, keep the loading indicator anchored there
             this.loadingStep = this.step >= 5 ? 5 : 4;
-            this._startLoading(`Generating ${size} design...`);
+            this._startLoading(`Generating ${size} (${this.aspectRatio}) design...`);
 
             const fd = this._bgFormData();
             fd.append("selected_idx", idx);
