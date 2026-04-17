@@ -489,8 +489,8 @@
                                 <p class="text-xs text-slate-300">Output: <code
                                         class="bg-slate-600 px-1 rounded text-slate-200">{{ output_dir }}/</code></p>
 
-                                <!-- Prompt Log -->
-                                <div class="border border-slate-500 rounded-lg overflow-hidden">
+                                <!-- Prompt Log — hidden for now -->
+                                <div x-cloak class="hidden border border-slate-500 rounded-lg overflow-hidden">
                                     <button @click="showPromptLog = !showPromptLog" :aria-expanded="showPromptLog"
                                         class="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-white hover:bg-slate-600 transition-colors">
                                         <span><span aria-hidden="true">📋</span> Prompts sent to Gemini</span>
