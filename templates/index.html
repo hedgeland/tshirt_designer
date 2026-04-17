@@ -562,7 +562,7 @@
                             <section class="rounded-xl p-4 transition-colors"
                                 :class="$store.activeColIdx === colIdx ? 'bg-slate-700' : 'bg-slate-800'">
                                 <!-- Step 1: Theme -->
-                                <section class="rounded-xl border border-slate-200 shadow-sm p-4">
+                                <section class="rounded-xl border border-slate-600 shadow-sm p-4">
                                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">1 ·
                                         Enter
                                         a theme</h2>
@@ -657,7 +657,7 @@
 
                                 <!-- Step 2: Pick a concept -->
                                 <section x-show="step >= 2" x-transition
-                                    class="rounded-xl border border-slate-200 shadow-sm p-4">
+                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
                                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">2 ·
                                         Pick
                                         a concept</h2>
@@ -686,7 +686,7 @@
 
                                 <!-- Step 3: Refine & Generate -->
                                 <section x-show="step >= 3" x-transition
-                                    class="rounded-xl border border-slate-200 shadow-sm p-4">
+                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
                                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">3 ·
                                         Refine &amp; generate</h2>
                                     <div class="space-y-3">
@@ -768,7 +768,7 @@
 
                                 <!-- Step 4: Gallery -->
                                 <section x-show="step >= 4 || loadedImageRes" x-transition x-ref="step4"
-                                    class="rounded-xl border border-slate-200 shadow-sm p-4">
+                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
                                     <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3">
                                         4 · Variants — click to select for finalization
                                     </h2>
@@ -859,7 +859,7 @@
 
                                 <!-- Step 5: Final Design -->
                                 <section x-show="step >= 5" x-transition
-                                    class="rounded-xl border border-slate-200 shadow-sm p-4">
+                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
                                     <h2 x-text="`5 · Final Design (${finalizedSize})`"
                                         class="text-xs font-semibold uppercase tracking-wider text-slate-100 mb-3"></h2>
                                     <div class="space-y-4">
