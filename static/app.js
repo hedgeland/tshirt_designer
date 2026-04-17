@@ -1401,6 +1401,7 @@ function designer() {
             if (!this.panelConceptsTemplate.trim() || !this.panelVariantsTemplate.trim() || !this.panelStyleTemplate.trim()) {
                 this.presetsStatus = "Prompt fields cannot be blank."; return;
             }
+            if (this.presetsNames.includes(name) && !confirm(`Overwrite preset "${name}"?`)) return;
 
             const fd = new FormData();
             fd.append("name", name);
