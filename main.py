@@ -454,6 +454,14 @@ async def finalize(
         prompts = session.get("prompts", [])
         theme = session.get("theme", "unknown")
 
+        # PIL images live only in memory — reload from disk if the session survived a
+        # server restart or page reload but the in-memory images were lost.
+        if not images:
+            image_paths = session.get("image_paths", [])
+            if image_paths:
+                images = [Image.open(p).copy() for p in image_paths if Path(p).exists()]
+                session["images"] = images
+
         if not images:
             yield sse({"type": "error", "message": "Generate variants first."})
             return
@@ -531,6 +539,11 @@ async def remove_variant_bg(
         session = get_column(session_id, column_id)
         images = session.get("images", [])
         paths = session.get("image_paths", [])
+
+        # Reload PIL images from disk if the server restarted or page was reloaded.
+        if not images and paths:
+            images = [Image.open(p).copy() for p in paths if Path(p).exists()]
+            session["images"] = images
 
         if not images:
             yield sse({"type": "error", "message": "Generate variants first."})
