@@ -1,5 +1,7 @@
 import asyncio
+import io
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
@@ -61,6 +63,7 @@ from src.output import (
 from src.prompts import build_prompts
 
 app = FastAPI()
+logger = logging.getLogger(__name__)
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 # Auth is active only when GOOGLE_CLIENT_ID is set. Without it the app behaves
@@ -112,6 +115,9 @@ templates = Jinja2Templates(directory="templates")
 # Each session holds N independent column workflow states rather than one flat dict.
 # Good enough for a single-user local tool; replace with Redis or a DB for multi-user.
 sessions: dict[str, dict] = {}
+
+# Column fields that are JSON-serializable (PIL images and other binary objects excluded).
+_SERIALIZABLE_COLUMN_KEYS = {"theme", "concepts", "prompts", "image_paths", "selected_idx", "final_path"}
 
 
 def init_column_state() -> dict:
@@ -767,9 +773,7 @@ async def session_set_reference_image(
 
     if reference_file is not None:
         data = await reference_file.read()
-        import io as _io
-
-        img = Image.open(_io.BytesIO(data)).convert("RGBA")
+        img = Image.open(io.BytesIO(data)).convert("RGBA")
     elif reference_path:
         # Reuse the same safety check as load_image_to_session: path must be within OUTPUT_DIR.
         clean = reference_path.lstrip("/")
@@ -787,13 +791,11 @@ async def session_set_reference_image(
 @app.get("/session/reference-image-preview")
 async def session_reference_image_preview(session_id: str, column_id: int = 0):
     """Return the stored reference image as a PNG for thumbnail display."""
-    import io as _io
-
     session = get_column(session_id, column_id)
     img: Image.Image | None = session.get("reference_image")
     if img is None:
         return Response(status_code=204)
-    buf = _io.BytesIO()
+    buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
 
@@ -1058,7 +1060,7 @@ async def session_columns(session_id: str):
     path fields are returned. Images will need to be re-generated after a page reload.
     """
     sess = get_session(session_id)
-    serializable_keys = {"theme", "concepts", "prompts", "image_paths", "selected_idx", "final_path"}
+    serializable_keys = _SERIALIZABLE_COLUMN_KEYS
     cols = [
         {k: col.get(k) for k in serializable_keys}
         for col in sess["columns"]
@@ -1081,7 +1083,7 @@ async def remove_column(session_id: str = Form(...), column_id: int = Form(...))
         return JSONResponse({"error": "Column not found."}, status_code=404)
     columns.pop(column_id)
     # Return the compacted list so the client can reassign indices in one step
-    serializable_keys = {"theme", "concepts", "prompts", "image_paths", "selected_idx", "final_path"}
+    serializable_keys = _SERIALIZABLE_COLUMN_KEYS
     cols = [{k: col.get(k) for k in serializable_keys} for col in columns]
     return {"columns": cols, "max_columns": sess["max_columns"]}
 
