@@ -1032,6 +1032,11 @@ function designer() {
         panelConceptsTemplate: cfg.conceptsTemplate,
         panelVariantsTemplate: cfg.variantsTemplate,
         panelStyleTemplate: cfg.styleTemplate,
+        // Snapshot of the last-loaded preset values — compared against panel fields to
+        // detect unsaved changes. Using reactive properties (not cfg) so Alpine tracks them.
+        _loadedConceptsTemplate: cfg.conceptsTemplate,
+        _loadedVariantsTemplate: cfg.variantsTemplate,
+        _loadedStyleTemplate: cfg.styleTemplate,
         // Persisted in localStorage; empty string means "use built-in default"
         userDefaultPreset: "",
 
@@ -1342,11 +1347,9 @@ function designer() {
         // ── Presets panel actions ──────────────────────────────────────────
 
         get presetsHasChanges() {
-            const saved = cfg.allPresets[this.presetsActive];
-            if (!saved) return false;
-            return this.panelConceptsTemplate !== saved.concepts_prompt
-                || this.panelVariantsTemplate !== saved.variants_prompt
-                || this.panelStyleTemplate !== saved.style_suffix;
+            return this.panelConceptsTemplate !== this._loadedConceptsTemplate
+                || this.panelVariantsTemplate !== this._loadedVariantsTemplate
+                || this.panelStyleTemplate !== this._loadedStyleTemplate;
         },
 
         openPresetsPanel() {
@@ -1382,6 +1385,9 @@ function designer() {
             this.panelConceptsTemplate = data.concepts_prompt;
             this.panelVariantsTemplate = data.variants_prompt;
             this.panelStyleTemplate = data.style_suffix;
+            this._loadedConceptsTemplate = data.concepts_prompt;
+            this._loadedVariantsTemplate = data.variants_prompt;
+            this._loadedStyleTemplate = data.style_suffix;
         },
 
         // Save the current panel templates under a new (or overwrite existing) name
@@ -1410,6 +1416,10 @@ function designer() {
                     variants_prompt: this.panelVariantsTemplate,
                     style_suffix: this.panelStyleTemplate,
                 };
+                // Sync snapshot so presetsHasChanges clears immediately
+                this._loadedConceptsTemplate = this.panelConceptsTemplate;
+                this._loadedVariantsTemplate = this.panelVariantsTemplate;
+                this._loadedStyleTemplate = this.panelStyleTemplate;
                 this.presetsNames = data.names;
                 this.presetsActive = data.saved;
                 this.presetsNewName = "";
