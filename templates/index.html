@@ -877,8 +877,8 @@
                                 <section x-show="step >= 4 || loadedImageRes" x-transition x-ref="step4"
                                     class="rounded-xl shadow-sm p-4">
                                     <div class="flex items-center justify-between mb-3">
-                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">4 ·
-                                            Variants — click to select for finalization</h2>
+                                        <h2 x-text="generatedVariantSize ? `4 · Variants (${generatedVariantSize}) — click to select for finalization` : '4 · Variants — click to select for finalization'"
+                                            class="text-xs font-semibold uppercase tracking-wider text-slate-100"></h2>
                                         <button @click="sCollapsed[4] = !sCollapsed[4]" :aria-expanded="!sCollapsed[4]"
                                             class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
                                             <svg :class="sCollapsed[4] ? '-rotate-90' : ''"

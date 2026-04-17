@@ -96,6 +96,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         maxColors: cfg.maxColors,
         aspectRatio: cfg.defaultAspectRatio,
         variantSize: cfg.defaultVariantSize,
+        generatedVariantSize: null,  // set when variants arrive; drives step-4 title badge
         finalSize: cfg.defaultFinalSize,
         // Separate size picker for re-generate (step 5); defaults to 4K and always
         // excludes the size the image was already finalized at.
@@ -293,6 +294,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     url: p, origUrl: p, noBgUrl: null, ts: 0,
                 }));
                 if (state.selected_idx != null) this.selectedVariant = state.selected_idx;
+                if (state.variant_size) this.generatedVariantSize = state.variant_size;
             }
 
             // Restore final image if one was saved
@@ -520,6 +522,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     const ts = Date.now();
                     this.variants = e.urls.map((url) => ({ url, origUrl: url, noBgUrl: null, ts }));
                     this.selectedVariant = e.urls.length === 1 ? 0 : null;
+                    this.generatedVariantSize = this.variantSize;
                     this.step = 4;
                     this._stopLoading();
                 },

@@ -117,7 +117,7 @@ templates = Jinja2Templates(directory="templates")
 sessions: dict[str, dict] = {}
 
 # Column fields that are JSON-serializable (PIL images and other binary objects excluded).
-_SERIALIZABLE_COLUMN_KEYS = {"theme", "concepts", "prompts", "image_paths", "selected_idx", "final_path"}
+_SERIALIZABLE_COLUMN_KEYS = {"theme", "concepts", "prompts", "variant_size", "image_paths", "selected_idx", "final_path"}
 
 
 def init_column_state() -> dict:
@@ -415,6 +415,7 @@ async def generate(
         session.update(
             {
                 "prompts": prompts,
+                "variant_size": variant_size,
                 "images": images,
                 "image_paths": paths,
                 "original_images": list(images),  # preserved so bg removal is undoable
