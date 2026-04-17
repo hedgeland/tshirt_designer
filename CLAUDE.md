@@ -50,7 +50,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 
 - Prefer inline comments. Explain the *why* — the intent, constraint, or non-obvious trade-off — not the *what* (the code already shows that).
 - All new backend logic goes in `src/`. `main.py` is routing + orchestration only.
-- `config.py` is the single source of truth for `MODEL`, `BRAINSTORM_SIZE`, `FINAL_SIZE`, `NUM_VARIANTS`, and `OUTPUT_DIR`.
+- `config.py` is the single source of truth for all constants — never define them elsewhere.
 - Image generation always produces square output (`width == height == size`).
 
 ## Session Continuity
