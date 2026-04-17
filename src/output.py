@@ -112,7 +112,7 @@ def scan_output() -> list[dict]:
 
         if finals or concepts:
             themes.append({
-                "theme": display_theme_name(theme_dir.name),
+                "theme": theme_dir.name.replace("_", " ").strip(),
                 "dir_name": theme_dir.name,
                 "theme_size_bytes": theme_bytes,
                 "finals": finals,
