@@ -560,179 +560,73 @@
                         <!-- ── Workflow steps ──────────────────────────────────────── -->
                         <div class="flex-1 overflow-y-auto p-4 space-y-4">
                             <section class="rounded-xl p-4 space-y-4 transition-colors"
-                                :class="$store.activeColIdx === colIdx ? 'bg-slate-500' : 'bg-slate-800'"
+                                :class="$store.activeColIdx === colIdx ? 'bg-slate-600' : 'bg-slate-800'"
                                 x-data="{ sCollapsed: {1: false, 2: false, 3: false, 4: false, 5: false} }">
                                 <div class="flex justify-end -mt-1 mb-1">
                                     <!-- Capture intent before loop to avoid mid-loop state drift. -->
-                                    <button
-                                        x-show="[1,2,3,4,5].filter(k => step >= k).some(k => !sCollapsed[k])"
+                                    <button x-show="[1,2,3,4,5].filter(k => step >= k).some(k => !sCollapsed[k])"
                                         @click="[1,2,3,4,5].filter(k => step >= k).forEach(k => sCollapsed[k] = true)"
-                                        class="text-xs text-slate-500 hover:text-slate-300 transition-colors">Collapse all</button>
-                                    <button
-                                        x-show="[1,2,3,4,5].filter(k => step >= k).some(k => sCollapsed[k])"
+                                        class="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                                        Collapse all</button>
+                                    <button x-show="[1,2,3,4,5].filter(k => step >= k).some(k => sCollapsed[k])"
                                         @click="[1,2,3,4,5].filter(k => step >= k).forEach(k => sCollapsed[k] = false)"
-                                        class="text-xs text-slate-500 hover:text-slate-300 transition-colors ml-3">Expand all</button>
+                                        class="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors ml-3">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        Expand all</button>
                                 </div>
                                 <!-- Step 1: Theme -->
                                 <section class="rounded-xl border border-slate-600 shadow-sm p-4">
                                     <div class="flex items-center justify-between mb-3">
-                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">1 · Enter a theme</h2>
+                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">1 ·
+                                            Enter a theme</h2>
                                         <button @click="sCollapsed[1] = !sCollapsed[1]" :aria-expanded="!sCollapsed[1]"
                                             class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
-                                            <svg :class="sCollapsed[1] ? '-rotate-90' : ''" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            <svg :class="sCollapsed[1] ? '-rotate-90' : ''"
+                                                class="w-3.5 h-3.5 transition-transform" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7" />
+                                            </svg>
                                         </button>
                                     </div>
                                     <div x-show="!sCollapsed[1]">
-                                    <!-- Theme textarea — full width -->
-                                    <label :for="'theme-input-' + col.id" class="sr-only">Design theme</label>
-                                    <textarea :id="'theme-input-' + col.id" x-model="theme" x-ref="themeInput"
-                                        @keydown.enter.prevent="doBrainstorm()" @focus="$el.select()" rows="2"
-                                        placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
-                                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"></textarea>
+                                        <!-- Theme textarea — full width -->
+                                        <label :for="'theme-input-' + col.id" class="sr-only">Design theme</label>
+                                        <textarea :id="'theme-input-' + col.id" x-model="theme" x-ref="themeInput"
+                                            @keydown.enter.prevent="doBrainstorm()" @focus="$el.select()" rows="2"
+                                            placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
+                                            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"></textarea>
 
-                                    <!-- Action row: Brainstorm + Direct on left, reference image controls on right -->
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <!-- Generate buttons -->
-                                        <button @click="doBrainstorm()" :disabled="isLoading || !theme.trim()"
-                                            title="Create prompts from your theme"
-                                            class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                            <svg x-show="isLoading && loadingStep === 1" aria-hidden="true"
-                                                class="animate-spin h-3 w-3 flex-shrink-0" fill="none"
-                                                viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                    stroke-width="4" />
-                                                <path class="opacity-75" fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                            </svg>
-                                            <span aria-hidden="true">🧠</span> Brainstorm
-                                        </button>
-                                        <button @click="doGenerateDirect()" :disabled="isLoading || !theme.trim()"
-                                            title="Generate image variants from prompt as is, skip the brainstorming"
-                                            class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                            <span aria-hidden="true">🎨</span> Go Direct!
-                                        </button>
-
-                                        <div class="flex-1"></div>
-
-                                        <!-- Reference image: Upload/Pick when unset, thumbnail + controls when set -->
-                                        <div x-show="!refImageUrl" class="flex gap-2">
-                                            <label :aria-label="'Upload reference image for Design ' + (col.id + 1)"
-                                                class="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
-                                                <span aria-hidden="true">⬆️</span> Upload
-                                                <input type="file" accept="image/*" class="hidden"
-                                                    @change="setReferenceFromFile($event.target.files[0]); $event.target.value=''">
-                                            </label>
-                                            <button @click="openMyBrowserForRef()"
-                                                title="Pick reference image from output browser"
-                                                class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
-                                                <span aria-hidden="true">📁</span> Pick
+                                        <!-- Action row: Brainstorm + Direct on left, reference image controls on right -->
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <!-- Generate buttons -->
+                                            <button @click="doBrainstorm()" :disabled="isLoading || !theme.trim()"
+                                                title="Create prompts from your theme"
+                                                class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                <svg x-show="isLoading && loadingStep === 1" aria-hidden="true"
+                                                    class="animate-spin h-3 w-3 flex-shrink-0" fill="none"
+                                                    viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4" />
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                                </svg>
+                                                <span aria-hidden="true">🧠</span> Brainstorm
                                             </button>
-                                        </div>
-                                        <div x-show="refImageUrl" class="flex items-center gap-2">
-                                            <img :src="refImageUrl" alt="Reference image"
-                                                class="h-8 w-8 object-cover rounded border border-slate-500">
-                                            <div class="grid grid-cols-2 rounded-lg overflow-hidden border border-slate-500 text-xs font-medium w-fit"
-                                                role="group" aria-label="Reference mode">
-                                                <button @click="referenceMode = 'style'"
-                                                    :aria-pressed="referenceMode === 'style'"
-                                                    title="Borrow color palette and aesthetic only"
-                                                    :class="referenceMode === 'style' ? 'bg-indigo-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'"
-                                                    class="px-2.5 py-1 transition-colors">Style</button>
-                                                <button @click="referenceMode = 'copy'"
-                                                    :aria-pressed="referenceMode === 'copy'"
-                                                    title="Replicate layout and subject placement"
-                                                    :class="referenceMode === 'copy' ? 'bg-indigo-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'"
-                                                    class="px-2.5 py-1 transition-colors">Copy</button>
-                                            </div>
-                                            <button @click="clearReference()" aria-label="Remove reference image"
-                                                title="Remove reference image"
-                                                class="text-xs text-slate-400 hover:text-red-400 transition-colors">✕</button>
-                                        </div>
-                                    </div>
-                                    <!-- Status / error -->
-                                    <div class="mt-3" x-show="loadingStep === 1 && (isLoading || error)">
-                                        <div x-show="error" role="alert"
-                                            class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-                                            <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
-                                            <span x-text="error" class="flex-1"></span>
-                                            <button @click="dismissError()" aria-label="Dismiss error"
-                                                class="text-red-400 hover:text-red-600 ml-2">✕</button>
-                                        </div>
-                                        <div x-show="isLoading" role="status" aria-live="polite"
-                                            class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
-                                            <svg aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
-                                                fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                    stroke-width="4" />
-                                                <path class="opacity-75" fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                            </svg>
-                                            <span x-text="loadingMsg"></span>
-                                        </div>
-                                    </div>
-                                    </div><!-- /collapse step 1 -->
-                                </section>
+                                            <button @click="doGenerateDirect()" :disabled="isLoading || !theme.trim()"
+                                                title="Generate image variants from prompt as is, skip the brainstorming"
+                                                class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                <span aria-hidden="true">🎨</span> Go Direct!
+                                            </button>
 
-                                <!-- Step 2: Pick a concept -->
-                                <section x-show="step >= 2" x-transition
-                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">2 · Pick a concept</h2>
-                                        <button @click="sCollapsed[2] = !sCollapsed[2]" :aria-expanded="!sCollapsed[2]"
-                                            class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
-                                            <svg :class="sCollapsed[2] ? '-rotate-90' : ''" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                    </div>
-                                    <div x-show="!sCollapsed[2]">
-                                    <div x-show="!directMode" class="space-y-2">
-                                        <template x-for="concept in concepts" :key="concept">
-                                            <label
-                                                class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
-                                                :class="selectedConcept === concept
-                                               ? 'border-indigo-400 bg-indigo-50'
-                                               : 'bg-slate-100 border-slate-300 hover:bg-white hover:border-slate-400'">
-                                                <input type="radio" :name="'concept-' + col.id" :value="concept"
-                                                    @change="selectConcept(concept)"
-                                                    :checked="selectedConcept === concept"
-                                                    class="mt-0.5 accent-indigo-600 flex-shrink-0">
-                                                <span x-text="concept"
-                                                    class="text-sm text-slate-700 leading-snug"></span>
-                                            </label>
-                                        </template>
-                                    </div>
-                                    <div x-show="directMode"
-                                        class="flex items-center gap-2 px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-sm text-slate-300">
-                                        <span>🎨</span>
-                                        <span>Direct mode — generating from your prompt as-is.</span>
-                                    </div>
-                                    </div><!-- /collapse step 2 -->
-                                </section>
+                                            <div class="flex-1"></div>
 
-                                <!-- Step 3: Refine & Generate -->
-                                <section x-show="step >= 3" x-transition
-                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">3 · Refine &amp; generate</h2>
-                                        <button @click="sCollapsed[3] = !sCollapsed[3]" :aria-expanded="!sCollapsed[3]"
-                                            class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
-                                            <svg :class="sCollapsed[3] ? '-rotate-90' : ''" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                    </div>
-                                    <div x-show="!sCollapsed[3]">
-                                    <div class="space-y-3">
-                                        <div>
-                                            <label class="text-xs block mb-1">Edit concept (optional)</label>
-                                            <textarea x-model="editedConcept" rows="2"
-                                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
-                                        </div>
-                                        <!-- Reference image (same controls as Step 1) -->
-                                        <div>
-                                            <label class="text-xs block mb-1">Reference image <span
-                                                    class="text-slate-400">(optional)</span></label>
+                                            <!-- Reference image: Upload/Pick when unset, thumbnail + controls when set -->
                                             <div x-show="!refImageUrl" class="flex gap-2">
-                                                <label
+                                                <label :aria-label="'Upload reference image for Design ' + (col.id + 1)"
                                                     class="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
-                                                    <span aria-hidden="true">🖼</span> Upload
+                                                    <span aria-hidden="true">⬆️</span> Upload
                                                     <input type="file" accept="image/*" class="hidden"
                                                         @change="setReferenceFromFile($event.target.files[0]); $event.target.value=''">
                                                 </label>
@@ -742,212 +636,167 @@
                                                     <span aria-hidden="true">📁</span> Pick
                                                 </button>
                                             </div>
-                                            <div x-show="refImageUrl" class="flex items-center gap-2 flex-wrap">
+                                            <div x-show="refImageUrl" class="flex items-center gap-2">
                                                 <img :src="refImageUrl" alt="Reference image"
-                                                    class="h-12 w-12 object-cover rounded-lg border border-slate-500">
-                                                <button @click="clearReference()" aria-label="Remove reference image"
-                                                    class="text-xs text-slate-400 hover:text-red-400 transition-colors">✕</button>
+                                                    class="h-8 w-8 object-cover rounded border border-slate-500">
                                                 <div class="grid grid-cols-2 rounded-lg overflow-hidden border border-slate-500 text-xs font-medium w-fit"
                                                     role="group" aria-label="Reference mode">
                                                     <button @click="referenceMode = 'style'"
                                                         :aria-pressed="referenceMode === 'style'"
+                                                        title="Borrow color palette and aesthetic only"
                                                         :class="referenceMode === 'style' ? 'bg-indigo-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'"
                                                         class="px-2.5 py-1 transition-colors">Style</button>
                                                     <button @click="referenceMode = 'copy'"
                                                         :aria-pressed="referenceMode === 'copy'"
+                                                        title="Replicate layout and subject placement"
                                                         :class="referenceMode === 'copy' ? 'bg-indigo-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'"
                                                         class="px-2.5 py-1 transition-colors">Copy</button>
                                                 </div>
+                                                <button @click="clearReference()" aria-label="Remove reference image"
+                                                    title="Remove reference image"
+                                                    class="text-xs text-slate-400 hover:text-red-400 transition-colors">✕</button>
                                             </div>
                                         </div>
-                                        <button @click="doGenerate()" :disabled="isLoading"
-                                            title="Generate image variants from the concept"
-                                            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                            <svg x-show="isLoading && step === 3 && variants.length === 0"
-                                                aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
-                                                fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                    stroke-width="4" />
-                                                <path class="opacity-75" fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                            </svg>
-                                            <span aria-hidden="true">🎨</span> <span x-text="generateBtnLabel"></span>
-                                        </button>
-                                    </div>
-                                    <div class="mt-3" x-show="loadingStep === 3 && (isLoading || error)">
-                                        <div x-show="error" role="alert"
-                                            class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-                                            <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
-                                            <span x-text="error" class="flex-1"></span>
-                                            <button @click="dismissError()"
-                                                class="text-red-400 hover:text-red-600 ml-2">✕</button>
-                                        </div>
-                                        <div x-show="isLoading" role="status" aria-live="polite"
-                                            class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
-                                            <svg aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
-                                                fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                    stroke-width="4" />
-                                                <path class="opacity-75" fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                            </svg>
-                                            <span x-text="loadingMsg"></span>
-                                        </div>
-                                    </div>
-                                    </div><!-- /collapse step 3 -->
-                                </section>
-
-                                <!-- Step 4: Gallery -->
-                                <section x-show="step >= 4 || loadedImageRes" x-transition x-ref="step4"
-                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">4 · Variants — click to select for finalization</h2>
-                                        <button @click="sCollapsed[4] = !sCollapsed[4]" :aria-expanded="!sCollapsed[4]"
-                                            class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
-                                            <svg :class="sCollapsed[4] ? '-rotate-90' : ''" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                    </div>
-                                    <div x-show="!sCollapsed[4]">
-                                    <div x-show="loadedImageRes"
-                                        class="mb-3 flex items-center gap-2 text-xs text-amber-300">
-                                        <span>📁 Loaded from output browser</span>
-                                        <span class="font-mono bg-slate-600 px-1.5 py-0.5 rounded"
-                                            x-text="loadedImageRes ? loadedImageRes.width + '×' + loadedImageRes.height : ''"></span>
-                                        <span class="text-slate-400">— finalize at higher resolution to upscale</span>
-                                    </div>
-                                    <div class="grid gap-2" :class="{
-                                     'grid-cols-1 max-w-xs': variants.length === 1,
-                                     'grid-cols-2': variants.length === 2,
-                                     'grid-cols-3': variants.length === 3,
-                                     'grid-cols-4': variants.length >= 4
-                                 }">
-                                        <template x-for="(v, i) in variants" :key="i">
-                                            <div @click="selectedVariant = i" role="button" tabindex="0"
-                                                :aria-pressed="selectedVariant === i"
-                                                :aria-label="`Variant ${i + 1}${selectedVariant === i ? ', selected' : ', click to select'}`"
-                                                @keydown.enter.prevent="selectedVariant = i"
-                                                @keydown.space.prevent="selectedVariant = i"
-                                                class="relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                                :class="selectedVariant === i ? 'border-indigo-500 shadow-md' : 'border-slate-200 hover:border-slate-300'">
-                                                <img :src="v.url + '?t=' + v.ts" alt=""
-                                                    class="w-full aspect-square object-contain bg-slate-100 block">
-                                                <div aria-hidden="true" x-show="selectedVariant === i"
-                                                    class="absolute top-1.5 right-1.5 bg-indigo-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow">
-                                                    ✓</div>
+                                        <!-- Status / error -->
+                                        <div class="mt-3" x-show="loadingStep === 1 && (isLoading || error)">
+                                            <div x-show="error" role="alert"
+                                                class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                                                <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
+                                                <span x-text="error" class="flex-1"></span>
+                                                <button @click="dismissError()" aria-label="Dismiss error"
+                                                    class="text-red-400 hover:text-red-600 ml-2">✕</button>
                                             </div>
-                                        </template>
-                                    </div>
-                                    <div class="flex gap-2 mt-4 flex-wrap">
-                                        <button @click="doFinalize()"
-                                            :disabled="isLoading || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
-                                            :title="(loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
-                                            ? `Already at ${finalSize} — change Final resolution in settings`
-                                            : `Re-generate selected variant at ${finalSize}`" x-text="(loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
-                                            ? `✨ ${finalSize} — already at this resolution`
-                                            : `✨ Finalize at ${finalSize}`"
-                                            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                        <button @click="doRemoveVariantBg()" :disabled="isLoading"
-                                            x-show="!(selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl)"
-                                            aria-label="Remove background from selected variant"
-                                            class="px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                            <span aria-hidden="true">✂️</span> Remove BG
-                                        </button>
-                                        <button @click="doRestoreVariantBg()" :disabled="isLoading"
-                                            x-show="selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl"
-                                            aria-label="Restore original background"
-                                            class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                            <span aria-hidden="true">↩</span> Undo BG
-                                        </button>
-                                        <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                            :disabled="isLoading || ((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes)"
-                                            x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
-                                            :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                                            class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                    </div>
-                                    <div x-show="cfg.printifyEnabled" class="mt-2">
-                                        <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
-                                            <input type="checkbox" x-model="pOverrideMinRes" class="rounded">
-                                            <span class="text-xs text-slate-400">Override <span
-                                                    x-text="cfg.printifyMinSize"></span> minimum (testing only)</span>
-                                        </label>
-                                    </div>
-                                    <div class="mt-3" x-show="loadingStep === 4 && (isLoading || error)">
-                                        <div x-show="error" role="alert"
-                                            class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-                                            <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
-                                            <span x-text="error" class="flex-1"></span>
-                                            <button @click="dismissError()"
-                                                class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                                            <div x-show="isLoading" role="status" aria-live="polite"
+                                                class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                                                <svg aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
+                                                    fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4" />
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                                </svg>
+                                                <span x-text="loadingMsg"></span>
+                                            </div>
                                         </div>
-                                        <div x-show="isLoading" role="status" aria-live="polite"
-                                            class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
-                                            <svg aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
-                                                fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                    stroke-width="4" />
-                                                <path class="opacity-75" fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                            </svg>
-                                            <span x-text="loadingMsg"></span>
-                                        </div>
-                                    </div>
-                                    </div><!-- /collapse step 4 -->
+                                    </div><!-- /collapse step 1 -->
                                 </section>
 
-                                <!-- Step 5: Final Design -->
-                                <section x-show="step >= 5" x-transition
+                                <!-- Step 2: Pick a concept -->
+                                <section x-show="step >= 2" x-transition
                                     class="rounded-xl border border-slate-600 shadow-sm p-4">
                                     <div class="flex items-center justify-between mb-3">
-                                        <h2 x-text="`5 · Final Design (${finalizedSize})`"
-                                            class="text-xs font-semibold uppercase tracking-wider text-slate-100"></h2>
-                                        <button @click="sCollapsed[5] = !sCollapsed[5]" :aria-expanded="!sCollapsed[5]"
+                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">2 ·
+                                            Pick a concept</h2>
+                                        <button @click="sCollapsed[2] = !sCollapsed[2]" :aria-expanded="!sCollapsed[2]"
                                             class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
-                                            <svg :class="sCollapsed[5] ? '-rotate-90' : ''" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            <svg :class="sCollapsed[2] ? '-rotate-90' : ''"
+                                                class="w-3.5 h-3.5 transition-transform" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7" />
+                                            </svg>
                                         </button>
                                     </div>
-                                    <div x-show="!sCollapsed[5]">
-                                    <div class="space-y-4">
-                                        <img :src="finalUrl ? finalUrl + '?t=' + finalTs : ''"
-                                            :alt="`Final design at ${finalizedSize}`"
-                                            class="max-w-xs w-full rounded-lg border border-slate-200 bg-slate-100 block">
-                                        <div class="flex gap-2 flex-wrap">
-                                            <a :href="finalUrl ? finalUrl + '?t=' + finalTs : '#'" download
-                                                :title="`Download ${finalizedSize} PNG`"
-                                                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-                                                <span x-text="`⬇ Download ${finalizedSize} PNG`"></span>
-                                            </a>
-                                            <button @click="doRemoveFinalBg()" :disabled="isLoading"
-                                                x-show="!finalBgRemoved"
-                                                class="px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                <span aria-hidden="true">✂️</span> Remove BG
+                                    <div x-show="!sCollapsed[2]">
+                                        <div x-show="!directMode" class="space-y-2">
+                                            <template x-for="concept in concepts" :key="concept">
+                                                <label
+                                                    class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+                                                    :class="selectedConcept === concept
+                                               ? 'border-indigo-400 bg-indigo-50'
+                                               : 'bg-slate-100 border-slate-300 hover:bg-white hover:border-slate-400'">
+                                                    <input type="radio" :name="'concept-' + col.id" :value="concept"
+                                                        @change="selectConcept(concept)"
+                                                        :checked="selectedConcept === concept"
+                                                        class="mt-0.5 accent-indigo-600 flex-shrink-0">
+                                                    <span x-text="concept"
+                                                        class="text-sm text-slate-700 leading-snug"></span>
+                                                </label>
+                                            </template>
+                                        </div>
+                                        <div x-show="directMode"
+                                            class="flex items-center gap-2 px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-sm text-slate-300">
+                                            <span>🎨</span>
+                                            <span>Direct mode — generating from your prompt as-is.</span>
+                                        </div>
+                                    </div><!-- /collapse step 2 -->
+                                </section>
+
+                                <!-- Step 3: Refine & Generate -->
+                                <section x-show="step >= 3" x-transition
+                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">3 ·
+                                            Refine &amp; generate</h2>
+                                        <button @click="sCollapsed[3] = !sCollapsed[3]" :aria-expanded="!sCollapsed[3]"
+                                            class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
+                                            <svg :class="sCollapsed[3] ? '-rotate-90' : ''"
+                                                class="w-3.5 h-3.5 transition-transform" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div x-show="!sCollapsed[3]">
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label class="text-xs block mb-1">Edit concept (optional)</label>
+                                                <textarea x-model="editedConcept" rows="2"
+                                                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
+                                            </div>
+                                            <!-- Reference image (same controls as Step 1) -->
+                                            <div>
+                                                <label class="text-xs block mb-1">Reference image <span
+                                                        class="text-slate-400">(optional)</span></label>
+                                                <div x-show="!refImageUrl" class="flex gap-2">
+                                                    <label
+                                                        class="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
+                                                        <span aria-hidden="true">🖼</span> Upload
+                                                        <input type="file" accept="image/*" class="hidden"
+                                                            @change="setReferenceFromFile($event.target.files[0]); $event.target.value=''">
+                                                    </label>
+                                                    <button @click="openMyBrowserForRef()"
+                                                        title="Pick reference image from output browser"
+                                                        class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
+                                                        <span aria-hidden="true">📁</span> Pick
+                                                    </button>
+                                                </div>
+                                                <div x-show="refImageUrl" class="flex items-center gap-2 flex-wrap">
+                                                    <img :src="refImageUrl" alt="Reference image"
+                                                        class="h-12 w-12 object-cover rounded-lg border border-slate-500">
+                                                    <button @click="clearReference()"
+                                                        aria-label="Remove reference image"
+                                                        class="text-xs text-slate-400 hover:text-red-400 transition-colors">✕</button>
+                                                    <div class="grid grid-cols-2 rounded-lg overflow-hidden border border-slate-500 text-xs font-medium w-fit"
+                                                        role="group" aria-label="Reference mode">
+                                                        <button @click="referenceMode = 'style'"
+                                                            :aria-pressed="referenceMode === 'style'"
+                                                            :class="referenceMode === 'style' ? 'bg-indigo-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'"
+                                                            class="px-2.5 py-1 transition-colors">Style</button>
+                                                        <button @click="referenceMode = 'copy'"
+                                                            :aria-pressed="referenceMode === 'copy'"
+                                                            :class="referenceMode === 'copy' ? 'bg-indigo-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'"
+                                                            class="px-2.5 py-1 transition-colors">Copy</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button @click="doGenerate()" :disabled="isLoading"
+                                                title="Generate image variants from the concept"
+                                                class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                <svg x-show="isLoading && step === 3 && variants.length === 0"
+                                                    aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
+                                                    fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4" />
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                                </svg>
+                                                <span aria-hidden="true">🎨</span> <span
+                                                    x-text="generateBtnLabel"></span>
                                             </button>
-                                            <button @click="doRestoreFinalBg()" :disabled="isLoading"
-                                                x-show="finalBgRemoved"
-                                                class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                <span aria-hidden="true">↩</span> Undo BG
-                                            </button>
-                                            <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                                :disabled="(cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes"
-                                                x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
-                                                :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                                                class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
                                         </div>
-                                        <div x-show="cfg.printifyEnabled">
-                                            <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
-                                                <input type="checkbox" x-model="pOverrideMinRes" class="rounded">
-                                                <span class="text-xs text-slate-400">Override <span
-                                                        x-text="cfg.printifyMinSize"></span> minimum (testing
-                                                    only)</span>
-                                            </label>
-                                        </div>
-                                        <div class="border-t border-slate-600 pt-3 flex gap-3 flex-wrap items-center">
-                                            <span class="text-xs text-slate-400">Re-generate at different
-                                                resolution:</span>
-                                            <button @click="doFinalize()" :disabled="isLoading"
-                                                x-text="`✨ Finalize at ${finalSize}`"
-                                                class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                        </div>
-                                        <div class="mt-3" x-show="loadingStep === 5 && (isLoading || error)">
+                                        <div class="mt-3" x-show="loadingStep === 3 && (isLoading || error)">
                                             <div x-show="error" role="alert"
                                                 class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
                                                 <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
@@ -967,7 +816,194 @@
                                                 <span x-text="loadingMsg"></span>
                                             </div>
                                         </div>
+                                    </div><!-- /collapse step 3 -->
+                                </section>
+
+                                <!-- Step 4: Gallery -->
+                                <section x-show="step >= 4 || loadedImageRes" x-transition x-ref="step4"
+                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">4 ·
+                                            Variants — click to select for finalization</h2>
+                                        <button @click="sCollapsed[4] = !sCollapsed[4]" :aria-expanded="!sCollapsed[4]"
+                                            class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
+                                            <svg :class="sCollapsed[4] ? '-rotate-90' : ''"
+                                                class="w-3.5 h-3.5 transition-transform" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
                                     </div>
+                                    <div x-show="!sCollapsed[4]">
+                                        <div x-show="loadedImageRes"
+                                            class="mb-3 flex items-center gap-2 text-xs text-amber-300">
+                                            <span>📁 Loaded from output browser</span>
+                                            <span class="font-mono bg-slate-600 px-1.5 py-0.5 rounded"
+                                                x-text="loadedImageRes ? loadedImageRes.width + '×' + loadedImageRes.height : ''"></span>
+                                            <span class="text-slate-400">— finalize at higher resolution to
+                                                upscale</span>
+                                        </div>
+                                        <div class="grid gap-2" :class="{
+                                     'grid-cols-1 max-w-xs': variants.length === 1,
+                                     'grid-cols-2': variants.length === 2,
+                                     'grid-cols-3': variants.length === 3,
+                                     'grid-cols-4': variants.length >= 4
+                                 }">
+                                            <template x-for="(v, i) in variants" :key="i">
+                                                <div @click="selectedVariant = i" role="button" tabindex="0"
+                                                    :aria-pressed="selectedVariant === i"
+                                                    :aria-label="`Variant ${i + 1}${selectedVariant === i ? ', selected' : ', click to select'}`"
+                                                    @keydown.enter.prevent="selectedVariant = i"
+                                                    @keydown.space.prevent="selectedVariant = i"
+                                                    class="relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                    :class="selectedVariant === i ? 'border-indigo-500 shadow-md' : 'border-slate-200 hover:border-slate-300'">
+                                                    <img :src="v.url + '?t=' + v.ts" alt=""
+                                                        class="w-full aspect-square object-contain bg-slate-100 block">
+                                                    <div aria-hidden="true" x-show="selectedVariant === i"
+                                                        class="absolute top-1.5 right-1.5 bg-indigo-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow">
+                                                        ✓</div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <div class="flex gap-2 mt-4 flex-wrap">
+                                            <button @click="doFinalize()"
+                                                :disabled="isLoading || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
+                                                :title="(loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
+                                            ? `Already at ${finalSize} — change Final resolution in settings`
+                                            : `Re-generate selected variant at ${finalSize}`" x-text="(loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
+                                            ? `✨ ${finalSize} — already at this resolution`
+                                            : `✨ Finalize at ${finalSize}`"
+                                                class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                            <button @click="doRemoveVariantBg()" :disabled="isLoading"
+                                                x-show="!(selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl)"
+                                                aria-label="Remove background from selected variant"
+                                                class="px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                <span aria-hidden="true">✂️</span> Remove BG
+                                            </button>
+                                            <button @click="doRestoreVariantBg()" :disabled="isLoading"
+                                                x-show="selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl"
+                                                aria-label="Restore original background"
+                                                class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                <span aria-hidden="true">↩</span> Undo BG
+                                            </button>
+                                            <button x-show="cfg.printifyEnabled" @click="openPrintify()"
+                                                :disabled="isLoading || ((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes)"
+                                                x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
+                                                :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                                                class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                        </div>
+                                        <div x-show="cfg.printifyEnabled" class="mt-2">
+                                            <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
+                                                <input type="checkbox" x-model="pOverrideMinRes" class="rounded">
+                                                <span class="text-xs text-slate-400">Override <span
+                                                        x-text="cfg.printifyMinSize"></span> minimum (testing
+                                                    only)</span>
+                                            </label>
+                                        </div>
+                                        <div class="mt-3" x-show="loadingStep === 4 && (isLoading || error)">
+                                            <div x-show="error" role="alert"
+                                                class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                                                <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
+                                                <span x-text="error" class="flex-1"></span>
+                                                <button @click="dismissError()"
+                                                    class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                                            </div>
+                                            <div x-show="isLoading" role="status" aria-live="polite"
+                                                class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                                                <svg aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
+                                                    fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4" />
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                                </svg>
+                                                <span x-text="loadingMsg"></span>
+                                            </div>
+                                        </div>
+                                    </div><!-- /collapse step 4 -->
+                                </section>
+
+                                <!-- Step 5: Final Design -->
+                                <section x-show="step >= 5" x-transition
+                                    class="rounded-xl border border-slate-600 shadow-sm p-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h2 x-text="`5 · Final Design (${finalizedSize})`"
+                                            class="text-xs font-semibold uppercase tracking-wider text-slate-100"></h2>
+                                        <button @click="sCollapsed[5] = !sCollapsed[5]" :aria-expanded="!sCollapsed[5]"
+                                            class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
+                                            <svg :class="sCollapsed[5] ? '-rotate-90' : ''"
+                                                class="w-3.5 h-3.5 transition-transform" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div x-show="!sCollapsed[5]">
+                                        <div class="space-y-4">
+                                            <img :src="finalUrl ? finalUrl + '?t=' + finalTs : ''"
+                                                :alt="`Final design at ${finalizedSize}`"
+                                                class="max-w-xs w-full rounded-lg border border-slate-200 bg-slate-100 block">
+                                            <div class="flex gap-2 flex-wrap">
+                                                <a :href="finalUrl ? finalUrl + '?t=' + finalTs : '#'" download
+                                                    :title="`Download ${finalizedSize} PNG`"
+                                                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+                                                    <span x-text="`⬇ Download ${finalizedSize} PNG`"></span>
+                                                </a>
+                                                <button @click="doRemoveFinalBg()" :disabled="isLoading"
+                                                    x-show="!finalBgRemoved"
+                                                    class="px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                    <span aria-hidden="true">✂️</span> Remove BG
+                                                </button>
+                                                <button @click="doRestoreFinalBg()" :disabled="isLoading"
+                                                    x-show="finalBgRemoved"
+                                                    class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                    <span aria-hidden="true">↩</span> Undo BG
+                                                </button>
+                                                <button x-show="cfg.printifyEnabled" @click="openPrintify()"
+                                                    :disabled="(cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes"
+                                                    x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
+                                                    :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                                                    class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                            </div>
+                                            <div x-show="cfg.printifyEnabled">
+                                                <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
+                                                    <input type="checkbox" x-model="pOverrideMinRes" class="rounded">
+                                                    <span class="text-xs text-slate-400">Override <span
+                                                            x-text="cfg.printifyMinSize"></span> minimum (testing
+                                                        only)</span>
+                                                </label>
+                                            </div>
+                                            <div
+                                                class="border-t border-slate-600 pt-3 flex gap-3 flex-wrap items-center">
+                                                <span class="text-xs text-slate-400">Re-generate at different
+                                                    resolution:</span>
+                                                <button @click="doFinalize()" :disabled="isLoading"
+                                                    x-text="`✨ Finalize at ${finalSize}`"
+                                                    class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                            </div>
+                                            <div class="mt-3" x-show="loadingStep === 5 && (isLoading || error)">
+                                                <div x-show="error" role="alert"
+                                                    class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                                                    <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
+                                                    <span x-text="error" class="flex-1"></span>
+                                                    <button @click="dismissError()"
+                                                        class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                                                </div>
+                                                <div x-show="isLoading" role="status" aria-live="polite"
+                                                    class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                                                    <svg aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
+                                                        fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                            stroke="currentColor" stroke-width="4" />
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                                    </svg>
+                                                    <span x-text="loadingMsg"></span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div><!-- /collapse step 5 -->
                                 </section>
                             </section>
