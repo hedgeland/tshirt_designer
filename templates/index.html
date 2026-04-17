@@ -171,7 +171,8 @@
                                 :disabled="!panelConceptsTemplate.trim() || !panelVariantsTemplate.trim() || !panelStyleTemplate.trim()"
                                 class="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">Save</button>
                             <button @click="deletePresetFromPanel()"
-                                class="text-xs px-2.5 py-1.5 bg-red-900 text-red-200 rounded-md hover:bg-red-800 transition-colors whitespace-nowrap">Delete</button>
+                                :disabled="presetsActive === cfg.builtinName"
+                                class="text-xs px-2.5 py-1.5 bg-red-900 text-red-200 rounded-md hover:bg-red-800 transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">Delete</button>
                         </div>
                         <p x-show="!panelConceptsTemplate.trim() || !panelVariantsTemplate.trim() || !panelStyleTemplate.trim()"
                             class="text-xs text-amber-400">Prompt fields cannot be blank.</p>
