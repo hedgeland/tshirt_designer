@@ -142,9 +142,17 @@
                             <select x-model="presetsActive" @change="loadPresetToPanel($event.target.value)"
                                 class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 bg-slate-800 text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                 <template x-for="name in presetsNames" :key="name">
-                                    <option :value="name" x-text="name"></option>
+                                    <option :value="name" x-text="name + (name === userDefaultPreset ? ' ★' : '')"></option>
                                 </template>
                             </select>
+                            <!-- Default toggle — lets user nominate any preset as their startup default -->
+                            <label class="flex items-center gap-2 mt-2 cursor-pointer select-none w-fit">
+                                <input type="checkbox" :checked="presetsActive === userDefaultPreset"
+                                    @change="toggleUserDefault()"
+                                    class="accent-indigo-500 w-3.5 h-3.5">
+                                <span class="text-xs text-slate-300">My default</span>
+                                <span x-show="presetsActive === userDefaultPreset" class="text-xs text-indigo-400">★ loads on startup</span>
+                            </label>
                         </div>
                         <!-- Template editors -->
                         <div>

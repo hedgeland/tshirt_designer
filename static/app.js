@@ -1032,6 +1032,8 @@ function designer() {
         panelConceptsTemplate: cfg.conceptsTemplate,
         panelVariantsTemplate: cfg.variantsTemplate,
         panelStyleTemplate: cfg.styleTemplate,
+        // Persisted in localStorage; empty string means "use built-in default"
+        userDefaultPreset: "",
 
         // ── Lifecycle ──────────────────────────────────────────────────────
         async init() {
@@ -1084,6 +1086,18 @@ function designer() {
             // Publish column count to a global Alpine store so column components can
             // disable the close button reactively without needing parent scope access.
             Alpine.store('columnCount', this.columns.length);
+
+            // Restore user's preferred default preset from localStorage. Validate it still
+            // exists in the current preset list (user may have deleted it since last visit).
+            const savedDefault = localStorage.getItem('userDefaultPreset');
+            if (savedDefault && this.presetsNames.includes(savedDefault)) {
+                this.userDefaultPreset = savedDefault;
+                this.presetsActive = savedDefault;
+                this.loadPresetToPanel(savedDefault);
+            } else if (savedDefault) {
+                // Preset was deleted — clear the stale entry
+                localStorage.removeItem('userDefaultPreset');
+            }
 
             // Keep browserOpen store in sync — column headers combine it with activeColIdx
             // to highlight the active column whenever the browser is open.
@@ -1331,6 +1345,18 @@ function designer() {
             this.showPresetsPanel = !this.showPresetsPanel;
         },
 
+        // Toggle the user's default preset. When set, it loads automatically on page load.
+        // When cleared, the built-in default is used instead.
+        toggleUserDefault() {
+            if (this.presetsActive === this.userDefaultPreset) {
+                this.userDefaultPreset = "";
+                localStorage.removeItem('userDefaultPreset');
+            } else {
+                this.userDefaultPreset = this.presetsActive;
+                localStorage.setItem('userDefaultPreset', this.presetsActive);
+            }
+        },
+
         // Load a named preset into the panel editor fields — synchronous lookup from cfg.allPresets
         loadPresetToPanel(name) {
             if (!name) return;
@@ -1383,6 +1409,11 @@ function designer() {
             const res = await fetch(`/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
             const data = await res.json();
             delete cfg.allPresets[name];
+            // Clear user default if the deleted preset was it
+            if (this.userDefaultPreset === name) {
+                this.userDefaultPreset = "";
+                localStorage.removeItem('userDefaultPreset');
+            }
             this.presetsNames = data.names;
             this.presetsActive = cfg.builtinName;
             this.loadPresetToPanel(cfg.builtinName);
