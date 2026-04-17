@@ -57,6 +57,11 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - **Gemini rejects alpha channels** — always flatten transparency to a white background before sending any image to the model (`image.convert("RGBA")` → composite onto white → `.convert("RGB")`).
 - **Streaming uses SSE** (`StreamingResponse` + `text/event-stream`). New real-time routes must follow this pattern — not websockets, not polling.
 
+## Planning
+
+- **Always plan before implementing** new functionality or major changes. Present the approach — files affected, key decisions, trade-offs — and wait for confirmation before writing code.
+- Minor fixes and small UI tweaks (single-file, low-risk) can proceed without a plan.
+
 ## Session Continuity
 
 - **Commit and push after every individual change** — each discrete edit gets its own commit and immediate `git push origin master`. Don't batch.
