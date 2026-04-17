@@ -41,6 +41,22 @@ def _extract_image(response) -> Image.Image:
     raise RuntimeError("No image returned from model")
 
 
+def flatten_transparency(img: Image.Image) -> Image.Image:
+    """Composite transparent pixels onto white before sending to Gemini.
+
+    Gemini rejects alpha channels — transparent areas render as black and
+    mislead the model. Flattening to white is the least surprising substitute.
+    Returns an RGB image; no-ops if the image has no transparency.
+    """
+    rgba = img.convert("RGBA")
+    if rgba.getextrema()[3][0] > 0:
+        # Alpha channel minimum > 0 means fully opaque — nothing to flatten.
+        return rgba.convert("RGB")
+    background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+    background.paste(rgba, mask=rgba.split()[3])
+    return background.convert("RGB")
+
+
 def generate_image(
     prompt: str,
     api_key: str,
@@ -52,14 +68,8 @@ def generate_image(
     client = get_client(api_key)
 
     if reference_image is not None:
-        # Flatten transparency before sending — same reason as finalize_image().
-        ref = reference_image.convert("RGBA")
-        if ref.getextrema()[3][0] == 0:
-            background = Image.new("RGBA", ref.size, (255, 255, 255, 255))
-            background.paste(ref, mask=ref.split()[3])
-            ref = background.convert("RGB")
         buf = io.BytesIO()
-        ref.save(buf, format="PNG")
+        flatten_transparency(reference_image).save(buf, format="PNG")
 
         # Prepend a mode-specific instruction so the model knows whether to borrow
         # only the visual style or to replicate the composition and subject matter.
@@ -108,15 +118,8 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
     """
     client = get_client(api_key)
 
-    # Flatten transparency before sending — Gemini doesn't support alpha channels and
-    # would render transparent areas as black, misleading the model.
-    ref = reference.convert("RGBA")
-    if ref.getextrema()[3][0] == 0:
-        background = Image.new("RGBA", ref.size, (255, 255, 255, 255))
-        background.paste(ref, mask=ref.split()[3])
-        ref = background.convert("RGB")
     buf = io.BytesIO()
-    ref.save(buf, format="PNG")
+    flatten_transparency(reference).save(buf, format="PNG")
 
     image_bytes = buf.getvalue()
 
