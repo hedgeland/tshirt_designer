@@ -1198,6 +1198,10 @@ function designer() {
             fd.append("session_id", this.sessionId);
             fd.append("min_columns", this.minColumns);
             await fetch("/session/min-columns", { method: "POST", body: fd });
+            // Bring column count up to the new floor if needed
+            while (this.columns.length < this.minColumns) {
+                await this.addColumn();
+            }
         },
 
         // ── Output browser ─────────────────────────────────────────────────
