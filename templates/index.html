@@ -113,7 +113,7 @@
                 </div>
 
                 <!-- Drawer panel -->
-                <div x-show="showPresetsPanel" x-transition.opacity @click.outside="showPresetsPanel = false"
+                <div x-show="showPresetsPanel" x-transition.opacity @click.outside="closePresetsPanel()"
                     class="absolute top-0 left-0 h-full flex flex-col bg-slate-700 shadow-2xl" style="width: 440px"
                     role="dialog" aria-modal="true" aria-labelledby="presets-drawer-title">
 
@@ -130,8 +130,14 @@
                         <button @click="applyPresetToColumn()"
                             title="Apply current templates to all columns"
                             class="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap">Apply to All</button>
-                        <button @click="showPresetsPanel = false" aria-label="Close presets panel" title="Close"
+                        <button @click="closePresetsPanel()" aria-label="Close presets panel" title="Close"
                             class="text-slate-400 hover:text-slate-200 transition-colors text-lg leading-none">✕</button>
+                    </div>
+
+                    <!-- Unsaved changes warning -->
+                    <div x-show="presetsHasChanges"
+                        class="px-4 py-2 bg-amber-900/50 border-b border-amber-700 flex-shrink-0">
+                        <p class="text-xs text-amber-300">Unsaved changes — save before closing.</p>
                     </div>
 
                     <!-- Content -->

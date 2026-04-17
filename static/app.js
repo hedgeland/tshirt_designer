@@ -1341,8 +1341,25 @@ function designer() {
 
         // ── Presets panel actions ──────────────────────────────────────────
 
+        get presetsHasChanges() {
+            const saved = cfg.allPresets[this.presetsActive];
+            if (!saved) return false;
+            return this.panelConceptsTemplate !== saved.concepts_prompt
+                || this.panelVariantsTemplate !== saved.variants_prompt
+                || this.panelStyleTemplate !== saved.style_suffix;
+        },
+
         openPresetsPanel() {
-            this.showPresetsPanel = !this.showPresetsPanel;
+            if (this.showPresetsPanel) {
+                this.closePresetsPanel();
+            } else {
+                this.showPresetsPanel = true;
+            }
+        },
+
+        closePresetsPanel() {
+            if (this.presetsHasChanges && !confirm('You have unsaved changes. Close anyway?')) return;
+            this.showPresetsPanel = false;
         },
 
         // Toggle the user's default preset. When set, it loads automatically on page load.
