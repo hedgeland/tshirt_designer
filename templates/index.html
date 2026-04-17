@@ -100,6 +100,94 @@
         <!-- relative wrapper so the output browser can use absolute positioning -->
         <div class="relative flex-1 overflow-hidden">
 
+            <!-- ── Presets Panel — left-side panel ────────────────────────────── -->
+            <div x-data="{ presetsPinned: false }"
+                class="absolute top-0 left-0 h-full z-20 overflow-hidden opacity-95 transition-[width] duration-200"
+                :style="`width: ${showPresetsPanel ? 460 : 30}px`"
+                @mouseenter="showPresetsPanel = true"
+                @mouseleave="if (!presetsPinned && $event.clientX > 0) { showPresetsPanel = false }">
+
+                <!-- Tab handle — rounded right, sticks out toward columns -->
+                <div class="absolute top-1/2 -translate-y-1/2 w-5 h-14 bg-slate-700 border border-l-0 border-slate-600 rounded-r-lg flex items-center justify-center cursor-pointer opacity-95 z-10"
+                    :style="`right: ${showPresetsPanel ? 0 : 10}px`" aria-hidden="true">
+                    <span class="text-slate-400 text-[10px] select-none" x-text="showPresetsPanel ? '‹' : '›'"></span>
+                </div>
+
+                <!-- Drawer panel -->
+                <div x-show="showPresetsPanel" x-transition.opacity
+                    class="absolute top-0 left-0 h-full flex flex-col bg-slate-700 shadow-2xl" style="width: 440px"
+                    role="dialog" aria-modal="true" aria-labelledby="presets-drawer-title">
+
+                    <!-- Header -->
+                    <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-600 flex-shrink-0">
+                        <button @click="presetsPinned = !presetsPinned"
+                            :title="presetsPinned ? 'Unpin panel' : 'Pin panel open'" :aria-pressed="presetsPinned"
+                            class="flex items-center justify-center w-6 h-6 rounded transition-colors"
+                            :class="presetsPinned ? 'text-indigo-400 bg-indigo-900/50 hover:bg-indigo-900' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-600'">
+                            <span class="text-sm leading-none" x-text="presetsPinned ? '📌' : '📍'"></span>
+                        </button>
+                        <span class="text-base" aria-hidden="true">🗂</span>
+                        <h2 id="presets-drawer-title" class="text-sm font-semibold">Prompt Presets</h2>
+                        <!-- Column selector — controls which column receives the applied preset -->
+                        <select :value="presetsTargetColIdx"
+                            @change="presetsTargetColIdx = parseInt($event.target.value)"
+                            class="text-xs px-2 py-0.5 rounded-full bg-indigo-900/60 text-indigo-300 border border-indigo-700 flex-1 cursor-pointer focus:outline-none focus:border-indigo-500">
+                            <template x-for="i in Array.from({length: $store.columnCount}, (_, j) => j)" :key="i">
+                                <option :value="i" :selected="i === presetsTargetColIdx" x-text="`→ Design ${i + 1}`"></option>
+                            </template>
+                        </select>
+                        <button @click="applyPresetToColumn()"
+                            title="Apply current templates to the selected column"
+                            class="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap">Apply</button>
+                        <button @click="showPresetsPanel = false" aria-label="Close presets panel" title="Close"
+                            class="text-slate-400 hover:text-slate-200 transition-colors text-lg leading-none">✕</button>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                        <!-- Preset selector -->
+                        <div>
+                            <label class="text-xs font-medium block mb-1">Active preset</label>
+                            <select x-model="presetsActive" @change="loadPresetToPanel(presetsActive)"
+                                class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 bg-slate-800 text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                <template x-for="name in presetsNames" :key="name">
+                                    <option :value="name" x-text="name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <!-- Template editors -->
+                        <div>
+                            <label class="text-xs font-medium block mb-1">Brainstorm prompt</label>
+                            <textarea x-model="panelConceptsTemplate" rows="5"
+                                class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-800 text-slate-100 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium block mb-1">Variants prompt</label>
+                            <textarea x-model="panelVariantsTemplate" rows="5"
+                                class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-800 text-slate-100 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium block mb-1">Style suffix</label>
+                            <textarea x-model="panelStyleTemplate" rows="3"
+                                class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-800 text-slate-100 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
+                        </div>
+                        <!-- Save / Delete -->
+                        <div class="flex gap-1.5 items-center">
+                            <input type="text" x-model="presetsNewName" placeholder="New preset name"
+                                @keydown.enter="savePresetFromPanel()"
+                                class="flex-1 min-w-0 text-xs border border-slate-500 rounded-md px-2 py-1.5 bg-slate-800 text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                            <button @click="savePresetFromPanel()"
+                                class="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap">Save</button>
+                            <button @click="deletePresetFromPanel()"
+                                class="text-xs px-2.5 py-1.5 bg-red-900 text-red-200 rounded-md hover:bg-red-800 transition-colors whitespace-nowrap">Delete</button>
+                        </div>
+                        <p x-show="presetsStatus" x-text="presetsStatus" role="status" aria-live="polite"
+                            class="text-xs text-slate-300"></p>
+                    </div>
+
+                </div><!-- /drawer panel -->
+            </div><!-- /presets wrapper -->
+
             <!-- ── Output Browser — right-side panel ──────────────────────────── -->
             <div x-data="{ browserPinned: false }"
                 class="absolute top-0 right-0 h-full z-20 overflow-hidden opacity-95 transition-[width] duration-200"
@@ -372,9 +460,9 @@
                         @click.capture="Alpine.store('activeColIdx', colIdx)"
                         class="min-w-[480px] flex-1 flex flex-col border-r border-slate-600 last:border-r-0 overflow-hidden bg-slate-800 relative">
 
-                        <!-- Column header — highlighted when this column is the active browser target -->
+                        <!-- Column header — highlighted when this column is the active browser or presets target -->
                         <div class="border-b border-slate-600 px-3 py-2 flex items-center gap-2 flex-shrink-0 transition-colors"
-                            :class="$store.browserOpen && $store.activeColIdx === colIdx
+                            :class="($store.browserOpen && $store.activeColIdx === colIdx) || ($store.presetsOpen && $store.presetsTargetColIdx === colIdx)
                                  ? 'bg-indigo-900/60 border-l-2 border-l-indigo-400'
                                  : 'bg-slate-700'">
                             <span class="text-sm font-semibold text-slate-200" x-text="`Design ${col.id + 1}`"></span>
@@ -386,6 +474,14 @@
                                 :class="settingsOpen ? 'bg-indigo-700 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-600'">
                                 <span aria-hidden="true">⚙️</span>
                                 <span x-text="settingsOpen ? 'Hide Settings' : 'Settings'"></span>
+                            </button>
+                            <!-- Presets button — active when this column is the presets panel target -->
+                            <button @click="openMyPresets()" title="Open prompt presets"
+                                class="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors"
+                                :class="$store.presetsOpen && $store.presetsTargetColIdx === colIdx
+                                    ? 'bg-indigo-700 text-white'
+                                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-600'">
+                                <span aria-hidden="true">🗂</span>
                             </button>
                             <!-- Output browser button — active state when this column is the current target -->
                             <button @click="openMyBrowser()" title="Open output browser"
@@ -505,54 +601,6 @@
                                     </div>
                                 </div>
 
-                                <!-- Presets -->
-                                <div class="border border-slate-500 rounded-lg overflow-hidden">
-                                    <button @click="showPresets = !showPresets" :aria-expanded="showPresets"
-                                        class="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-white hover:bg-slate-600 transition-colors">
-                                        <span><span aria-hidden="true">🗂</span> Prompt Presets</span>
-                                        <span class="text-slate-300 text-[10px]" aria-hidden="true"
-                                            x-text="showPresets ? '▲' : '▼'"></span>
-                                    </button>
-                                    <div x-show="showPresets" x-transition
-                                        class="border-t border-slate-500 p-3 space-y-3">
-                                        <div>
-                                            <label class="text-xs font-medium block mb-1">Active preset</label>
-                                            <select x-model="activePreset" @change="loadPreset(activePreset)"
-                                                class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                <template x-for="name in presetNames" :key="name">
-                                                    <option :value="name" x-text="name"></option>
-                                                </template>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="text-xs font-medium block mb-1">Brainstorm prompt</label>
-                                            <textarea x-model="conceptsTemplate" rows="4"
-                                                class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
-                                        </div>
-                                        <div>
-                                            <label class="text-xs font-medium block mb-1">Variants prompt</label>
-                                            <textarea x-model="variantsTemplate" rows="4"
-                                                class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
-                                        </div>
-                                        <div>
-                                            <label class="text-xs font-medium block mb-1">Style suffix</label>
-                                            <textarea x-model="styleTemplate" rows="3"
-                                                class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
-                                        </div>
-                                        <div class="flex gap-1.5 items-center">
-                                            <label :for="'new-preset-' + col.id" class="sr-only">New preset name</label>
-                                            <input :id="'new-preset-' + col.id" type="text" x-model="newPresetName"
-                                                placeholder="New preset name" @keydown.enter="savePreset()"
-                                                class="flex-1 min-w-0 text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                            <button @click="savePreset()"
-                                                class="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap">Save</button>
-                                            <button @click="deletePreset()"
-                                                class="text-xs px-2.5 py-1.5 bg-red-900 text-red-200 rounded-md hover:bg-red-800 transition-colors whitespace-nowrap">Delete</button>
-                                        </div>
-                                        <p x-show="presetStatus" x-text="presetStatus" role="status" aria-live="polite"
-                                            class="text-xs text-slate-300"></p>
-                                    </div>
-                                </div>
 
                             </div>
                         </div><!-- /settings panel -->

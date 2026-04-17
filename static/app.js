@@ -8,6 +8,9 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('browserOpen', false);
     // Tracks which column was last clicked — drives the active-column visual
     Alpine.store('activeColIdx', 0);
+    // Tracks whether the presets panel is open and which column it targets
+    Alpine.store('presetsOpen', false);
+    Alpine.store('presetsTargetColIdx', 0);
 });
 
 
@@ -97,13 +100,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         variantSize: cfg.defaultVariantSize,
         finalSize: cfg.defaultFinalSize,
 
-        // ── Preset management ──────────────────────────────────────────────
-        // presetNames is a local copy — save/delete update it for this column only.
-        // Other columns discover new presets on next page load (acceptable for single-user tool).
-        presetNames: cfg.presetNames,
-        activePreset: cfg.builtinName,
-        newPresetName: "",
-        presetStatus: "",
+        // ── Prompt templates ───────────────────────────────────────────────
+        // Populated from cfg defaults; replaced when user applies a preset from the global panel.
         conceptsTemplate: cfg.conceptsTemplate,
         variantsTemplate: cfg.variantsTemplate,
         styleTemplate: cfg.styleTemplate,
@@ -198,6 +196,11 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             // Receive "set reference image" events dispatched by the output browser
             window.addEventListener('col-set-reference', (e) => {
                 if (e.detail.colIdx === this.colIdx) this._doSetReferenceFromBrowser(e.detail.imageUrl);
+            });
+
+            // Receive "apply preset" events dispatched by the global presets panel
+            window.addEventListener('col-apply-preset', (e) => {
+                if (e.detail.colIdx === this.colIdx) this._applyPreset(e.detail);
             });
 
         },
@@ -394,6 +397,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         openMyBrowser() {
             window.dispatchEvent(new CustomEvent('designer-open-browser', { detail: { colIdx: this.colIdx } }));
+        },
+
+        openMyPresets() {
+            window.dispatchEvent(new CustomEvent('designer-open-presets', { detail: { colIdx: this.colIdx } }));
         },
 
         openMyBrowserForRef() {
@@ -668,50 +675,11 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             });
         },
 
-        // ── Preset actions ─────────────────────────────────────────────────
-        async loadPreset(name) {
-            if (!name) return;
-            const res = await fetch(`/presets/${encodeURIComponent(name)}`);
-            const data = await res.json();
-            if (!data.error) {
-                this.conceptsTemplate = data.concepts_prompt;
-                this.variantsTemplate = data.variants_prompt;
-                this.styleTemplate = data.style_suffix;
-            }
-        },
-
-        async savePreset() {
-            const name = this.newPresetName.trim();
-            if (!name) { this.presetStatus = "Enter a preset name."; return; }
-
-            const fd = new FormData();
-            fd.append("name", name);
-            fd.append("concepts", this.conceptsTemplate);
-            fd.append("variants", this.variantsTemplate);
-            fd.append("style", this.styleTemplate);
-
-            const res = await fetch("/presets", { method: "POST", body: fd });
-            const data = await res.json();
-            if (data.error) {
-                this.presetStatus = data.error;
-            } else {
-                this.presetNames = data.names;
-                this.activePreset = data.saved;
-                this.newPresetName = "";
-                this.presetStatus = `Saved "${name}".`;
-            }
-        },
-
-        async deletePreset() {
-            const name = this.activePreset;
-            if (name === cfg.builtinName) { this.presetStatus = "Cannot delete the built-in preset."; return; }
-
-            const res = await fetch(`/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
-            const data = await res.json();
-            this.presetNames = data.names;
-            this.activePreset = cfg.builtinName;
-            await this.loadPreset(cfg.builtinName);
-            this.presetStatus = `Deleted "${name}".`;
+        // Apply a preset dispatched from the global presets panel
+        _applyPreset({ conceptsTemplate, variantsTemplate, styleTemplate }) {
+            this.conceptsTemplate = conceptsTemplate;
+            this.variantsTemplate = variantsTemplate;
+            this.styleTemplate = styleTemplate;
         },
 
         // ── Printify actions ───────────────────────────────────────────────
@@ -1057,12 +1025,24 @@ function designer() {
         renamingDir: "",        // dir_name of the theme currently being renamed
         renameValue: "",        // current value of the rename input
 
+        // ── Presets panel ─────────────────────────────────────────────────
+        showPresetsPanel: false,
+        presetsTargetColIdx: 0,
+        presetsActive: cfg.builtinName,
+        presetsNames: cfg.presetNames,
+        presetsNewName: "",
+        presetsStatus: "",
+        panelConceptsTemplate: cfg.conceptsTemplate,
+        panelVariantsTemplate: cfg.variantsTemplate,
+        panelStyleTemplate: cfg.styleTemplate,
+
         // ── Lifecycle ──────────────────────────────────────────────────────
         async init() {
-            // Route browser-open requests dispatched by column components
+            // Route browser-open and presets-open requests dispatched by column components
             window.addEventListener('designer-open-browser', (e) => this.openBrowser(e.detail.colIdx));
             window.addEventListener('designer-open-browser-for-ref', (e) => this.openBrowserForReference(e.detail.colIdx));
             window.addEventListener('designer-close-column', (e) => this.closeColumn(e.detail.colIdx));
+            window.addEventListener('designer-open-presets', (e) => this.openPresetsPanel(e.detail.colIdx));
 
             // Warn before unload if any column has started work — reloading clears
             // server-side PIL images, but text state and paths survive via session restore.
@@ -1111,6 +1091,9 @@ function designer() {
             // Keep browserOpen store in sync — column headers combine it with activeColIdx
             // to highlight the active column whenever the browser is open.
             this.$watch('showBrowser', (v) => Alpine.store('browserOpen', v));
+            // Keep presetsOpen and presetsTargetColIdx stores in sync for column header highlights
+            this.$watch('showPresetsPanel', (v) => Alpine.store('presetsOpen', v));
+            this.$watch('presetsTargetColIdx', (v) => Alpine.store('presetsTargetColIdx', v));
         },
 
         // ── Computed ───────────────────────────────────────────────────────
@@ -1345,6 +1328,79 @@ function designer() {
                 detail: { colIdx: Alpine.store('activeColIdx'), imageUrl },
             }));
             this.showBrowser = false;
+        },
+
+        // ── Presets panel actions ──────────────────────────────────────────
+
+        // Toggle the presets panel; clicking the same column's button closes it
+        openPresetsPanel(colIdx) {
+            if (this.showPresetsPanel && this.presetsTargetColIdx === colIdx) {
+                this.showPresetsPanel = false;
+                return;
+            }
+            this.presetsTargetColIdx = colIdx;
+            this.showPresetsPanel = true;
+        },
+
+        // Load a named preset into the panel editor fields
+        async loadPresetToPanel(name) {
+            if (!name) return;
+            const res = await fetch(`/presets/${encodeURIComponent(name)}`);
+            const data = await res.json();
+            if (!data.error) {
+                this.panelConceptsTemplate = data.concepts_prompt;
+                this.panelVariantsTemplate = data.variants_prompt;
+                this.panelStyleTemplate = data.style_suffix;
+            }
+        },
+
+        // Save the current panel templates under a new (or overwrite existing) name
+        async savePresetFromPanel() {
+            const name = this.presetsNewName.trim();
+            if (!name) { this.presetsStatus = "Enter a preset name."; return; }
+
+            const fd = new FormData();
+            fd.append("name", name);
+            fd.append("concepts", this.panelConceptsTemplate);
+            fd.append("variants", this.panelVariantsTemplate);
+            fd.append("style", this.panelStyleTemplate);
+
+            const res = await fetch("/presets", { method: "POST", body: fd });
+            const data = await res.json();
+            if (data.error) {
+                this.presetsStatus = data.error;
+            } else {
+                this.presetsNames = data.names;
+                this.presetsActive = data.saved;
+                this.presetsNewName = "";
+                this.presetsStatus = `Saved "${name}".`;
+            }
+        },
+
+        // Delete the currently selected preset (builtin is protected)
+        async deletePresetFromPanel() {
+            const name = this.presetsActive;
+            if (name === cfg.builtinName) { this.presetsStatus = "Cannot delete the built-in preset."; return; }
+
+            const res = await fetch(`/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
+            const data = await res.json();
+            this.presetsNames = data.names;
+            this.presetsActive = cfg.builtinName;
+            await this.loadPresetToPanel(cfg.builtinName);
+            this.presetsStatus = `Deleted "${name}".`;
+        },
+
+        // Dispatch the current panel templates to the target column
+        applyPresetToColumn() {
+            window.dispatchEvent(new CustomEvent('col-apply-preset', {
+                detail: {
+                    colIdx: this.presetsTargetColIdx,
+                    conceptsTemplate: this.panelConceptsTemplate,
+                    variantsTemplate: this.panelVariantsTemplate,
+                    styleTemplate: this.panelStyleTemplate,
+                },
+            }));
+            this.presetsStatus = `Applied to Design ${this.presetsTargetColIdx + 1}.`;
         },
     };
 }
