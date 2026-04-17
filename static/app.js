@@ -1458,8 +1458,10 @@ function designer() {
                 localStorage.removeItem('userDefaultPreset');
             }
             this.presetsNames = data.names;
-            this.presetsActive = cfg.builtinName;
-            this.loadPresetToPanel(cfg.builtinName);
+            const fallback = (this.userDefaultPreset && this.userDefaultPreset !== name)
+                ? this.userDefaultPreset : cfg.builtinName;
+            this.presetsActive = fallback;
+            this.loadPresetToPanel(fallback);
             this.presetsStatus = `Deleted "${name}".`;
         },
 
