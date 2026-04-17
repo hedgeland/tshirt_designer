@@ -780,6 +780,15 @@
                                             <span>🎨</span>
                                             <span>Direct mode — generating from your prompt as-is.</span>
                                         </div>
+                                        <div class="flex items-center gap-2 mt-3">
+                                            <label class="text-xs text-slate-400 flex-shrink-0">Aspect ratio</label>
+                                            <select x-model="aspectRatio"
+                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                <template x-for="r in cfg.aspectRatios" :key="r">
+                                                    <option :value="r" x-text="r"></option>
+                                                </template>
+                                            </select>
+                                        </div>
                                     </div><!-- /collapse step 2 -->
                                 </section>
 
@@ -842,6 +851,13 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            <div class="flex items-center gap-2">
+                                            <select x-model="variantSize"
+                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                {% for s in brainstorm_sizes %}
+                                                <option value="{{ s }}">{{ s }}</option>
+                                                {% endfor %}
+                                            </select>
                                             <button @click="doGenerate()" :disabled="isLoading"
                                                 title="Generate image variants from the concept"
                                                 class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -856,7 +872,7 @@
                                                 <span aria-hidden="true">🎨</span> <span
                                                     x-text="generateBtnLabel"></span>
                                             </button>
-                                        </div>
+                                            </div>
                                         <div class="mt-3" x-show="loadingStep === 3 && (isLoading || error)">
                                             <div x-show="error" role="alert"
                                                 class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
@@ -927,7 +943,13 @@
                                                 </div>
                                             </template>
                                         </div>
-                                        <div class="flex gap-2 mt-4 flex-wrap">
+                                        <div class="flex gap-2 mt-4 flex-wrap items-center">
+                                            <select x-model="finalSize"
+                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                {% for s in final_sizes %}
+                                                <option value="{{ s }}">{{ s }}</option>
+                                                {% endfor %}
+                                            </select>
                                             <button @click="doFinalize()"
                                                 :disabled="isLoading || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
                                                 :title="(loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
