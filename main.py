@@ -48,8 +48,7 @@ from config import (
 from src import presets, printify
 from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
-from src.finalize import finalize_design
-from src.image import generate_image
+from src.image import finalize_image as finalize_design, generate_image
 from src.output import (
     archive_files,
     archive_theme,
