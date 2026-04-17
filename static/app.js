@@ -3,6 +3,7 @@
 // never see undefined on first render. Values are updated by designer.init().
 document.addEventListener('alpine:init', () => {
     Alpine.store('columnCount', 1); // updated to actual count after session restore
+    Alpine.store('minColumns', 1);  // updated after session restore; drives close-button disable
     // Tracks whether the output browser is open — combined with activeColIdx in templates
     // to highlight the targeted column header without a separate colIdx in the store.
     Alpine.store('browserOpen', false);
@@ -1024,6 +1025,7 @@ function designer() {
         // re-evaluate x-data, causing column 1 to ignore the restored state).
         columns: [],
         maxColumns: cfg.maxColumns,
+        minColumns: 1,
 
         // ── Output browser ────────────────────────────────────────────────
         showBrowser: false,
@@ -1087,6 +1089,8 @@ function designer() {
                     const data = await res.json();
                     // Clamp to the configured hard cap in case server state differs
                     this.maxColumns = data.max_columns ?? cfg.maxColumns;
+                    this.minColumns = data.min_columns ?? 1;
+                    Alpine.store('minColumns', this.minColumns);
                     // Re-create the column list from persisted server state; each entry
                     // carries its initialState so columnDesigner can restore the workflow step.
                     if (Array.isArray(data.columns) && data.columns.length > 0) {
@@ -1123,6 +1127,7 @@ function designer() {
             // to highlight the active column whenever the browser is open.
             this.$watch('showBrowser', (v) => Alpine.store('browserOpen', v));
             this.$watch('showPresetsPanel', (v) => Alpine.store('presetsOpen', v));
+            this.$watch('minColumns', (v) => Alpine.store('minColumns', v));
         },
 
         // ── Computed ───────────────────────────────────────────────────────
@@ -1156,7 +1161,7 @@ function designer() {
         // Rebuilds the columns array from the server's compacted response so indices
         // stay in sync after the gap is closed.
         async closeColumn(colIdx) {
-            if (this.columns.length <= 1) return; // guard — button should already be disabled
+            if (this.columns.length <= this.minColumns) return; // guard — button should already be disabled
             // Read live Alpine state from the column DOM to decide whether to confirm
             const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
             const colData = el?._x_dataStack?.[0];
@@ -1182,7 +1187,17 @@ function designer() {
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
             fd.append("max_columns", this.maxColumns);
+            // Clamp minColumns down if it would exceed the new max
+            if (this.minColumns > this.maxColumns) this.minColumns = this.maxColumns;
             await fetch("/session/max-columns", { method: "POST", body: fd });
+        },
+
+        // Persist the user's min-columns floor to the server
+        async updateMinColumns() {
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("min_columns", this.minColumns);
+            await fetch("/session/min-columns", { method: "POST", body: fd });
         },
 
         // ── Output browser ─────────────────────────────────────────────────

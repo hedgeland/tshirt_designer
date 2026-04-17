@@ -141,6 +141,7 @@ def get_session(session_id: str) -> dict:
         sessions[session_id] = {
             "columns": [init_column_state()],   # start with one column
             "max_columns": MAX_COLUMNS,
+            "min_columns": 1,
         }
     return sessions[session_id]
 
@@ -1094,7 +1095,7 @@ async def session_columns(session_id: str):
         {k: col.get(k) for k in serializable_keys}
         for col in sess["columns"]
     ]
-    return {"columns": cols, "max_columns": sess["max_columns"]}
+    return {"columns": cols, "max_columns": sess["max_columns"], "min_columns": sess.get("min_columns", 1)}
 
 
 @app.post("/session/remove-column")
@@ -1114,7 +1115,7 @@ async def remove_column(session_id: str = Form(...), column_id: int = Form(...))
     # Return the compacted list so the client can reassign indices in one step
     serializable_keys = _SERIALIZABLE_COLUMN_KEYS
     cols = [{k: col.get(k) for k in serializable_keys} for col in columns]
-    return {"columns": cols, "max_columns": sess["max_columns"]}
+    return {"columns": cols, "max_columns": sess["max_columns"], "min_columns": sess.get("min_columns", 1)}
 
 
 @app.post("/session/max-columns")
@@ -1124,6 +1125,15 @@ async def set_max_columns(session_id: str = Form(...), max_columns: int = Form(.
     clamped = max(1, min(max_columns, MAX_COLUMNS))
     sess["max_columns"] = clamped
     return {"max_columns": clamped}
+
+
+@app.post("/session/min-columns")
+async def set_min_columns(session_id: str = Form(...), min_columns: int = Form(...)):
+    """Update the user's minimum column floor, clamped to [1, current max_columns]."""
+    sess = get_session(session_id)
+    clamped = max(1, min(min_columns, sess["max_columns"]))
+    sess["min_columns"] = clamped
+    return {"min_columns": clamped}
 
 
 if __name__ == "__main__":

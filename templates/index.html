@@ -84,6 +84,12 @@
             <!-- Column controls -->
             <div class="flex items-center gap-3 flex-shrink-0">
                 <label class="flex items-center gap-1.5 text-xs text-slate-300">
+                    Min columns
+                    <input type="number" x-model.number="minColumns" min="1" :max="maxColumns" step="1"
+                        @change="updateMinColumns()" aria-label="Minimum number of columns"
+                        class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                </label>
+                <label class="flex items-center gap-1.5 text-xs text-slate-300">
                     Max columns
                     <input type="number" x-model.number="maxColumns" min="1" :max="cfg.maxColumns" step="1"
                         @change="updateMaxColumns()" aria-label="Maximum number of columns"
@@ -498,10 +504,10 @@
                                 <span aria-hidden="true">📁</span>
                             </button>
                             <!-- Close column button — disabled while loading or when it's the only column -->
-                            <button @click="requestClose()" :disabled="isLoading || $store.columnCount <= 1"
+                            <button @click="requestClose()" :disabled="isLoading || $store.columnCount <= $store.minColumns"
                                 title="Close column"
                                 class="flex items-center justify-center w-6 h-6 text-sm rounded transition-colors"
-                                :class="(isLoading || $store.columnCount <= 1)
+                                :class="(isLoading || $store.columnCount <= $store.minColumns)
                                     ? 'text-slate-600 cursor-not-allowed'
                                     : 'text-slate-400 hover:text-red-400 hover:bg-slate-600'">
                                 ×
