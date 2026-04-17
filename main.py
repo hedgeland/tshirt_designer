@@ -243,6 +243,7 @@ async def index(request: Request):
             "output_dir": OUTPUT_DIR,
             "preset_names": presets.all_preset_names(),
             "builtin_name": presets.BUILTIN_NAME,
+            "all_presets": presets.all_presets(),
             "concepts_template": builtin["concepts_prompt"],
             "variants_template": builtin["variants_prompt"],
             "style_template": builtin["style_suffix"],

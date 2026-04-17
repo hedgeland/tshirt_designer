@@ -32,6 +32,13 @@ def all_preset_names() -> list[str]:
     return [BUILTIN_NAME] + list(load_user_presets().keys())
 
 
+def all_presets() -> dict[str, dict[str, str]]:
+    """Return every preset (builtin + user) keyed by name for embedding in page config."""
+    result = {BUILTIN_NAME: load_builtin()}
+    result.update(load_user_presets())
+    return result
+
+
 def get_preset(name: str) -> dict[str, str]:
     if name == BUILTIN_NAME:
         return load_builtin()

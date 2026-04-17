@@ -1342,16 +1342,14 @@ function designer() {
             this.showPresetsPanel = true;
         },
 
-        // Load a named preset into the panel editor fields
-        async loadPresetToPanel(name) {
+        // Load a named preset into the panel editor fields — synchronous lookup from cfg.allPresets
+        loadPresetToPanel(name) {
             if (!name) return;
-            const res = await fetch(`/presets/${encodeURIComponent(name)}`);
-            const data = await res.json();
-            if (!data.error) {
-                this.panelConceptsTemplate = data.concepts_prompt;
-                this.panelVariantsTemplate = data.variants_prompt;
-                this.panelStyleTemplate = data.style_suffix;
-            }
+            const data = cfg.allPresets[name];
+            if (!data) return;
+            this.panelConceptsTemplate = data.concepts_prompt;
+            this.panelVariantsTemplate = data.variants_prompt;
+            this.panelStyleTemplate = data.style_suffix;
         },
 
         // Save the current panel templates under a new (or overwrite existing) name
@@ -1370,6 +1368,12 @@ function designer() {
             if (data.error) {
                 this.presetsStatus = data.error;
             } else {
+                // Keep local allPresets cache in sync so switching to this preset is instant
+                cfg.allPresets[data.saved] = {
+                    concepts_prompt: this.panelConceptsTemplate,
+                    variants_prompt: this.panelVariantsTemplate,
+                    style_suffix: this.panelStyleTemplate,
+                };
                 this.presetsNames = data.names;
                 this.presetsActive = data.saved;
                 this.presetsNewName = "";
@@ -1384,9 +1388,10 @@ function designer() {
 
             const res = await fetch(`/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
             const data = await res.json();
+            delete cfg.allPresets[name];
             this.presetsNames = data.names;
             this.presetsActive = cfg.builtinName;
-            await this.loadPresetToPanel(cfg.builtinName);
+            this.loadPresetToPanel(cfg.builtinName);
             this.presetsStatus = `Deleted "${name}".`;
         },
 
