@@ -34,6 +34,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - `config.py` — single source of truth for all constants
 - `templates/index.html` — single-page Jinja2 template; Tailwind CSS + Alpine.js
 - `static/app.js` — Alpine.js component (`designer()`) and `streamSSE` helper
+- `src/client.py` — shared `get_client()` singleton; all Gemini calls go through this
 - `src/brainstorm.py` — generates text concepts from a theme
 - `src/prompts.py` — builds image prompts from a selected concept
 - `src/image.py` — calls Gemini image generation API
@@ -41,6 +42,8 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - `src/output.py` — saves images to disk
 - `src/background.py` — removes a solid background color from an image
 - `src/presets.py` — load/save named prompt template sets
+- `src/prompt_templates.py` — string substitution for prompt templates (loading is in `presets.py`)
+- `src/printify.py` — Printify API client; synchronous, called via `asyncio.to_thread`
 - `.claude/commands/` — project slash commands (`/resume`, `/tune-prompts`)
 
 ### Ignore
@@ -52,11 +55,11 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - All new backend logic goes in `src/`. `main.py` is routing + orchestration only.
 - `config.py` is the single source of truth for all constants — never define them elsewhere.
 - Image generation always produces square output (`width == height == size`).
+- **Gemini rejects alpha channels** — always flatten transparency to a white background before sending any image to the model (`image.convert("RGBA")` → composite onto white → `.convert("RGB")`).
+- **Streaming uses SSE** (`StreamingResponse` + `text/event-stream`). New real-time routes must follow this pattern — not websockets, not polling.
 
 ## Session Continuity
 
 - **Commit and push after every individual change** — each discrete edit gets its own commit and immediate `git push origin master`. Don't batch.
-- **Commit frequently** during multi-step tasks — after each logical unit of work, not just at the end. Prefer small, focused commits over large batches.
-- **Push to GitHub after every commit** (`git push origin master`) so work is never only local.
 - **Use WIP prefixes** when committing incomplete work: `WIP: <description>`. This makes interrupted sessions easy to spot with `git log`.
 - The `/resume` slash command reconstructs context from git history and diffs when resuming after an interrupted session.
