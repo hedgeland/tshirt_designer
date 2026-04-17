@@ -37,8 +37,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - `src/client.py` — shared `get_client()` singleton; all Gemini calls go through this
 - `src/brainstorm.py` — generates text concepts from a theme
 - `src/prompts.py` — builds image prompts from a selected concept
-- `src/image.py` — calls Gemini image generation API
-- `src/finalize.py` — regenerates the approved design at `FINAL_SIZE`
+- `src/image.py` — calls Gemini image generation API; `generate_image()` for variants, `finalize_image()` for high-res approval
 - `src/output.py` — saves images to disk
 - `src/background.py` — removes a solid background color from an image
 - `src/presets.py` — load/save named prompt template sets
