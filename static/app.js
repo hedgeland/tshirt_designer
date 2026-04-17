@@ -1387,8 +1387,10 @@ function designer() {
             }
         },
 
-        closePresetsPanel() {
-            if (this.presetsHasChanges && !confirm('You have unsaved changes. Close anyway?')) return;
+        closePresetsPanel(skipConfirm = false) {
+            // On mouse-out we skip the confirm so the panel doesn't trap the cursor;
+            // unsaved changes are still present if the user re-opens.
+            if (!skipConfirm && this.presetsHasChanges && !confirm('You have unsaved changes. Close anyway?')) return;
             this.showPresetsPanel = false;
         },
 

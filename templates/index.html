@@ -104,7 +104,8 @@
             <div x-data="{ presetsPinned: false }"
                 class="absolute top-0 left-0 h-full z-20 overflow-hidden opacity-95 transition-[width] duration-200"
                 :style="`width: ${showPresetsPanel ? 460 : 30}px`"
-                @mouseenter="showPresetsPanel = true">
+                @mouseenter="showPresetsPanel = true"
+                @mouseleave="if (!presetsPinned && $event.clientX > 0) closePresetsPanel(true)"
 
                 <!-- Tab handle — rounded right, sticks out toward columns -->
                 <div class="absolute top-1/2 -translate-y-1/2 w-5 h-14 bg-slate-700 border border-l-0 border-slate-600 rounded-r-lg flex items-center justify-center cursor-pointer opacity-95 z-10"
