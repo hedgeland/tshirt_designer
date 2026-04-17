@@ -112,7 +112,7 @@ def scan_output() -> list[dict]:
 
         if finals or concepts:
             themes.append({
-                "theme": theme_dir.name.replace("_", " ").strip(),
+                "theme": display_theme_name(theme_dir.name),
                 "dir_name": theme_dir.name,
                 "theme_size_bytes": theme_bytes,
                 "finals": finals,
@@ -234,12 +234,29 @@ def load_image_to_session(session: dict, image_url: str, display_theme: str) -> 
 
 
 def safe_theme_name(theme: str) -> str:
-    """Return a short, filesystem-safe version of a theme string (max 10 chars)."""
+    """Return a short, filesystem-safe directory name: first 10 sanitized chars + YYYYMMDD.
+
+    The date suffix keeps same-theme runs from different days in separate folders
+    while ensuring variants and finals generated in the same session (same day) share
+    one directory.
+    """
     sanitized = "".join(
         c if c.isalnum() or c in ("-", "_") else "_"
         for c in theme.strip().replace(" ", "_")
     )
-    return sanitized[:10]
+    date = datetime.now().strftime("%Y%m%d")
+    return f"{sanitized[:10]}_{date}"
+
+
+def display_theme_name(dir_name: str) -> str:
+    """Convert a directory name back to a human-readable theme string.
+
+    Strips the trailing _YYYYMMDD date suffix added by safe_theme_name before
+    converting underscores to spaces.
+    """
+    import re
+    name = re.sub(r"_\d{8}$", "", dir_name)  # remove date suffix if present
+    return name.replace("_", " ").strip()
 
 
 def timestamp() -> str:
