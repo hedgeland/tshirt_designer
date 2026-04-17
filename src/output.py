@@ -234,11 +234,12 @@ def load_image_to_session(session: dict, image_url: str, display_theme: str) -> 
 
 
 def safe_theme_name(theme: str) -> str:
-    """Return a filesystem-safe version of a theme string."""
-    return "".join(
+    """Return a short, filesystem-safe version of a theme string (max 10 chars)."""
+    sanitized = "".join(
         c if c.isalnum() or c in ("-", "_") else "_"
         for c in theme.strip().replace(" ", "_")
     )
+    return sanitized[:10]
 
 
 def timestamp() -> str:
