@@ -398,6 +398,20 @@ async def generate(
 
         paths = await asyncio.to_thread(save_variants, theme, concept_idx, images)
 
+        # Save a prompt sidecar alongside the variants so every generation is documented
+        if paths:
+            sidecar_path = Path(paths[0]).parent / f"prompts_{Path(paths[0]).stem.split('_', 2)[-1]}.md"
+            sidecar = templates.get_template("variant_prompts.md").render(
+                theme=theme,
+                concept=concept.strip(),
+                variant_count=len(prompts),
+                size=variant_size,
+                aspect_ratio=aspect_ratio,
+                generated=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                prompts=prompts,
+            )
+            await asyncio.to_thread(sidecar_path.write_text, sidecar, "utf-8")
+
         session.update(
             {
                 "prompts": prompts,
