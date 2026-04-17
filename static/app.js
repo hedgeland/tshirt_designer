@@ -1356,6 +1356,7 @@ function designer() {
         async savePresetFromPanel() {
             const name = this.presetsNewName.trim();
             if (!name) { this.presetsStatus = "Enter a preset name."; return; }
+            if (name === cfg.builtinName) { this.presetsStatus = "Cannot overwrite the built-in preset."; return; }
 
             const fd = new FormData();
             fd.append("name", name);
