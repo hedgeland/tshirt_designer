@@ -55,6 +55,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 
 ## Session Continuity
 
+- **Commit and push after every individual change** — each discrete edit gets its own commit and immediate `git push origin master`. Don't batch.
 - **Commit frequently** during multi-step tasks — after each logical unit of work, not just at the end. Prefer small, focused commits over large batches.
 - **Push to GitHub after every commit** (`git push origin master`) so work is never only local.
 - **Use WIP prefixes** when committing incomplete work: `WIP: <description>`. This makes interrupted sessions easy to spot with `git log`.
