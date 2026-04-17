@@ -8,9 +8,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('browserOpen', false);
     // Tracks which column was last clicked — drives the active-column visual
     Alpine.store('activeColIdx', 0);
-    // Tracks whether the presets panel is open and which column it targets
     Alpine.store('presetsOpen', false);
-    Alpine.store('presetsTargetColIdx', 0);
 });
 
 
@@ -400,7 +398,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         },
 
         openMyPresets() {
-            window.dispatchEvent(new CustomEvent('designer-open-presets', { detail: { colIdx: this.colIdx } }));
+            window.dispatchEvent(new CustomEvent('designer-open-presets'));
         },
 
         openMyBrowserForRef() {
@@ -1027,7 +1025,6 @@ function designer() {
 
         // ── Presets panel ─────────────────────────────────────────────────
         showPresetsPanel: false,
-        presetsTargetColIdx: 0,
         presetsActive: cfg.builtinName,
         presetsNames: cfg.presetNames,
         presetsNewName: "",
@@ -1042,7 +1039,7 @@ function designer() {
             window.addEventListener('designer-open-browser', (e) => this.openBrowser(e.detail.colIdx));
             window.addEventListener('designer-open-browser-for-ref', (e) => this.openBrowserForReference(e.detail.colIdx));
             window.addEventListener('designer-close-column', (e) => this.closeColumn(e.detail.colIdx));
-            window.addEventListener('designer-open-presets', (e) => this.openPresetsPanel(e.detail.colIdx));
+            window.addEventListener('designer-open-presets', () => this.openPresetsPanel());
 
             // Warn before unload if any column has started work — reloading clears
             // server-side PIL images, but text state and paths survive via session restore.
@@ -1091,9 +1088,7 @@ function designer() {
             // Keep browserOpen store in sync — column headers combine it with activeColIdx
             // to highlight the active column whenever the browser is open.
             this.$watch('showBrowser', (v) => Alpine.store('browserOpen', v));
-            // Keep presetsOpen and presetsTargetColIdx stores in sync for column header highlights
             this.$watch('showPresetsPanel', (v) => Alpine.store('presetsOpen', v));
-            this.$watch('presetsTargetColIdx', (v) => Alpine.store('presetsTargetColIdx', v));
         },
 
         // ── Computed ───────────────────────────────────────────────────────
@@ -1332,14 +1327,8 @@ function designer() {
 
         // ── Presets panel actions ──────────────────────────────────────────
 
-        // Toggle the presets panel; clicking the same column's button closes it
-        openPresetsPanel(colIdx) {
-            if (this.showPresetsPanel && this.presetsTargetColIdx === colIdx) {
-                this.showPresetsPanel = false;
-                return;
-            }
-            this.presetsTargetColIdx = colIdx;
-            this.showPresetsPanel = true;
+        openPresetsPanel() {
+            this.showPresetsPanel = !this.showPresetsPanel;
         },
 
         // Load a named preset into the panel editor fields — synchronous lookup from cfg.allPresets
@@ -1397,17 +1386,20 @@ function designer() {
             this.presetsStatus = `Deleted "${name}".`;
         },
 
-        // Dispatch the current panel templates to the target column
+        // Broadcast the current panel templates to every column
         applyPresetToColumn() {
-            window.dispatchEvent(new CustomEvent('col-apply-preset', {
-                detail: {
-                    colIdx: this.presetsTargetColIdx,
-                    conceptsTemplate: this.panelConceptsTemplate,
-                    variantsTemplate: this.panelVariantsTemplate,
-                    styleTemplate: this.panelStyleTemplate,
-                },
-            }));
-            this.presetsStatus = `Applied to Design ${this.presetsTargetColIdx + 1}.`;
+            const count = Alpine.store('columnCount');
+            for (let i = 0; i < count; i++) {
+                window.dispatchEvent(new CustomEvent('col-apply-preset', {
+                    detail: {
+                        colIdx: i,
+                        conceptsTemplate: this.panelConceptsTemplate,
+                        variantsTemplate: this.panelVariantsTemplate,
+                        styleTemplate: this.panelStyleTemplate,
+                    },
+                }));
+            }
+            this.presetsStatus = `Applied to all columns.`;
         },
     };
 }
