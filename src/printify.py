@@ -8,8 +8,10 @@ from pathlib import Path
 
 import httpx
 
+from config import PRINTIFY_API_TIMEOUT, PRINTIFY_UPLOAD_TIMEOUT
+
 _BASE = "https://api.printify.com/v1"
-_TIMEOUT = 30  # seconds; image upload gets a longer timeout below
+_TIMEOUT = PRINTIFY_API_TIMEOUT
 
 
 def _h(token: str) -> dict[str, str]:
@@ -67,7 +69,7 @@ def upload_image(token: str, image_path: str) -> str:
         f"{_BASE}/uploads/images.json",
         headers=_h(token),
         json={"file_name": path.name, "contents": encoded},
-        timeout=120,  # 4K PNG uploads can be large
+        timeout=PRINTIFY_UPLOAD_TIMEOUT,  # 4K PNG uploads can be large
     )
     r.raise_for_status()
     return r.json()["id"]

@@ -37,6 +37,7 @@ from config import (
     MAX_COLUMNS,
     NUM_VARIANTS,
     OUTPUT_DIR,
+    PRINTIFY_DEFAULT_SEARCH,
     PRINTIFY_MIN_SIZE,
     PRINTIFY_SHOP_ID,
     PRINTIFY_SHOP_NAME,
@@ -875,7 +876,7 @@ async def printify_blueprints(q: str = ""):
         return JSONResponse({"error": str(e)}, status_code=502)
 
     # Default filter: show shirt-like items unless user provides a custom query.
-    search = q.strip().lower() if q.strip() else "shirt tee"
+    search = q.strip().lower() if q.strip() else PRINTIFY_DEFAULT_SEARCH
     terms = search.split()
     filtered = [
         {

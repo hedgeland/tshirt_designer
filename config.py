@@ -39,6 +39,11 @@ PRINTIFY_TOKEN = os.getenv("PRINTIFY_TOKEN", "")
 PRINTIFY_SHOP_ID = os.getenv("PRINTIFY_SHOP_ID", "")
 # Auto-select this shop by name when the publish modal opens (case-insensitive).
 PRINTIFY_SHOP_NAME = os.getenv("PRINTIFY_SHOP_NAME", "")
+# Default blueprint search term shown before the user types a query.
+PRINTIFY_DEFAULT_SEARCH = "shirt tee"
+# Timeout for standard Printify API calls; image uploads use the longer value.
+PRINTIFY_API_TIMEOUT = 30
+PRINTIFY_UPLOAD_TIMEOUT = 120
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 
 # Aspect ratio options supported by the Gemini 3.1 Flash Image Preview model.
