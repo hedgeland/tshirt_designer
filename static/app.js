@@ -1388,6 +1388,9 @@ function designer() {
             this._loadedConceptsTemplate = data.concepts_prompt;
             this._loadedVariantsTemplate = data.variants_prompt;
             this._loadedStyleTemplate = data.style_suffix;
+            // Pre-fill the save name so editing a user preset and re-saving is one click.
+            // Leave blank for the built-in since it can't be overwritten.
+            this.presetsNewName = (name !== cfg.builtinName) ? name : "";
         },
 
         // Save the current panel templates under a new (or overwrite existing) name
