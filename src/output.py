@@ -248,17 +248,6 @@ def safe_theme_name(theme: str) -> str:
     return f"{sanitized[:10]}_{date}"
 
 
-def display_theme_name(dir_name: str) -> str:
-    """Convert a directory name back to a human-readable theme string.
-
-    Strips the trailing _YYYYMMDD date suffix added by safe_theme_name before
-    converting underscores to spaces.
-    """
-    import re
-    name = re.sub(r"_\d{8}$", "", dir_name)  # remove date suffix if present
-    return name.replace("_", " ").strip()
-
-
 def timestamp() -> str:
     """Return a sortable timestamp string for use in filenames."""
     return datetime.now().strftime("%Y%m%d_%H%M%S")
