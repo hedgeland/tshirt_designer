@@ -1182,13 +1182,43 @@ function designer() {
             Alpine.store('columnCount', this.columns.length);
         },
 
-        // Persist the user's max-columns preference to the server
+        // Persist the user's max-columns preference to the server; trims excess columns.
         async updateMaxColumns() {
+            // Clamp minColumns down if it would exceed the new max
+            if (this.minColumns > this.maxColumns) this.minColumns = this.maxColumns;
+
+            // Identify columns that need to be removed (rightmost first)
+            const excess = this.columns.length - this.maxColumns;
+            if (excess > 0) {
+                // Warn once if any of the columns being removed have work in progress
+                const hasWip = Array.from({ length: excess }, (_, i) => {
+                    const colIdx = this.columns.length - excess + i;
+                    const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
+                    const d = el?._x_dataStack?.[0];
+                    return d?.theme?.trim() || d?.concepts?.length || d?.variants?.length || d?.finalUrl;
+                }).some(Boolean);
+                if (hasWip && !confirm(`Lowering the max will close ${excess} column${excess > 1 ? 's' : ''} with work in progress. Continue?`)) {
+                    // Revert the input to the current actual column count
+                    this.maxColumns = this.columns.length;
+                    return;
+                }
+                // Close excess columns from the right, one at a time
+                while (this.columns.length > this.maxColumns) {
+                    const fd = new FormData();
+                    fd.append("session_id", this.sessionId);
+                    fd.append("column_id", this.columns.length - 1);
+                    const res = await fetch("/session/remove-column", { method: "POST", body: fd });
+                    if (!res.ok) break;
+                    const data = await res.json();
+                    if (data.error) break;
+                    this.columns = data.columns.map((state, i) => ({ id: i, initialState: state }));
+                    Alpine.store('columnCount', this.columns.length);
+                }
+            }
+
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
             fd.append("max_columns", this.maxColumns);
-            // Clamp minColumns down if it would exceed the new max
-            if (this.minColumns > this.maxColumns) this.minColumns = this.maxColumns;
             await fetch("/session/max-columns", { method: "POST", body: fd });
         },
 
