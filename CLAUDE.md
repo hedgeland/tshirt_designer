@@ -41,7 +41,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - `src/output.py` — saves images to disk
 - `src/background.py` — removes a solid background color from an image
 - `src/presets.py` — load/save named prompt template sets
-- `.claude/commands/` — project slash commands (`/commit`, `/tune-prompts`)
+- `.claude/commands/` — project slash commands (`/resume`, `/tune-prompts`)
 
 ### Ignore
 - `.gemini/` and `gemini.md` — Gemini CLI configuration; not relevant to this codebase
@@ -52,3 +52,10 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - All new backend logic goes in `src/`. `main.py` is routing + orchestration only.
 - `config.py` is the single source of truth for `MODEL`, `BRAINSTORM_SIZE`, `FINAL_SIZE`, `NUM_VARIANTS`, and `OUTPUT_DIR`.
 - Image generation always produces square output (`width == height == size`).
+
+## Session Continuity
+
+- **Commit frequently** during multi-step tasks — after each logical unit of work, not just at the end. Prefer small, focused commits over large batches.
+- **Push to GitHub after every commit** (`git push origin master`) so work is never only local.
+- **Use WIP prefixes** when committing incomplete work: `WIP: <description>`. This makes interrupted sessions easy to spot with `git log`.
+- The `/resume` slash command reconstructs context from git history and diffs when resuming after an interrupted session.

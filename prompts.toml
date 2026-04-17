@@ -46,7 +46,7 @@ the subject contained entirely within the frame and filling up the frame as much
 as possible while maintaining a 5% negative space margin, \
 bold consistent line weights, maximum {max_colors} solid colors total, \
 limited color palette, solid {bg_color} background filling the entire frame, \
-high contrast, screen print ready, professional sticker-like aesthetic, \
+high contrast, screen print ready, \
 no gradients, no shading, no photographic textures, \
 strictly no elements touching the image borders, \
 anatomically accurate to the subject's real-world form"""
