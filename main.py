@@ -774,7 +774,7 @@ async def session_set_reference_image(
         # Reuse the same safety check as load_image_to_session: path must be within OUTPUT_DIR.
         clean = reference_path.lstrip("/")
         abs_path = Path(clean).resolve()
-        if not str(abs_path).startswith(str(Path(OUTPUT_DIR).resolve())):
+        if not abs_path.is_relative_to(Path(OUTPUT_DIR).resolve()):
             return JSONResponse({"error": "Invalid path"}, status_code=400)
         img = Image.open(abs_path).convert("RGBA")
     else:
