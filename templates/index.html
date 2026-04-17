@@ -168,10 +168,13 @@
                                 @keydown.enter="savePresetFromPanel()"
                                 class="flex-1 min-w-0 text-xs border border-slate-500 rounded-md px-2 py-1.5 bg-slate-800 text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                             <button @click="savePresetFromPanel()"
-                                class="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap">Save</button>
+                                :disabled="!panelConceptsTemplate.trim() || !panelVariantsTemplate.trim() || !panelStyleTemplate.trim()"
+                                class="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">Save</button>
                             <button @click="deletePresetFromPanel()"
                                 class="text-xs px-2.5 py-1.5 bg-red-900 text-red-200 rounded-md hover:bg-red-800 transition-colors whitespace-nowrap">Delete</button>
                         </div>
+                        <p x-show="!panelConceptsTemplate.trim() || !panelVariantsTemplate.trim() || !panelStyleTemplate.trim()"
+                            class="text-xs text-amber-400">Prompt fields cannot be blank.</p>
                         <p x-show="presetsStatus" x-text="presetsStatus" role="status" aria-live="polite"
                             class="text-xs text-slate-300"></p>
                     </div>
