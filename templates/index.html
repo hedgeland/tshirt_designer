@@ -563,16 +563,15 @@
                                 :class="$store.activeColIdx === colIdx ? 'bg-slate-700' : 'bg-slate-800'"
                                 x-data="{ sCollapsed: {1: false, 2: false, 3: false, 4: false, 5: false} }">
                                 <div class="flex justify-end -mt-1 mb-1">
-                                    <!-- Only show "Expand all" when at least one visible section is collapsed.
-                                         Capture expand/collapse intent before the loop to avoid mid-loop state drift. -->
+                                    <!-- Capture intent before loop to avoid mid-loop state drift. -->
+                                    <button
+                                        x-show="[1,2,3,4,5].filter(k => step >= k).some(k => !sCollapsed[k])"
+                                        @click="[1,2,3,4,5].filter(k => step >= k).forEach(k => sCollapsed[k] = true)"
+                                        class="text-xs text-slate-500 hover:text-slate-300 transition-colors">Collapse all</button>
                                     <button
                                         x-show="[1,2,3,4,5].filter(k => step >= k).some(k => sCollapsed[k])"
-                                        @click="(function(){
-                                            const vs = [1,2,3,4,5].filter(k => step >= k);
-                                            const shouldExpand = vs.some(k => sCollapsed[k]);
-                                            vs.forEach(k => sCollapsed[k] = !shouldExpand);
-                                        })()"
-                                        class="text-xs text-slate-500 hover:text-slate-300 transition-colors">Expand all</button>
+                                        @click="[1,2,3,4,5].filter(k => step >= k).forEach(k => sCollapsed[k] = false)"
+                                        class="text-xs text-slate-500 hover:text-slate-300 transition-colors ml-3">Expand all</button>
                                 </div>
                                 <!-- Step 1: Theme -->
                                 <section class="rounded-xl border border-slate-600 shadow-sm p-4">
