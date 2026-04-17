@@ -1037,8 +1037,11 @@ function designer() {
 
         // ── Column management ──────────────────────────────────────────────
         // Each entry is { id } — actual workflow state lives in columnDesigner instances.
-        // Starts with one column; user adds more via addColumn().
-        columns: [{ id: 0 }],
+        // Starts empty; init() populates after fetching session state so x-data on each
+        // column element is always evaluated with the correct initialState from the server
+        // (if columns were pre-seeded here, Alpine would reuse the key-0 node and never
+        // re-evaluate x-data, causing column 1 to ignore the restored state).
+        columns: [],
         maxColumns: cfg.maxColumns,
 
         // ── Output browser ────────────────────────────────────────────────
@@ -1092,10 +1095,13 @@ function designer() {
                             id: i,
                             initialState: state,
                         }));
+                    } else {
+                        this.columns = [{ id: 0, initialState: {} }];
                     }
                 }
             } catch {
-                // Network or parse error — start fresh with the default single column
+                // Network or parse error — start fresh with a single empty column
+                this.columns = [{ id: 0, initialState: {} }];
             }
 
             // Publish column count to a global Alpine store so column components can
