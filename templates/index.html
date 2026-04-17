@@ -147,7 +147,7 @@
                             <label class="text-xs font-medium block mb-1">Active preset</label>
                             <select x-model="presetsActive" @change="loadPresetToPanel($event.target.value)"
                                 class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 bg-slate-800 text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                <template x-for="name in presetsNames" :key="name">
+                                <template x-for="name in sortedPresetsNames" :key="name">
                                     <option :value="name" x-text="name + (name === userDefaultPreset ? ' ★' : '')"></option>
                                 </template>
                             </select>

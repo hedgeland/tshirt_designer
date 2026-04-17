@@ -1346,6 +1346,18 @@ function designer() {
 
         // ── Presets panel actions ──────────────────────────────────────────
 
+        get sortedPresetsNames() {
+            const ud = this.userDefaultPreset;
+            const bi = cfg.builtinName;
+            const rest = this.presetsNames
+                .filter(n => n !== ud && n !== bi)
+                .sort((a, b) => a.localeCompare(b));
+            const head = [];
+            if (ud && this.presetsNames.includes(ud)) head.push(ud);
+            if (this.presetsNames.includes(bi) && bi !== ud) head.push(bi);
+            return [...head, ...rest];
+        },
+
         get presetsHasChanges() {
             return this.panelConceptsTemplate !== this._loadedConceptsTemplate
                 || this.panelVariantsTemplate !== this._loadedVariantsTemplate
