@@ -97,6 +97,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         aspectRatio: cfg.defaultAspectRatio,
         variantSize: cfg.defaultVariantSize,
         finalSize: cfg.defaultFinalSize,
+        // Separate size picker for re-generate (step 5); defaults to 4K and always
+        // excludes the size the image was already finalized at.
+        regenSize: "4K",
 
         // ── Prompt templates ───────────────────────────────────────────────
         // Populated from cfg defaults; replaced when user applies a preset from the global panel.
@@ -199,6 +202,13 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             // Receive "apply preset" events dispatched by the global presets panel
             window.addEventListener('col-apply-preset', (e) => {
                 if (e.detail.colIdx === this.colIdx) this._applyPreset(e.detail);
+            });
+
+            // Keep regenSize pointing at a valid option (not the size already finalized at)
+            this.$watch('finalizedSize', (val) => {
+                if (this.regenSize === val) {
+                    this.regenSize = cfg.finalSizes.find(s => s !== val) || cfg.finalSizes[0];
+                }
             });
 
         },
@@ -517,17 +527,19 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             });
         },
 
-        async doFinalize() {
+        async doFinalize(sizeOverride = null) {
             if (this.isLoading) return;
+            // sizeOverride lets the re-generate button pass a different size than finalSize
+            const size = sizeOverride ?? this.finalSize;
             const idx = this.selectedVariant ?? 0;
             // If already at step 5, keep the loading indicator anchored there
             this.loadingStep = this.step >= 5 ? 5 : 4;
-            this._startLoading(`Generating ${this.finalSize} design...`);
+            this._startLoading(`Generating ${size} design...`);
 
             const fd = this._bgFormData();
             fd.append("selected_idx", idx);
             fd.append("aspect_ratio", this.aspectRatio);
-            fd.append("final_size", this.finalSize);
+            fd.append("final_size", size);
 
             await streamSSE("/finalize", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
@@ -536,7 +548,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this._origFinalUrl = e.url;
                     this._noBgFinalUrl = null;
                     this.finalTs = Date.now();
-                    this.finalizedSize = this.finalSize;
+                    this.finalizedSize = size;
                     this.step = 5;
                     this._stopLoading();
                 },

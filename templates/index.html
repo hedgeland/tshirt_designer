@@ -1033,8 +1033,14 @@
                                                 class="border-t border-slate-600 pt-3 flex gap-3 flex-wrap items-center">
                                                 <span class="text-xs text-slate-400">Re-generate at different
                                                     resolution:</span>
-                                                <button @click="doFinalize()" :disabled="isLoading"
-                                                    x-text="`✨ Finalize at ${finalSize}`"
+                                                <select x-model="regenSize"
+                                                    class="text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                    <template x-for="s in cfg.finalSizes" :key="s">
+                                                        <option :value="s" :disabled="s === finalizedSize" x-text="s === finalizedSize ? s + ' (current)' : s"></option>
+                                                    </template>
+                                                </select>
+                                                <button @click="doFinalize(regenSize)" :disabled="isLoading || regenSize === finalizedSize"
+                                                    x-text="`✨ Re-generate at ${regenSize}`"
                                                     class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
                                             </div>
                                             <div class="mt-3" x-show="loadingStep === 5 && (isLoading || error)">
