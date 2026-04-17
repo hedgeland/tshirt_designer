@@ -1403,6 +1403,8 @@ function designer() {
             // Pre-fill the save name so editing a user preset and re-saving is one click.
             // Leave blank for the built-in since it can't be overwritten.
             this.presetsNewName = (name !== cfg.builtinName) ? name : "";
+            // Selecting a preset immediately applies it to all columns — no separate Apply step needed.
+            this.applyPresetToColumn();
         },
 
         // Save the current panel templates under a new (or overwrite existing) name
