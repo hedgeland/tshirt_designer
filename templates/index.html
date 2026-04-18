@@ -955,8 +955,15 @@
 
                                             <!-- Active combo image + actions -->
                                             <div x-show="activeComboUrl" class="space-y-2">
-                                                <img :src="activeComboUrl" alt="Active render"
-                                                    class="max-w-xs w-full rounded-lg border border-slate-200 bg-slate-100 block">
+                                                <!-- Wrap image in relative container so the label can be positioned over it -->
+                                                <div class="relative inline-block max-w-xs w-full">
+                                                    <img :src="activeComboUrl" alt="Active render"
+                                                        class="w-full rounded-lg border border-slate-200 bg-slate-100 block">
+                                                    <span x-show="activeComboSize"
+                                                        x-text="`${activeComboSize} ${activeComboObj?.aspectRatio ?? ''}`"
+                                                        class="absolute bottom-2 right-2 text-xs font-semibold text-white px-1.5 py-0.5 rounded pointer-events-none"
+                                                        style="text-shadow: 0 0 3px #000, 0 0 3px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"></span>
+                                                </div>
                                                 <div class="flex gap-2 flex-wrap items-center">
                                                     <a :href="activeComboUrl" download
                                                         :title="`Download ${activeComboSize} PNG`"
