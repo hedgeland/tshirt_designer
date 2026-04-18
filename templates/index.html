@@ -954,12 +954,16 @@
                                                 </template>
                                             </select>
                                             <button @click="doFinalize()"
-                                                :disabled="isLoading || finalSize === finalizedSize || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
-                                                :title="finalSize === finalizedSize
+                                                :disabled="isLoading || finalSize === finalizedSize || existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio) || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
+                                                :title="existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio)
+                                            ? `Already rendered — select from list below`
+                                            : finalSize === finalizedSize
                                             ? `Already finalized at ${finalSize} — pick a different resolution`
                                             : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
                                             ? `Already at ${finalSize} — change Final resolution in settings`
-                                            : `Finalize selected variant at ${finalSize}`" x-text="finalSize === finalizedSize
+                                            : `Finalize selected variant at ${finalSize}`" x-text="existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio)
+                                            ? `✨ ${finalSize} · ${aspectRatio} — already rendered`
+                                            : finalSize === finalizedSize
                                             ? `✨ ${finalSize} — already finalized`
                                             : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
                                             ? `✨ ${finalSize} — already at this resolution`
@@ -982,6 +986,16 @@
                                                 x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
                                                 :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
                                                 class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                        </div>
+                                        <!-- Already-rendered combos for this variant -->
+                                        <div x-show="existingFinals.length > 0" class="flex flex-wrap items-center gap-1.5 mt-2">
+                                            <span class="text-xs text-slate-400">Already rendered:</span>
+                                            <template x-for="f in existingFinals" :key="f.size + f.aspectRatio">
+                                                <button @click="selectFinal(f)"
+                                                    :class="f.size === finalizedSize && f.aspectRatio === aspectRatio ? 'bg-indigo-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-slate-200'"
+                                                    class="text-xs px-2 py-0.5 rounded transition-colors"
+                                                    x-text="`${f.size} · ${f.aspectRatio}`"></button>
+                                            </template>
                                         </div>
                                         <div x-show="cfg.printifyEnabled" class="mt-2">
                                             <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
@@ -1075,9 +1089,21 @@
                                                         <option :value="s" :selected="s === regenSize" :disabled="s === finalizedSize" x-text="s === finalizedSize ? s + ' (current)' : s"></option>
                                                     </template>
                                                 </select>
-                                                <button @click="doFinalize(regenSize)" :disabled="isLoading || regenSize === finalizedSize"
-                                                    x-text="`✨ Re-generate at ${regenSize}`"
+                                                <button @click="doFinalize(regenSize)"
+                                                    :disabled="isLoading || regenSize === finalizedSize || existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio)"
+                                                    :title="existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) ? 'Already rendered — select from list below' : ''"
+                                                    x-text="existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) ? `✨ ${regenSize} · ${aspectRatio} — already rendered` : `✨ Re-generate at ${regenSize}`"
                                                     class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                            </div>
+                                            <!-- Already-rendered combos for this variant -->
+                                            <div x-show="existingFinals.length > 0" class="flex flex-wrap items-center gap-1.5 mt-2">
+                                                <span class="text-xs text-slate-400">Already rendered:</span>
+                                                <template x-for="f in existingFinals" :key="f.size + f.aspectRatio">
+                                                    <button @click="selectFinal(f)"
+                                                        :class="f.size === finalizedSize && f.aspectRatio === aspectRatio ? 'bg-indigo-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-slate-200'"
+                                                        class="text-xs px-2 py-0.5 rounded transition-colors"
+                                                        x-text="`${f.size} · ${f.aspectRatio}`"></button>
+                                                </template>
                                             </div>
                                             <div class="mt-3" x-show="loadingStep === 5 && (isLoading || error)">
                                                 <div x-show="error" role="alert"

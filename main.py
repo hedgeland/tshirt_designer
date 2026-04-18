@@ -59,7 +59,6 @@ from src.output import (
     safe_theme_name,
     save_variants,
     scan_output,
-    timestamp,
 )
 from src.prompts import build_prompts
 
@@ -193,6 +192,28 @@ def _has_transparency(img: Image.Image) -> bool:
     if img.mode != "RGBA":
         return False
     return img.split()[3].getextrema()[0] == 0
+
+
+def _scan_existing_finals(theme_dir: Path, idx: int) -> list[dict]:
+    """Return all finalized images for a given variant index in theme_dir.
+
+    Parses deterministic filenames of the form final_v{idx}_{ar_safe}_{size}.png
+    and returns [{size, aspectRatio, url}] sorted by size descending.
+    """
+    results = []
+    for p in theme_dir.glob(f"final_v{idx}_*.png"):
+        if "_no_bg" in p.name:
+            continue
+        parts = p.stem.split("_")  # ["final", "v{idx}", ar_safe, size]
+        if len(parts) != 4:
+            continue
+        ar_safe, size = parts[2], parts[3]
+        results.append({
+            "size": size,
+            "aspectRatio": ar_safe.replace("x", ":"),
+            "url": f"/{p}",
+        })
+    return results
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
@@ -505,7 +526,7 @@ async def finalize(
             session["original_final"] = final_img
             session["original_final_path"] = str(final_path)
             session["no_bg_final_cache"] = None
-            yield sse({"type": "final", "url": f"/{final_path}"})
+            yield sse({"type": "final", "url": f"/{final_path}", "existing_finals": _scan_existing_finals(theme_dir, idx)})
             return
 
         variant = images[idx]
@@ -562,7 +583,7 @@ async def finalize(
         session["original_final_path"] = str(final_path)
         session["no_bg_final_cache"] = None  # stale on each new finalize
 
-        yield sse({"type": "final", "url": final_url})
+        yield sse({"type": "final", "url": final_url, "existing_finals": _scan_existing_finals(theme_dir, idx)})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 

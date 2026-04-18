@@ -102,6 +102,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // Separate size picker for re-generate (step 5); defaults to 4K and always
         // excludes the size the image was already finalized at.
         regenSize: "4K",
+        existingFinals: [],   // [{size, aspectRatio, url}] — combos already on disk for the selected variant
 
         // ── Prompt templates ───────────────────────────────────────────────
         // Populated from cfg defaults; replaced when user applies a preset from the global panel.
@@ -212,6 +213,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 if (this.regenSize === val) this.regenSize = best;
                 if (this.finalSize === val) this.finalSize = best;
             });
+
+            // Clear existing finals when user switches to a different variant (different idx = different files)
+            this.$watch('selectedVariant', () => { this.existingFinals = []; });
 
         },
 
@@ -365,6 +369,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this._noBgFinalUrl = null;
             this.finalTs = 0;
             this.finalizedSize = "";
+            this.existingFinals = [];
             this.error = "";
             this.theme = displayTheme;
             this.variants = [{ url, origUrl: url, noBgUrl: null, ts: Date.now() }];
@@ -480,6 +485,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedVariant = null;
             this.finalUrl = null;
             this.loadedImageRes = null;
+            this.existingFinals = [];
             // Advance to step 3 so the aspect ratio/resolution selectors and Generate button are visible,
             // but don't auto-generate — let the user configure first
             this.step = 3;
@@ -495,6 +501,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedVariant = null;
             this.finalUrl = null;
             this.loadedImageRes = null;
+            this.existingFinals = [];
             this.step = Math.max(this.step, 3);
 
             const fd = new FormData();
@@ -554,11 +561,18 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this._noBgFinalUrl = null;
                     this.finalTs = Date.now();
                     this.finalizedSize = size;
+                    this.existingFinals = e.existing_finals ?? this.existingFinals;
                     this.step = 5;
                     this._stopLoading();
                 },
                 error: (e) => { this._onError(e.message); },
             });
+        },
+
+        async selectFinal(item) {
+            // Load an already-rendered combo: set aspect ratio and call doFinalize (cache hit, instant)
+            this.aspectRatio = item.aspectRatio;
+            await this.doFinalize(item.size);
         },
 
         async doFinalizeForPrintify() {
@@ -581,6 +595,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this._noBgFinalUrl = null;
                     this.finalTs = Date.now();
                     this.finalizedSize = cfg.printifyMinSize;
+                    this.existingFinals = e.existing_finals ?? this.existingFinals;
                     this.step = 5;
                     this.printifyStatus = "";
                 },
