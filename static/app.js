@@ -630,7 +630,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             if (combo.noBgUrl) {
                 const updated = { ...this.variantCombos };
                 updated[variantIdx] = (updated[variantIdx] || []).map(c =>
-                    c === combo ? { ...c, url: c.noBgUrl } : c
+                    // origUrl may have been cleared by a prior undo; fall back to activeComboUrl
+                    c === combo ? { ...c, url: c.noBgUrl, origUrl: c.origUrl ?? this.activeComboUrl } : c
                 );
                 this.variantCombos = updated;
                 this.activeComboUrl = combo.noBgUrl;
@@ -667,10 +668,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             const combo = this.activeComboObj;
             if (!combo?.origUrl) return;
 
-            // Instant swap — origUrl was captured when bg was first removed.
+            // Instant swap — clear origUrl so the button state resets to "Remove BG".
             const updated = { ...this.variantCombos };
             updated[variantIdx] = (updated[variantIdx] || []).map(c =>
-                c === combo ? { ...c, url: c.origUrl } : c
+                c === combo ? { ...c, url: c.origUrl, origUrl: undefined } : c
             );
             this.variantCombos = updated;
             this.activeComboUrl = combo.origUrl;
