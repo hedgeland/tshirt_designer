@@ -848,7 +848,7 @@
                                             <!-- Variant count selector — mirrors the settings slider but inline for quick access -->
                                             <select x-model.number="numVariants"
                                                 title="Number of variants to generate"
-                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 w-24">
                                                 <template x-for="n in [1,2,3,4,5]" :key="n">
                                                     <option :value="n" x-text="n + (n === 1 ? ' variant' : ' variants')"></option>
                                                 </template>
