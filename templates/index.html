@@ -941,6 +941,12 @@
                                             </template>
                                         </div>
                                         <div class="flex gap-2 mt-4 flex-wrap items-center">
+                                            <select x-model="aspectRatio"
+                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                <template x-for="r in cfg.aspectRatios" :key="r">
+                                                    <option :value="r" x-text="r"></option>
+                                                </template>
+                                            </select>
                                             <select x-model="finalSize"
                                                 class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                 {% for s in final_sizes %}
