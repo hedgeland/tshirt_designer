@@ -950,11 +950,13 @@
                                             <select @change="finalSize = $event.target.value"
                                                 class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                 <template x-for="s in cfg.finalSizes" :key="s">
-                                                    <option :value="s" :selected="s === finalSize" :disabled="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio)" x-text="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) ? s + ' (current)' : s"></option>
+                                                    <option :value="s" :selected="s === finalSize"
+                                                        :disabled="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) || (s === generatedVariantSize && aspectRatio === generatedVariantAspectRatio)"
+                                                        x-text="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) ? s + ' (current)' : (s === generatedVariantSize && aspectRatio === generatedVariantAspectRatio) ? s + ' (variant)' : s"></option>
                                                 </template>
                                             </select>
                                             <button @click="doFinalize()"
-                                                :disabled="isLoading || existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio) || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
+                                                :disabled="isLoading || existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio) || (finalSize === generatedVariantSize && aspectRatio === generatedVariantAspectRatio) || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
                                                 :title="existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio)
                                             ? `Already rendered — select from list below`
                                             : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
@@ -1082,11 +1084,13 @@
                                                 <select @change="regenSize = $event.target.value"
                                                     class="text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                     <template x-for="s in cfg.finalSizes" :key="s">
-                                                        <option :value="s" :selected="s === regenSize" :disabled="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio)" x-text="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) ? s + ' (current)' : s"></option>
+                                                        <option :value="s" :selected="s === regenSize"
+                                                            :disabled="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) || (s === generatedVariantSize && aspectRatio === generatedVariantAspectRatio)"
+                                                            x-text="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) ? s + ' (current)' : (s === generatedVariantSize && aspectRatio === generatedVariantAspectRatio) ? s + ' (variant)' : s"></option>
                                                     </template>
                                                 </select>
                                                 <button @click="doFinalize(regenSize)"
-                                                    :disabled="isLoading || existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio)"
+                                                    :disabled="isLoading || existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) || (regenSize === generatedVariantSize && aspectRatio === generatedVariantAspectRatio)"
                                                     :title="existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) ? 'Already rendered — select from list below' : `Re-generate at ${regenSize} · ${aspectRatio}`"
                                                     x-text="existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) ? `✨ ${regenSize} · ${aspectRatio} — already rendered` : `✨ Re-generate at ${regenSize}`"
                                                     class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>

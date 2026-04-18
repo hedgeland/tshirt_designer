@@ -214,7 +214,11 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             // Checks both the most recent finalize AND the full existingFinals list.
             // Re-runs on finalizedSize changes (new finalize) and aspectRatio changes.
             const recheckSizeSelectors = () => {
-                const blocked = (s) => this.existingFinals.some(f => f.size === s && f.aspectRatio === this.aspectRatio);
+                const blocked = (s) =>
+                    // Already finalized at this combo
+                    this.existingFinals.some(f => f.size === s && f.aspectRatio === this.aspectRatio) ||
+                    // Same combo as the generated variants — no point re-rendering at identical size+aspect
+                    (s === this.generatedVariantSize && this.aspectRatio === this.generatedVariantAspectRatio);
                 const best = cfg.finalSizes.filter(s => !blocked(s)).at(-1) || cfg.finalSizes[0];
                 if (blocked(this.regenSize)) this.regenSize = best;
                 if (blocked(this.finalSize)) this.finalSize = best;
@@ -222,6 +226,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.$watch('finalizedSize', recheckSizeSelectors);
             this.$watch('aspectRatio', recheckSizeSelectors);
             this.$watch('existingFinals', recheckSizeSelectors);
+            this.$watch('generatedVariantSize', recheckSizeSelectors);
 
             // Restore per-variant finals when switching variants; clear on unknown variant
             this.$watch('selectedVariant', (val) => {
