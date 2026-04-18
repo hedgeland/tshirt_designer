@@ -950,21 +950,21 @@
                                             <select @change="finalSize = $event.target.value"
                                                 class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                 <template x-for="s in cfg.finalSizes" :key="s">
-                                                    <option :value="s" :selected="s === finalSize" :disabled="s === finalizedSize" x-text="s === finalizedSize ? s + ' (current)' : s"></option>
+                                                    <option :value="s" :selected="s === finalSize" :disabled="s === finalizedSize && aspectRatio === finalizedAspectRatio" x-text="s === finalizedSize && aspectRatio === finalizedAspectRatio ? s + ' (current)' : s"></option>
                                                 </template>
                                             </select>
                                             <button @click="doFinalize()"
-                                                :disabled="isLoading || finalSize === finalizedSize || existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio) || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
+                                                :disabled="isLoading || (finalSize === finalizedSize && aspectRatio === finalizedAspectRatio) || existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio) || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
                                                 :title="existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio)
                                             ? `Already rendered — select from list below`
-                                            : finalSize === finalizedSize
-                                            ? `Already finalized at ${finalSize} — pick a different resolution`
+                                            : (finalSize === finalizedSize && aspectRatio === finalizedAspectRatio)
+                                            ? `Already finalized at ${finalSize} · ${aspectRatio} — pick a different combo`
                                             : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
                                             ? `Already at ${finalSize} — change Final resolution in settings`
                                             : `Finalize selected variant at ${finalSize}`" x-text="existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio)
                                             ? `✨ ${finalSize} · ${aspectRatio} — already rendered`
-                                            : finalSize === finalizedSize
-                                            ? `✨ ${finalSize} — already finalized`
+                                            : (finalSize === finalizedSize && aspectRatio === finalizedAspectRatio)
+                                            ? `✨ ${finalSize} · ${aspectRatio} — already finalized`
                                             : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
                                             ? `✨ ${finalSize} — already at this resolution`
                                             : `✨ Finalize at ${finalSize}`"
@@ -1086,11 +1086,11 @@
                                                 <select @change="regenSize = $event.target.value"
                                                     class="text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                     <template x-for="s in cfg.finalSizes" :key="s">
-                                                        <option :value="s" :selected="s === regenSize" :disabled="s === finalizedSize" x-text="s === finalizedSize ? s + ' (current)' : s"></option>
+                                                        <option :value="s" :selected="s === regenSize" :disabled="s === finalizedSize && aspectRatio === finalizedAspectRatio" x-text="s === finalizedSize && aspectRatio === finalizedAspectRatio ? s + ' (current)' : s"></option>
                                                     </template>
                                                 </select>
                                                 <button @click="doFinalize(regenSize)"
-                                                    :disabled="isLoading || regenSize === finalizedSize || existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio)"
+                                                    :disabled="isLoading || (regenSize === finalizedSize && aspectRatio === finalizedAspectRatio) || existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio)"
                                                     :title="existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) ? 'Already rendered — select from list below' : ''"
                                                     x-text="existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) ? `✨ ${regenSize} · ${aspectRatio} — already rendered` : `✨ Re-generate at ${regenSize}`"
                                                     class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>

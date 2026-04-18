@@ -209,12 +209,17 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 if (e.detail.colIdx === this.colIdx) this._applyPreset(e.detail);
             });
 
-            // Keep regenSize and finalSize pointing at a valid option (not the size already finalized at)
-            this.$watch('finalizedSize', (val) => {
-                const best = cfg.finalSizes.filter(s => s !== val).at(-1) || cfg.finalSizes[0];
-                if (this.regenSize === val) this.regenSize = best;
-                if (this.finalSize === val) this.finalSize = best;
-            });
+            // Keep regenSize and finalSize away from the already-finalized combo.
+            // Must re-check on both finalizedSize changes (new finalize) and aspectRatio changes
+            // (user may switch aspect ratio to match a previously-finalized combo).
+            const recheckSizeSelectors = () => {
+                const blocked = (s) => s === this.finalizedSize && this.aspectRatio === this.finalizedAspectRatio;
+                const best = cfg.finalSizes.filter(s => !blocked(s)).at(-1) || cfg.finalSizes[0];
+                if (blocked(this.regenSize)) this.regenSize = best;
+                if (blocked(this.finalSize)) this.finalSize = best;
+            };
+            this.$watch('finalizedSize', recheckSizeSelectors);
+            this.$watch('aspectRatio', recheckSizeSelectors);
 
             // Clear existing finals when user switches to a different variant (different idx = different files)
             this.$watch('selectedVariant', () => { this.existingFinals = []; });
