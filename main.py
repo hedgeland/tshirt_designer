@@ -433,7 +433,6 @@ async def generate(
                 "original_images": list(images),  # preserved so bg removal is undoable
                 "original_image_paths": list(paths),
                 "no_bg_variant_cache": {},  # cleared on each new generate
-                "finalize_cache": {},       # cleared on each new generate; keyed by idx:aspect:size
                 "selected_idx": 0 if num_variants == 1 else None,
                 "final_image": None,
                 "final_path": None,
@@ -482,18 +481,31 @@ async def finalize(
 
         idx = selected_idx if 0 <= selected_idx < len(images) else 0
 
-        # Return the previously generated file if this exact combo was already finalized
-        cache_key = f"{idx}:{aspect_ratio}:{final_size}"
-        finalize_cache = session.get("finalize_cache", {})
-        cached = finalize_cache.get(cache_key)
-        if cached and Path(cached["path"]).exists():
-            final_img = Image.open(cached["path"]).copy()
+        # Deterministic filename encodes the combo so the file itself is the cache.
+        # Colon in aspect ratio is replaced with 'x' to keep filenames filesystem-safe.
+        ar_safe = aspect_ratio.replace(":", "x")
+        final_name = f"final_v{idx}_{ar_safe}_{final_size}.png"
+
+        # Co-locate finals with their variant siblings: derive the theme dir from
+        # the stored variant paths rather than calling safe_theme_name() (which stamps
+        # a fresh timestamp and would scatter finals into new directories).
+        image_paths = session.get("image_paths", [])
+        if image_paths:
+            theme_dir = Path(image_paths[0]).parent.parent
+        else:
+            theme_dir = Path(OUTPUT_DIR) / safe_theme_name(theme)
+
+        final_path = theme_dir / final_name
+
+        # Return the existing file immediately if this combo was already generated
+        if final_path.exists():
+            final_img = Image.open(final_path).copy()
             session["final_image"] = final_img
-            session["final_path"] = cached["path"]
+            session["final_path"] = str(final_path)
             session["original_final"] = final_img
-            session["original_final_path"] = cached["path"]
+            session["original_final_path"] = str(final_path)
             session["no_bg_final_cache"] = None
-            yield sse({"type": "final", "url": cached["url"]})
+            yield sse({"type": "final", "url": f"/{final_path}"})
             return
 
         variant = images[idx]
@@ -529,8 +541,6 @@ async def finalize(
                 decontaminate=decontaminate,
             )
 
-        ts = timestamp()
-        final_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / f"final_{ts}.png"
         final_path.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(final_img.save, str(final_path), "PNG")
 
@@ -551,10 +561,6 @@ async def finalize(
         session["original_final"] = final_img  # preserved so bg removal is undoable
         session["original_final_path"] = str(final_path)
         session["no_bg_final_cache"] = None  # stale on each new finalize
-
-        # Cache so re-selecting this combo skips regeneration
-        finalize_cache = session.setdefault("finalize_cache", {})
-        finalize_cache[cache_key] = {"path": str(final_path), "url": final_url}
 
         yield sse({"type": "final", "url": final_url})
 
