@@ -897,7 +897,7 @@
                                 <section x-show="step >= 4 || loadedImageRes" x-transition x-ref="step4"
                                     class="rounded-xl shadow-sm p-4">
                                     <div class="flex items-center justify-between mb-3">
-                                        <h2 x-text="generatedVariantSize ? `4 · Variants (${generatedVariantSize}) — click to select for finalization` : '4 · Variants — click to select for finalization'"
+                                        <h2 x-text="generatedVariantSize ? `4 · Variants (${generatedVariantSize} · ${generatedVariantAspectRatio}) — click to select for finalization` : '4 · Variants — click to select for finalization'"
                                             class="text-xs font-semibold uppercase tracking-wider text-slate-100"></h2>
                                         <button @click="sCollapsed[4] = !sCollapsed[4]" :aria-expanded="!sCollapsed[4]"
                                             class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
@@ -1032,7 +1032,7 @@
                                 <section x-show="step >= 5" x-transition
                                     class="rounded-xl shadow-sm p-4">
                                     <div class="flex items-center justify-between mb-3">
-                                        <h2 x-text="`5 · Final Design (${finalizedSize})`"
+                                        <h2 x-text="finalizedAspectRatio ? `5 · Final Design (${finalizedSize} · ${finalizedAspectRatio})` : `5 · Final Design (${finalizedSize})`"
                                             class="text-xs font-semibold uppercase tracking-wider text-slate-100"></h2>
                                         <button @click="sCollapsed[5] = !sCollapsed[5]" :aria-expanded="!sCollapsed[5]"
                                             class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">

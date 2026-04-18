@@ -97,7 +97,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         maxColors: cfg.maxColors,
         aspectRatio: cfg.defaultAspectRatio,
         variantSize: cfg.defaultVariantSize,
-        generatedVariantSize: null,  // set when variants arrive; drives step-4 title badge
+        generatedVariantSize: null,        // set when variants arrive; drives step-4 title badge
+        generatedVariantAspectRatio: null, // aspect ratio used when variants were generated
+        finalizedAspectRatio: "",          // aspect ratio used when final was generated
         finalSize: cfg.defaultFinalSize,
         // Separate size picker for re-generate (step 5); defaults to 4K and always
         // excludes the size the image was already finalized at.
@@ -532,6 +534,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this.variants = e.urls.map((url) => ({ url, origUrl: url, noBgUrl: null, ts }));
                     this.selectedVariant = e.urls.length === 1 ? 0 : null;
                     this.generatedVariantSize = this.variantSize;
+                    this.generatedVariantAspectRatio = this.aspectRatio;
                     this.step = 4;
                     this._stopLoading();
                 },
@@ -561,6 +564,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this._noBgFinalUrl = null;
                     this.finalTs = Date.now();
                     this.finalizedSize = size;
+                    this.finalizedAspectRatio = this.aspectRatio;
                     this.existingFinals = e.existing_finals ?? this.existingFinals;
                     this.step = 5;
                     this._stopLoading();
