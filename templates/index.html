@@ -935,6 +935,11 @@
                                                     <div aria-hidden="true" x-show="selectedVariant === i"
                                                         class="absolute top-1.5 right-1.5 bg-indigo-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow">
                                                         ✓</div>
+                                                    <span x-show="generatedVariantSize"
+                                                        x-text="`${generatedVariantSize} ${generatedVariantAspectRatio}`"
+                                                        aria-hidden="true"
+                                                        class="absolute bottom-1.5 right-1.5 text-xs font-semibold text-white pointer-events-none"
+                                                        style="text-shadow: 0 0 3px #000, 0 0 3px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"></span>
                                                 </div>
                                             </template>
                                         </div>
