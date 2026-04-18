@@ -72,11 +72,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         variants: [],          // [{url, origUrl, noBgUrl, ts}]
         prompts: [],
         selectedVariant: null,
-        finalUrl: null,
-        finalTs: 0,
-        finalizedSize: "",     // resolution the final image was actually generated at
-        _origFinalUrl: null,
-        _noBgFinalUrl: null,
         directMode: false,     // true when user skips brainstorm and generates directly
 
         // ── UI state ───────────────────────────────────────────────────────
@@ -99,13 +94,15 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         variantSize: cfg.defaultVariantSize,
         generatedVariantSize: null,        // set when variants arrive; drives step-4 title badge
         generatedVariantAspectRatio: null, // aspect ratio used when variants were generated
-        finalizedAspectRatio: "",          // aspect ratio used when final was generated
-        finalSize: cfg.defaultFinalSize,
-        // Separate size picker for re-generate (step 5); defaults to 4K and always
-        // excludes the size the image was already finalized at.
-        regenSize: "4K",
-        existingFinals: [],      // [{size, aspectRatio, url}] for the current variant — drives disable logic
-        finalsByVariant: {},     // persists existingFinals per variant idx across variant switches
+        renderSize: cfg.defaultFinalSize,  // size picker for rendering new combos in step 4
+
+        // ── Unified render state ───────────────────────────────────────────
+        // variantCombos[i] = [{size, aspectRatio, url}] for all renders of variant i.
+        // Populated by /generate and updated by /render.  The file's existence on disk
+        // IS the cache — rendering an existing combo returns instantly from the server.
+        variantCombos: {},
+        activeComboUrl: null,  // URL of the selected combo (for download / BG removal / Printify)
+        activeComboSize: "",   // resolution of selected combo (for Printify upscale gate)
 
         // ── Prompt templates ───────────────────────────────────────────────
         // Populated from cfg defaults; replaced when user applies a preset from the global panel.
@@ -210,27 +207,17 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 if (e.detail.colIdx === this.colIdx) this._applyPreset(e.detail);
             });
 
-            // Keep regenSize and finalSize away from any already-rendered combo.
-            // Checks both the most recent finalize AND the full existingFinals list.
-            // Re-runs on finalizedSize changes (new finalize) and aspectRatio changes.
-            const recheckSizeSelectors = () => {
-                const blocked = (s) =>
-                    // Already finalized at this combo
-                    this.existingFinals.some(f => f.size === s && f.aspectRatio === this.aspectRatio) ||
-                    // Same combo as the generated variants — no point re-rendering at identical size+aspect
-                    (s === this.generatedVariantSize && this.aspectRatio === this.generatedVariantAspectRatio);
-                const best = cfg.finalSizes.filter(s => !blocked(s)).at(-1) || cfg.finalSizes[0];
-                if (blocked(this.regenSize)) this.regenSize = best;
-                if (blocked(this.finalSize)) this.finalSize = best;
-            };
-            this.$watch('finalizedSize', recheckSizeSelectors);
-            this.$watch('aspectRatio', recheckSizeSelectors);
-            this.$watch('existingFinals', recheckSizeSelectors);
-            this.$watch('generatedVariantSize', recheckSizeSelectors);
-
-            // Restore per-variant finals when switching variants; clear on unknown variant
+            // When switching variants, restore or clear the active combo from variantCombos.
+            // Combos are sorted largest-first so index 0 is the highest-quality render.
             this.$watch('selectedVariant', (val) => {
-                this.existingFinals = this.finalsByVariant[val ?? 0] || [];
+                const combos = this.variantCombos[val ?? 0] || [];
+                if (combos.length > 0) {
+                    this.activeComboUrl = combos[0].url;
+                    this.activeComboSize = combos[0].size;
+                } else {
+                    this.activeComboUrl = null;
+                    this.activeComboSize = "";
+                }
             });
 
         },
@@ -245,17 +232,12 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             return this.variants[this.selectedVariant ?? 0];
         },
 
-        // Derived from URL comparison — no separate flag needed
-        get finalBgRemoved() {
-            return this._noBgFinalUrl !== null && this.finalUrl === this._noBgFinalUrl;
-        },
-
         get pDesignPx() {
             return this.pScale * this.pPrintWidth;
         },
 
         get pNeedsUpscale() {
-            return (cfg.sizePx[this.finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize];
+            return (cfg.sizePx[this.activeComboSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize];
         },
 
         get pImageOutOfBounds() {
@@ -312,22 +294,14 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             // the static files are still on disk so the URLs remain valid).
             if (Array.isArray(state.image_paths) && state.image_paths.length) {
                 this.variants = state.image_paths.map(p => ({
-                    url: p, origUrl: p, noBgUrl: null, ts: 0,
+                    url: "/" + p.replace(/^\//, ""), origUrl: "/" + p.replace(/^\//, ""), noBgUrl: null, ts: 0,
                 }));
                 if (state.selected_idx != null) this.selectedVariant = state.selected_idx;
                 if (state.variant_size) this.generatedVariantSize = state.variant_size;
             }
 
-            // Restore final image if one was saved
-            if (state.final_path) {
-                this.finalUrl       = state.final_path;
-                this._origFinalUrl  = state.final_path;
-            }
-
-            // Advance the step indicator to match the most progressed phase
-            if (state.final_path) {
-                this.step = 5;
-            } else if (this.variants.length) {
+            // Advance the step indicator to match the most progressed phase (4 is the max)
+            if (this.variants.length) {
                 this.step = 4;
             } else if (this.concepts.length) {
                 // If a concept was previously selected, pre-populate editedConcept
@@ -380,12 +354,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedConcept = null;
             this.editedConcept = "";
             this.prompts = [];
-            this.finalUrl = null;
-            this._origFinalUrl = null;
-            this._noBgFinalUrl = null;
-            this.finalTs = 0;
-            this.finalizedSize = "";
-            this.existingFinals = []; this.finalsByVariant = {};
+            this.variantCombos = {};
+            this.activeComboUrl = null;
+            this.activeComboSize = "";
             this.error = "";
             this.theme = displayTheme;
             this.variants = [{ url, origUrl: url, noBgUrl: null, ts: Date.now() }];
@@ -468,7 +439,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
-            this.finalUrl = null;
+            this.variantCombos = {};
+            this.activeComboUrl = null;
+            this.activeComboSize = "";
             this.loadedImageRes = null;
             this.step = 1;
 
@@ -499,9 +472,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
-            this.finalUrl = null;
+            this.variantCombos = {};
+            this.activeComboUrl = null;
+            this.activeComboSize = "";
             this.loadedImageRes = null;
-            this.existingFinals = []; this.finalsByVariant = {};
             // Advance to step 3 so the aspect ratio/resolution selectors and Generate button are visible,
             // but don't auto-generate — let the user configure first
             this.step = 3;
@@ -515,9 +489,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
-            this.finalUrl = null;
+            this.variantCombos = {};
+            this.activeComboUrl = null;
+            this.activeComboSize = "";
             this.loadedImageRes = null;
-            this.existingFinals = []; this.finalsByVariant = {};
             this.step = Math.max(this.step, 3);
 
             const fd = new FormData();
@@ -549,6 +524,17 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this.selectedVariant = e.urls.length === 1 ? 0 : null;
                     this.generatedVariantSize = this.variantSize;
                     this.generatedVariantAspectRatio = this.aspectRatio;
+                    // Store initial combo lists from backend (one combo per variant after /generate)
+                    if (e.combo_lists) {
+                        const combos = {};
+                        e.combo_lists.forEach((list, i) => { combos[i] = list; });
+                        this.variantCombos = combos;
+                        // Auto-select the first combo for a single-variant generation
+                        if (e.urls.length === 1 && e.combo_lists[0]?.length > 0) {
+                            this.activeComboUrl = e.combo_lists[0][0].url;
+                            this.activeComboSize = e.combo_lists[0][0].size;
+                        }
+                    }
                     this.step = 4;
                     this._stopLoading();
                 },
@@ -556,69 +542,69 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             });
         },
 
-        async doFinalize(sizeOverride = null) {
+        async doRender(sizeOverride = null) {
             if (this.isLoading) return;
-            // sizeOverride lets the re-generate button pass a different size than finalSize
-            const size = sizeOverride ?? this.finalSize;
+            const size = sizeOverride ?? this.renderSize;
             const idx = this.selectedVariant ?? 0;
-            // If already at step 5, keep the loading indicator anchored there
-            this.loadingStep = this.step >= 5 ? 5 : 4;
-            this._startLoading(`Generating ${size} (${this.aspectRatio}) design...`);
+            // Skip if this combo already exists
+            const existing = this.variantCombos[idx] || [];
+            if (existing.some(c => c.size === size && c.aspectRatio === this.aspectRatio)) return;
 
-            const fd = this._bgFormData();
-            fd.append("selected_idx", idx);
+            this.loadingStep = 4;
+            this._startLoading(`Rendering variant ${idx + 1} at ${size} (${this.aspectRatio})...`);
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fd.append("variant_idx", idx);
             fd.append("aspect_ratio", this.aspectRatio);
-            fd.append("final_size", size);
+            fd.append("size", size);
 
-            await streamSSE("/finalize", fd, {
+            await streamSSE("/render", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
-                final: (e) => {
-                    this.finalUrl = e.url;
-                    this._origFinalUrl = e.url;
-                    this._noBgFinalUrl = null;
-                    this.finalTs = Date.now();
-                    this.finalizedSize = size;
-                    this.finalizedAspectRatio = this.aspectRatio;
-                    if (e.existing_finals) {
-                        const vidx = this.selectedVariant ?? 0;
-                        this.finalsByVariant[vidx] = e.existing_finals;
-                        this.existingFinals = e.existing_finals;
-                    }
-                    this.step = 5;
+                render: (e) => {
+                    const updated = { ...this.variantCombos };
+                    updated[e.variant_idx] = e.combos;
+                    this.variantCombos = updated;
+                    // Auto-select the newly rendered combo as active
+                    this.activeComboUrl = e.url;
+                    this.activeComboSize = size;
                     this._stopLoading();
                 },
                 error: (e) => { this._onError(e.message); },
             });
         },
 
-        async selectFinal(item) {
-            // Load an already-rendered combo: set aspect ratio and call doFinalize (cache hit, instant)
-            this.aspectRatio = item.aspectRatio;
-            await this.doFinalize(item.size);
+        async selectCombo(combo) {
+            // Activate an already-rendered combo (instant — no API call)
+            this.activeComboUrl = combo.url;
+            this.activeComboSize = combo.size;
+            this.aspectRatio = combo.aspectRatio;
         },
 
-        async doFinalizeForPrintify() {
+        async doRenderForPrintify() {
+            // Called from the Printify modal when the active combo is below the minimum resolution.
             if (this.printifyBusy) return;
             this.printifyBusy = true;
             this.printifyError = "";
-            this.printifyStatus = `Re-finalizing at ${cfg.printifyMinSize}…`;
+            this.printifyStatus = `Rendering at ${cfg.printifyMinSize}…`;
 
             const idx = this.selectedVariant ?? 0;
-            const fd = this._bgFormData();
-            fd.append("selected_idx", idx);
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fd.append("variant_idx", idx);
             fd.append("aspect_ratio", this.aspectRatio);
-            fd.append("final_size", cfg.printifyMinSize);
+            fd.append("size", cfg.printifyMinSize);
 
-            await streamSSE("/finalize", fd, {
+            await streamSSE("/render", fd, {
                 status: (e) => { this.printifyStatus = e.message; },
-                final: (e) => {
-                    this.finalUrl = e.url;
-                    this._origFinalUrl = e.url;
-                    this._noBgFinalUrl = null;
-                    this.finalTs = Date.now();
-                    this.finalizedSize = cfg.printifyMinSize;
-                    this.existingFinals = e.existing_finals ?? this.existingFinals;
-                    this.step = 5;
+                render: (e) => {
+                    const updated = { ...this.variantCombos };
+                    updated[e.variant_idx] = e.combos;
+                    this.variantCombos = updated;
+                    this.activeComboUrl = e.url;
+                    this.activeComboSize = cfg.printifyMinSize;
                     this.printifyStatus = "";
                 },
                 error: (e) => { this.printifyError = e.message; },
@@ -686,47 +672,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 .catch(() => this._onError("Failed to sync variant state."));
         },
 
-        async doRestoreFinalBg() {
-            if (this.isLoading) return;
-            // Instant UI swap
-            this.finalUrl = this._origFinalUrl;
-            this.finalTs = Date.now();
-            // Sync server session in background
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fd.append("column_id", this.colIdx);
-            fetch("/restore-bg/final", { method: "POST", body: fd })
-                .catch(() => this._onError("Failed to sync final state."));
-        },
-
-        async doRemoveFinalBg() {
-            if (this.isLoading) return;
-            // Instant swap if we've already removed bg for this final image before
-            if (this._noBgFinalUrl) {
-                this.finalUrl = this._noBgFinalUrl;
-                this.finalTs = Date.now();
-                const fd = new FormData();
-                fd.append("session_id", this.sessionId);
-                fd.append("column_id", this.colIdx);
-                fetch("/apply-cached-bg/final", { method: "POST", body: fd })
-                    .catch(() => this._onError("Failed to sync final state."));
-                return;
-            }
-            this.loadingStep = 5;
-            this._startLoading("Removing background...");
-
-            await streamSSE("/remove-bg/final", this._bgFormData(), {
-                status: (e) => { this.loadingMsg = e.message; },
-                final_updated: (e) => {
-                    this.finalUrl = e.url;
-                    this.finalTs = Date.now();
-                    if (e.bg_removed) this._noBgFinalUrl = e.url;
-                    this._stopLoading();
-                },
-                error: (e) => { this._onError(e.message); },
-            });
-        },
-
         // Apply a preset dispatched from the global presets panel
         _applyPreset({ conceptsTemplate, variantsTemplate, styleTemplate }) {
             this.conceptsTemplate = conceptsTemplate;
@@ -756,8 +701,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pTitle = this.theme || "Custom T-Shirt";
             this.showPrintify = true;
 
-            // Fetch content bounds from the final image alpha channel for Y placement
-            if (this.finalUrl) {
+            // Fetch content bounds from the active combo image alpha channel for Y placement
+            if (this.activeComboUrl) {
                 fetch(`/analysis/final?session_id=${encodeURIComponent(this.sessionId)}&column_id=${this.colIdx}`)
                     .then(r => r.json())
                     .then(data => { this.pContentTop = data.content_top ?? 0; })
@@ -1014,7 +959,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             fd.append("design_x", designX.toFixed(4));
             fd.append("design_y", designY.toFixed(4));
             fd.append("design_scale", scale);
-            fd.append("final_url", this.finalUrl ?? "");
+            fd.append("final_url", this.activeComboUrl ?? "");
             fd.append("override_min_res", this.pOverrideMinRes);
 
             await streamSSE("/printify/publish", fd, {
@@ -1111,7 +1056,7 @@ function designer() {
                     const el = document.querySelector(`[data-col-idx="${col.id}"]`);
                     const data = el?._x_dataStack?.[0];
                     // Consider a column "in progress" if it has a theme, concepts, variants, or final image
-                    return data?.theme?.trim() || data?.concepts?.length || data?.variants?.length || data?.finalUrl;
+                    return data?.theme?.trim() || data?.concepts?.length || data?.variants?.length;
                 });
                 if (anyWork) {
                     e.preventDefault();
@@ -1204,7 +1149,7 @@ function designer() {
             const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
             const colData = el?._x_dataStack?.[0];
             const hasWork = colData?.theme?.trim() || colData?.concepts?.length
-                         || colData?.variants?.length || colData?.finalUrl;
+                         || colData?.variants?.length;
             const label = `Design ${colIdx + 1}`;
             if (hasWork && !confirm(`Close ${label}? Work in this column will be lost.`)) return;
             const fd = new FormData();
@@ -1233,7 +1178,7 @@ function designer() {
                     const colIdx = this.columns.length - excess + i;
                     const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
                     const d = el?._x_dataStack?.[0];
-                    return d?.theme?.trim() || d?.concepts?.length || d?.variants?.length || d?.finalUrl;
+                    return d?.theme?.trim() || d?.concepts?.length || d?.variants?.length;
                 }).some(Boolean);
                 if (hasWip && !confirm(`Lowering the max will close ${excess} column${excess > 1 ? 's' : ''} with work in progress. Continue?`)) {
                     // Revert the input to the current actual column count

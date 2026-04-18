@@ -583,16 +583,6 @@
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div>
-                                        <label :for="'final-size-' + col.id"
-                                            class="text-xs font-medium block mb-1">Final resolution</label>
-                                        <select :id="'final-size-' + col.id" x-model="finalSize"
-                                            class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                            {% for s in final_sizes %}
-                                            <option value="{{ s }}">{{ s }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
                                 </div>
 
                                 <p class="text-xs text-slate-300">Output: <code
@@ -622,16 +612,16 @@
                         <div class="flex-1 overflow-y-auto p-4 space-y-4">
                             <section class="rounded-xl p-4 space-y-4 transition-colors"
                                 :class="$store.activeColIdx === colIdx ? 'bg-slate-600' : 'bg-slate-800'"
-                                x-data="{ sCollapsed: {1: false, 2: false, 3: false, 4: false, 5: false} }">
+                                x-data="{ sCollapsed: {1: false, 2: false, 3: false, 4: false} }">
                                 <div class="flex justify-end -mt-1 mb-1">
                                     <!-- Capture intent before loop to avoid mid-loop state drift. -->
-                                    <button x-show="[1,2,3,4,5].filter(k => step >= k).some(k => !sCollapsed[k])"
-                                        @click="[1,2,3,4,5].filter(k => step >= k).forEach(k => sCollapsed[k] = true)"
+                                    <button x-show="[1,2,3,4].filter(k => step >= k).some(k => !sCollapsed[k])"
+                                        @click="[1,2,3,4].filter(k => step >= k).forEach(k => sCollapsed[k] = true)"
                                         class="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors">
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
                                         Collapse all</button>
-                                    <button x-show="[1,2,3,4,5].filter(k => step >= k).some(k => sCollapsed[k])"
-                                        @click="[1,2,3,4,5].filter(k => step >= k).forEach(k => sCollapsed[k] = false)"
+                                    <button x-show="[1,2,3,4].filter(k => step >= k).some(k => sCollapsed[k])"
+                                        @click="[1,2,3,4].filter(k => step >= k).forEach(k => sCollapsed[k] = false)"
                                         class="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors ml-3">
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                         Expand all</button>
@@ -897,7 +887,7 @@
                                 <section x-show="step >= 4 || loadedImageRes" x-transition x-ref="step4"
                                     class="rounded-xl shadow-sm p-4">
                                     <div class="flex items-center justify-between mb-3">
-                                        <h2 x-text="generatedVariantSize ? `4 · Variants (${generatedVariantSize} · ${generatedVariantAspectRatio}) — click to select for finalization` : '4 · Variants — click to select for finalization'"
+                                        <h2 x-text="generatedVariantSize ? `4 · Variant Gallery (${generatedVariantSize} · ${generatedVariantAspectRatio})` : '4 · Variant Gallery'"
                                             class="text-xs font-semibold uppercase tracking-wider text-slate-100"></h2>
                                         <button @click="sCollapsed[4] = !sCollapsed[4]" :aria-expanded="!sCollapsed[4]"
                                             class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
@@ -940,68 +930,90 @@
                                                 </div>
                                             </template>
                                         </div>
-                                        <div class="flex gap-2 mt-4 flex-wrap items-center">
-                                            <select x-model="aspectRatio"
-                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                <template x-for="r in cfg.aspectRatios" :key="r">
-                                                    <option :value="r" x-text="r"></option>
+                                        <!-- ── Combo gallery for selected variant ────────────────── -->
+                                        <div class="mt-4 space-y-3">
+                                            <!-- Rendered combos for this variant — pills to select the active image -->
+                                            <div x-show="(variantCombos[selectedVariant ?? 0] || []).length > 0"
+                                                class="flex flex-wrap items-center gap-1.5">
+                                                <span class="text-xs text-slate-400">Rendered combos:</span>
+                                                <template x-for="c in (variantCombos[selectedVariant ?? 0] || [])"
+                                                    :key="c.size + c.aspectRatio">
+                                                    <button @click="selectCombo(c)"
+                                                        :class="c.url === activeComboUrl ? 'bg-indigo-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-slate-200'"
+                                                        class="text-xs px-2 py-0.5 rounded transition-colors"
+                                                        x-text="`${c.size} · ${c.aspectRatio}`"></button>
                                                 </template>
-                                            </select>
-                                            <select @change="finalSize = $event.target.value"
-                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                <template x-for="s in cfg.finalSizes" :key="s">
-                                                    <option :value="s" :selected="s === finalSize"
-                                                        :disabled="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) || (s === generatedVariantSize && aspectRatio === generatedVariantAspectRatio)"
-                                                        x-text="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) ? s + ' (current)' : (s === generatedVariantSize && aspectRatio === generatedVariantAspectRatio) ? s + ' (variant)' : s"></option>
-                                                </template>
-                                            </select>
-                                            <button @click="doFinalize()"
-                                                :disabled="isLoading || existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio) || (finalSize === generatedVariantSize && aspectRatio === generatedVariantAspectRatio) || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
-                                                :title="existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio)
-                                            ? `Already rendered — select from list below`
-                                            : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
-                                            ? `Already at ${finalSize} — change Final resolution in settings`
-                                            : `Finalize selected variant at ${finalSize}`" x-text="existingFinals.some(f => f.size === finalSize && f.aspectRatio === aspectRatio)
-                                            ? `✨ ${finalSize} · ${aspectRatio} — already rendered`
-                                            : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
-                                            ? `✨ ${finalSize} — already at this resolution`
-                                            : `✨ Finalize at ${finalSize}`"
-                                                class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                            <button @click="doRemoveVariantBg()" :disabled="isLoading"
-                                                x-show="!(selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl)"
-                                                aria-label="Remove background from selected variant"
-                                                class="px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                <span aria-hidden="true">✂️</span> Remove BG
-                                            </button>
-                                            <button @click="doRestoreVariantBg()" :disabled="isLoading"
-                                                x-show="selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl"
-                                                aria-label="Restore original background"
-                                                class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                <span aria-hidden="true">↩</span> Undo BG
-                                            </button>
-                                            <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                                :disabled="isLoading || ((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes)"
-                                                x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
-                                                :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                                                class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                        </div>
-                                        <!-- Already-rendered combos for this variant -->
-                                        <div x-show="existingFinals.length > 0" class="flex flex-wrap items-center gap-1.5 mt-2">
-                                            <span class="text-xs text-slate-400">Already rendered:</span>
-                                            <template x-for="f in existingFinals" :key="f.size + f.aspectRatio">
-                                                <button @click="selectFinal(f)"
-                                                    :class="f.size === finalizedSize && f.aspectRatio === aspectRatio ? 'bg-indigo-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-slate-200'"
-                                                    class="text-xs px-2 py-0.5 rounded transition-colors"
-                                                    x-text="`${f.size} · ${f.aspectRatio}`"></button>
-                                            </template>
-                                        </div>
-                                        <div x-show="cfg.printifyEnabled" class="mt-2">
-                                            <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
-                                                <input type="checkbox" x-model="pOverrideMinRes" class="rounded">
-                                                <span class="text-xs text-slate-400">Override <span
-                                                        x-text="cfg.printifyMinSize"></span> minimum (testing
-                                                    only)</span>
-                                            </label>
+                                            </div>
+
+                                            <!-- Active combo image + actions -->
+                                            <div x-show="activeComboUrl" class="space-y-2">
+                                                <img :src="activeComboUrl" alt="Active render"
+                                                    class="max-w-xs w-full rounded-lg border border-slate-200 bg-slate-100 block">
+                                                <div class="flex gap-2 flex-wrap items-center">
+                                                    <a :href="activeComboUrl" download
+                                                        :title="`Download ${activeComboSize} PNG`"
+                                                        class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                                        x-text="`⬇ ${activeComboSize} PNG`"></a>
+                                                    <button x-show="cfg.printifyEnabled" @click="openPrintify()"
+                                                        :disabled="isLoading || (pNeedsUpscale && !pOverrideMinRes)"
+                                                        x-text="(pNeedsUpscale && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
+                                                        :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                                                        class="px-3 py-1.5 text-white text-xs font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Variant-level BG removal -->
+                                            <div class="flex gap-2 flex-wrap items-center">
+                                                <button @click="doRemoveVariantBg()" :disabled="isLoading"
+                                                    x-show="!(selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl)"
+                                                    aria-label="Remove background from selected variant"
+                                                    class="px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                    <span aria-hidden="true">✂️</span> Remove BG
+                                                </button>
+                                                <button @click="doRestoreVariantBg()" :disabled="isLoading"
+                                                    x-show="selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl"
+                                                    aria-label="Restore original background"
+                                                    class="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                    <span aria-hidden="true">↩</span> Undo BG
+                                                </button>
+                                            </div>
+
+                                            <!-- Render new combo controls -->
+                                            <div class="flex gap-2 flex-wrap items-center border-t border-slate-600 pt-3">
+                                                <span class="text-xs text-slate-400">Render new combo:</span>
+                                                <select x-model="aspectRatio"
+                                                    class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                    <template x-for="r in cfg.aspectRatios" :key="r">
+                                                        <option :value="r" x-text="r"></option>
+                                                    </template>
+                                                </select>
+                                                <select @change="renderSize = $event.target.value"
+                                                    class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                    <template x-for="s in cfg.finalSizes" :key="s">
+                                                        <option :value="s" :selected="s === renderSize"
+                                                            :disabled="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === s && c.aspectRatio === aspectRatio)"
+                                                            x-text="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === s && c.aspectRatio === aspectRatio) ? s + ' ✓' : s">
+                                                        </option>
+                                                    </template>
+                                                </select>
+                                                <button @click="doRender()"
+                                                    :disabled="isLoading || (variantCombos[selectedVariant ?? 0] || []).some(c => c.size === renderSize && c.aspectRatio === aspectRatio)"
+                                                    :title="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === renderSize && c.aspectRatio === aspectRatio)
+                                                        ? 'Already rendered — click the pill above to select it'
+                                                        : `Render at ${renderSize} · ${aspectRatio}`"
+                                                    x-text="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === renderSize && c.aspectRatio === aspectRatio)
+                                                        ? `✨ ${renderSize} · ${aspectRatio} — already rendered`
+                                                        : `✨ Render at ${renderSize}`"
+                                                    class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                            </div>
+
+                                            <div x-show="cfg.printifyEnabled">
+                                                <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
+                                                    <input type="checkbox" x-model="pOverrideMinRes" class="rounded">
+                                                    <span class="text-xs text-slate-400">Override <span
+                                                            x-text="cfg.printifyMinSize"></span> minimum (testing only)</span>
+                                                </label>
+                                            </div>
                                         </div>
                                         <div class="mt-3" x-show="loadingStep === 4 && (isLoading || error)">
                                             <div x-show="error" role="alert"
@@ -1026,108 +1038,6 @@
                                     </div><!-- /collapse step 4 -->
                                 </section>
 
-                                <!-- Step 5: Final Design -->
-                                <section x-show="step >= 5" x-transition
-                                    class="rounded-xl shadow-sm p-4">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <h2 x-text="finalizedAspectRatio ? `5 · Final Design (${finalizedSize} · ${finalizedAspectRatio})` : `5 · Final Design (${finalizedSize})`"
-                                            class="text-xs font-semibold uppercase tracking-wider text-slate-100"></h2>
-                                        <button @click="sCollapsed[5] = !sCollapsed[5]" :aria-expanded="!sCollapsed[5]"
-                                            class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
-                                            <svg :class="sCollapsed[5] ? '-rotate-90' : ''"
-                                                class="w-3.5 h-3.5 transition-transform" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <div x-show="!sCollapsed[5]">
-                                        <div class="space-y-4">
-                                            <img :src="finalUrl ? finalUrl + '?t=' + finalTs : ''"
-                                                :alt="`Final design at ${finalizedSize}`"
-                                                class="max-w-xs w-full rounded-lg border border-slate-200 bg-slate-100 block">
-                                            <div class="flex gap-2 flex-wrap">
-                                                <a :href="finalUrl ? finalUrl + '?t=' + finalTs : '#'" download
-                                                    :title="`Download ${finalizedSize} PNG`"
-                                                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-                                                    <span x-text="`⬇ Download ${finalizedSize} PNG`"></span>
-                                                </a>
-                                                <button @click="doRemoveFinalBg()" :disabled="isLoading"
-                                                    x-show="!finalBgRemoved"
-                                                    class="px-4 py-2 bg-blue-400 text-white text-sm font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                    <span aria-hidden="true">✂️</span> Remove BG
-                                                </button>
-                                                <button @click="doRestoreFinalBg()" :disabled="isLoading"
-                                                    x-show="finalBgRemoved"
-                                                    class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                    <span aria-hidden="true">↩</span> Undo BG
-                                                </button>
-                                                <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                                    :disabled="(cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes"
-                                                    x-text="((cfg.sizePx[finalizedSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
-                                                    :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                                                    class="px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                            </div>
-                                            <div x-show="cfg.printifyEnabled">
-                                                <label class="flex items-center gap-2 cursor-pointer select-none w-fit">
-                                                    <input type="checkbox" x-model="pOverrideMinRes" class="rounded">
-                                                    <span class="text-xs text-slate-400">Override <span
-                                                            x-text="cfg.printifyMinSize"></span> minimum (testing
-                                                        only)</span>
-                                                </label>
-                                            </div>
-                                            <div
-                                                class="border-t border-slate-600 pt-3 flex gap-3 flex-wrap items-center">
-                                                <span class="text-xs text-slate-400">Re-generate at different
-                                                    resolution:</span>
-                                                <select @change="regenSize = $event.target.value"
-                                                    class="text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                    <template x-for="s in cfg.finalSizes" :key="s">
-                                                        <option :value="s" :selected="s === regenSize"
-                                                            :disabled="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) || (s === generatedVariantSize && aspectRatio === generatedVariantAspectRatio)"
-                                                            x-text="existingFinals.some(f => f.size === s && f.aspectRatio === aspectRatio) ? s + ' (current)' : (s === generatedVariantSize && aspectRatio === generatedVariantAspectRatio) ? s + ' (variant)' : s"></option>
-                                                    </template>
-                                                </select>
-                                                <button @click="doFinalize(regenSize)"
-                                                    :disabled="isLoading || existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) || (regenSize === generatedVariantSize && aspectRatio === generatedVariantAspectRatio)"
-                                                    :title="existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) ? 'Already rendered — select from list below' : `Re-generate at ${regenSize} · ${aspectRatio}`"
-                                                    x-text="existingFinals.some(f => f.size === regenSize && f.aspectRatio === aspectRatio) ? `✨ ${regenSize} · ${aspectRatio} — already rendered` : `✨ Re-generate at ${regenSize}`"
-                                                    class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                            </div>
-                                            <!-- Already-rendered combos for this variant -->
-                                            <div x-show="existingFinals.length > 0" class="flex flex-wrap items-center gap-1.5 mt-2">
-                                                <span class="text-xs text-slate-400">Already rendered:</span>
-                                                <template x-for="f in existingFinals" :key="f.size + f.aspectRatio">
-                                                    <button @click="selectFinal(f)"
-                                                        :class="f.size === finalizedSize && f.aspectRatio === aspectRatio ? 'bg-indigo-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-slate-200'"
-                                                        class="text-xs px-2 py-0.5 rounded transition-colors"
-                                                        x-text="`${f.size} · ${f.aspectRatio}`"></button>
-                                                </template>
-                                            </div>
-                                            <div class="mt-3" x-show="loadingStep === 5 && (isLoading || error)">
-                                                <div x-show="error" role="alert"
-                                                    class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-                                                    <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
-                                                    <span x-text="error" class="flex-1"></span>
-                                                    <button @click="dismissError()"
-                                                        class="text-red-400 hover:text-red-600 ml-2">✕</button>
-                                                </div>
-                                                <div x-show="isLoading" role="status" aria-live="polite"
-                                                    class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
-                                                    <svg aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
-                                                        fill="none" viewBox="0 0 24 24">
-                                                        <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                            stroke="currentColor" stroke-width="4" />
-                                                        <path class="opacity-75" fill="currentColor"
-                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                                    </svg>
-                                                    <span x-text="loadingMsg"></span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div><!-- /collapse step 5 -->
-                                </section>
                             </section>
                         </div><!-- /workflow steps -->
 
@@ -1161,15 +1071,14 @@
                                             <span class="text-amber-500 text-lg flex-shrink-0">⚠️</span>
                                             <div class="flex-1 min-w-0">
                                                 <p class="text-sm font-medium text-amber-800">
-                                                    Design is at <span x-text="finalizedSize"></span> — Printify
+                                                    Design is at <span x-text="activeComboSize || 'low res'"></span> — Printify
                                                     requires <span x-text="cfg.printifyMinSize"></span>.
                                                 </p>
-                                                <p class="text-xs text-amber-600 mt-0.5">Re-finalize at a higher
-                                                    resolution before publishing.</p>
+                                                <p class="text-xs text-amber-600 mt-0.5">Render at a higher resolution before publishing.</p>
                                             </div>
-                                            <button @click="doFinalizeForPrintify()" :disabled="printifyBusy"
+                                            <button @click="doRenderForPrintify()" :disabled="printifyBusy"
                                                 class="flex-shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                Re-finalize at <span x-text="cfg.printifyMinSize"></span>
+                                                Render at <span x-text="cfg.printifyMinSize"></span>
                                             </button>
                                         </div>
 
@@ -1379,7 +1288,7 @@
                                                 </div>
 
                                                 <!-- Live placement preview -->
-                                                <div x-show="(finalUrl || selectedVariantObj?.url) && pPrintWidth && pPrintHeight"
+                                                <div x-show="(activeComboUrl || selectedVariantObj?.url) && pPrintWidth && pPrintHeight"
                                                     class="flex-shrink-0">
                                                     <label
                                                         class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Preview</label>
@@ -1395,7 +1304,7 @@
                                                                      ? 'border-l-2 border-red-500 opacity-90'
                                                                      : pDrag ? 'border-l border-slate-400 opacity-50' : 'opacity-0'">
                                                         </div>
-                                                        <img :src="(finalUrl || selectedVariantObj?.url) ? (finalUrl || selectedVariantObj?.url) + '?t=' + finalTs : ''"
+                                                        <img :src="(activeComboUrl || selectedVariantObj?.url) ? (activeComboUrl || selectedVariantObj?.url) : ''"
                                                             alt="Design placement preview" tabindex="0"
                                                             title="Drag to reposition — or use arrow keys (Shift for 10px steps)"
                                                             @mousedown.prevent="startDrag($event)"
