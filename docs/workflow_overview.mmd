@@ -2,22 +2,19 @@ graph TD
     Auth([1. Auth - Google OAuth optional])
     ColMgmt[2. Session and Column Management - one session per tab up to maxColumns independent columns]
     Ideation[3. Ideation - per column Enter theme brainstorm concepts select one]
-    PromptBuild[4. Prompt Building - per column Load or build prompts generate N low-res images]
-    Variants[5. Variant Generation - per column Review variants optional BG removal rerender or approve]
-    Finalize[6. Finalization - per column Upscale selected variant to chosen resolution optional BG removal]
-    Publish[7. Publish - per column Configure Printify product upload optional publish to store]
+    PromptBuild[4. Prompt Building - per column Load or build prompts generate N renders at chosen aspect and size]
+    Variants[5. Variant Gallery - per column All renders unified by variant aspect ratio and resolution Render new combos using smallest existing render as reference]
+    Publish[6. Publish - per column Configure Printify product upload optional publish to store]
 
     Auth --> ColMgmt
     ColMgmt --> Ideation
     Ideation --> PromptBuild
     PromptBuild --> Variants
-    Variants --> Finalize
-    Finalize --> Publish
+    Variants --> Publish
 
     style Auth fill:#fff3cd,stroke:#ffc107,stroke-dasharray: 5 5
     style ColMgmt fill:#f8d7da,stroke:#dc3545
     style Ideation fill:#d1e7dd,stroke:#198754
     style PromptBuild fill:#d1ecf1,stroke:#0dcaf0
     style Variants fill:#cfe2ff,stroke:#0d6efd
-    style Finalize fill:#e2d9f3,stroke:#6f42c1
     style Publish fill:#ffe5d0,stroke:#fd7e14

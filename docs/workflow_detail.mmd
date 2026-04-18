@@ -19,7 +19,7 @@ graph TD
         AddCol --> ColView
         ColView --> SetMaxCols[POST /session/max-columns User updates maxColumns via header input]
         SetMaxCols --> ColView
-        ColView --> CloseColBtn{Close column ×}
+        ColView --> CloseColBtn{Close column x}
         CloseColBtn -- "isLoading=true OR last column" --> ColView
         CloseColBtn -- "isLoading=false AND not last column" --> ConfirmClose{Has work?}
         ConfirmClose -- "No" --> RemoveCol[POST /session/remove-column Compact session columns array]
@@ -47,37 +47,35 @@ graph TD
         ConceptIn([Concept ready]) --> LoadPreset{Load preset?}
         LoadPreset -- Yes --> ApplyPreset[GET /presets/:name Replace template fields]
         LoadPreset -- No --> BuildPrompts
-        ApplyPreset --> BuildPrompts[POST /generate column_id scoped Build N variant prompts]
-        BuildPrompts --> GenImages([Generate N low-res images in parallel across columns])
+        ApplyPreset --> BuildPrompts[POST /generate column_id scoped Build N variant prompts generate renders at chosen aspect and size saved as variant_N_ARxAR_SIZE.png]
+        BuildPrompts --> GenImages([N initial renders streamed to gallery])
     end
 
-    %% 5. Variant Generation - per column
-    subgraph VariantGen [5. Variant Generation - per column]
-        ViewVariants(View N low-res variants) --> PickVariant[Pick a variant]
-        PickVariant --> VariantChoice{Action?}
+    %% 5. Variant Gallery - per column
+    subgraph VariantGen [5. Variant Gallery - per column]
+        ViewVariants(View N variants each showing all rendered combos aspect x resolution) --> PickVariant[Pick a variant]
+        PickVariant --> ComboGallery(View all combos for selected variant)
+        ComboGallery --> VariantChoice{Action?}
+
+        VariantChoice -- "Select combo" --> SelectCombo([Active combo set for BG removal and publish])
+
+        VariantChoice -- "Render new combo" --> RenderCheck{Combo on disk?}
+        RenderCheck -- "Yes" --> ServeExisting[Serve existing file instantly no API call]
+        RenderCheck -- "No" --> RenderNew[POST /render column_id scoped Load smallest existing render as reference generate at new aspect and size save as variant_N_ARxAR_SIZE.png]
+        ServeExisting --> UpdateCombos([Combo gallery updated])
+        RenderNew --> UpdateCombos
+
         VariantChoice -- "Remove BG" --> RemoveBGVariant[POST /remove-bg/variant column_id scoped Save _no_bg copy cache result]
-        RemoveBGVariant --> ViewVariants
+        RemoveBGVariant --> ComboGallery
         VariantChoice -- "Undo Remove BG" --> RestoreBGVariant[POST /restore-bg/variant column_id scoped Restore original from session cache]
-        RestoreBGVariant --> ViewVariants
+        RestoreBGVariant --> ComboGallery
+
         VariantChoice -- "Rerender" --> RerenderVariants([Back to Prompt Building])
-        VariantChoice -- "Finalize" --> ReadyToFinalize([Proceed to Finalization])
+        VariantChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
     end
 
-    %% 6. Finalization - per column
-    subgraph Finalization [6. Finalization - per column]
-        ClickFinalize([Click Finalize]) --> Gen4K[POST /finalize column_id scoped Upscale to selected resolution Auto-remove BG if variant had BG removed]
-        Gen4K --> ViewFinal(View final image)
-        ViewFinal --> FinalChoice{Action?}
-        FinalChoice -- "Remove BG" --> RemoveBGFinal[POST /remove-bg/final column_id scoped Save _no_bg copy cache result]
-        RemoveBGFinal --> ViewFinal
-        FinalChoice -- "Undo Remove BG" --> RestoreBGFinal[POST /restore-bg/final column_id scoped Restore original from session cache]
-        RestoreBGFinal --> ViewFinal
-        FinalChoice -- "Re-finalize at new resolution" --> ClickFinalize
-        FinalChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
-    end
-
-    %% 7. Publish - per column
-    subgraph Publish [7. Publish - Printify - per column]
+    %% 6. Publish - per column
+    subgraph Publish [6. Publish - Printify - per column]
         OpenPrintify([Open Printify panel]) --> SelectShop[GET /printify/shops Select shop]
         SelectShop --> SelectBlueprint[GET /printify/blueprints Select blueprint]
         SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers Select provider]
@@ -97,7 +95,6 @@ graph TD
     DirectConcept --> ConceptIn
     GenImages --> ViewVariants
     RerenderVariants -.-> ConceptIn
-    ReadyToFinalize --> ClickFinalize
     ReadyToPublish --> OpenPrintify
     ColView -.-> EnterTheme
 
@@ -107,7 +104,6 @@ graph TD
     style Ideation fill:#d1e7dd,stroke:#198754
     style PromptBuild fill:#d1ecf1,stroke:#0dcaf0
     style VariantGen fill:#cfe2ff,stroke:#0d6efd
-    style Finalization fill:#e2d9f3,stroke:#6f42c1
     style Publish fill:#ffe5d0,stroke:#fd7e14
 
     %% Decision nodes - amber
@@ -116,13 +112,12 @@ graph TD
     style AddColBtn fill:#fff3cd,stroke:#ffc107
     style CloseColBtn fill:#fff3cd,stroke:#ffc107
     style ConfirmClose fill:#fff3cd,stroke:#ffc107
-    style RemoveCol fill:#cfe2ff,stroke:#0d6efd
     style OptRefImage fill:#fff3cd,stroke:#ffc107
     style IdeationMode fill:#fff3cd,stroke:#ffc107
     style IdeationChoice fill:#fff3cd,stroke:#ffc107
     style LoadPreset fill:#fff3cd,stroke:#ffc107
     style VariantChoice fill:#fff3cd,stroke:#ffc107
-    style FinalChoice fill:#fff3cd,stroke:#ffc107
+    style RenderCheck fill:#fff3cd,stroke:#ffc107
     style PublishChoice fill:#fff3cd,stroke:#ffc107
 
     %% API call nodes - blue
@@ -130,14 +125,14 @@ graph TD
     style RestoreState fill:#cfe2ff,stroke:#0d6efd
     style AddCol fill:#cfe2ff,stroke:#0d6efd
     style SetMaxCols fill:#cfe2ff,stroke:#0d6efd
+    style RemoveCol fill:#cfe2ff,stroke:#0d6efd
     style Brainstorm fill:#cfe2ff,stroke:#0d6efd
     style ApplyPreset fill:#cfe2ff,stroke:#0d6efd
     style BuildPrompts fill:#cfe2ff,stroke:#0d6efd
+    style RenderNew fill:#cfe2ff,stroke:#0d6efd
+    style ServeExisting fill:#cfe2ff,stroke:#0d6efd
     style RemoveBGVariant fill:#cfe2ff,stroke:#0d6efd
     style RestoreBGVariant fill:#cfe2ff,stroke:#0d6efd
-    style Gen4K fill:#cfe2ff,stroke:#0d6efd
-    style RemoveBGFinal fill:#cfe2ff,stroke:#0d6efd
-    style RestoreBGFinal fill:#cfe2ff,stroke:#0d6efd
     style SelectShop fill:#cfe2ff,stroke:#0d6efd
     style SelectBlueprint fill:#cfe2ff,stroke:#0d6efd
     style SelectProvider fill:#cfe2ff,stroke:#0d6efd
@@ -152,7 +147,7 @@ graph TD
     style ColView fill:#f8f9fa,stroke:#6c757d
     style ViewConcepts fill:#f8f9fa,stroke:#6c757d
     style ViewVariants fill:#f8f9fa,stroke:#6c757d
-    style ViewFinal fill:#f8f9fa,stroke:#6c757d
+    style ComboGallery fill:#f8f9fa,stroke:#6c757d
 
     %% Terminal nodes - green
     style PageLoad fill:#d1e7dd,stroke:#198754
@@ -163,9 +158,9 @@ graph TD
     style ConceptSelected fill:#d1e7dd,stroke:#198754
     style ConceptIn fill:#d1e7dd,stroke:#198754
     style GenImages fill:#d1e7dd,stroke:#198754
+    style SelectCombo fill:#d1e7dd,stroke:#198754
+    style UpdateCombos fill:#d1e7dd,stroke:#198754
     style RerenderVariants fill:#d1e7dd,stroke:#198754
-    style ReadyToFinalize fill:#d1e7dd,stroke:#198754
-    style ClickFinalize fill:#d1e7dd,stroke:#198754
     style ReadyToPublish fill:#d1e7dd,stroke:#198754
     style OpenPrintify fill:#d1e7dd,stroke:#198754
     style Done fill:#d1e7dd,stroke:#198754
