@@ -232,6 +232,13 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             return this.variants[this.selectedVariant ?? 0];
         },
 
+        // Finds the combo object whose url or origUrl matches the active combo URL.
+        get activeComboObj() {
+            if (!this.activeComboUrl) return null;
+            const combos = this.variantCombos[this.selectedVariant ?? 0] || [];
+            return combos.find(c => c.url === this.activeComboUrl || c.origUrl === this.activeComboUrl) ?? null;
+        },
+
         get pDesignPx() {
             return this.pScale * this.pPrintWidth;
         },
@@ -614,20 +621,19 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         },
 
         async doRemoveVariantBg() {
-            if (this.isLoading) return;
-            const idx = this.selectedVariant ?? 0;
-            const v = this.variants[idx];
-            if (v?.noBgUrl) {
-                // Cache hit — instant UI swap; sync server state in background
-                const updated = [...this.variants];
-                updated[idx] = { ...v, url: v.noBgUrl, ts: Date.now() };
-                this.variants = updated;
-                const fd = new FormData();
-                fd.append("session_id", this.sessionId);
-                fd.append("column_id", this.colIdx);
-                fd.append("selected_idx", idx);
-                fetch("/apply-cached-bg/variant", { method: "POST", body: fd })
-                    .catch(() => this._onError("Failed to sync variant state."));
+            if (this.isLoading || !this.activeComboUrl) return;
+            const variantIdx = this.selectedVariant ?? 0;
+            const combo = this.activeComboObj;
+            if (!combo) return;
+
+            // If we already processed this combo before (noBgUrl cached), just swap URLs.
+            if (combo.noBgUrl) {
+                const updated = { ...this.variantCombos };
+                updated[variantIdx] = (updated[variantIdx] || []).map(c =>
+                    c === combo ? { ...c, url: c.noBgUrl } : c
+                );
+                this.variantCombos = updated;
+                this.activeComboUrl = combo.noBgUrl;
                 return;
             }
 
@@ -635,20 +641,20 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this._startLoading("Removing background...");
 
             const fd = this._bgFormData();
-            fd.append("selected_idx", idx);
+            fd.append("combo_url", this.activeComboUrl);
 
-            await streamSSE("/remove-bg/variant", fd, {
+            await streamSSE("/remove-bg/combo", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
-                variant_updated: (e) => {
-                    const updated = [...this.variants];
-                    const prev = updated[e.index] ?? {};
-                    updated[e.index] = {
-                        ...prev,
-                        url: e.url,
-                        ts: Date.now(),
-                        noBgUrl: e.bg_removed ? e.url : prev.noBgUrl,
-                    };
-                    this.variants = updated;
+                combo_bg_removed: (e) => {
+                    // Store origUrl so undo works, and noBgUrl so re-apply is instant.
+                    const updated = { ...this.variantCombos };
+                    updated[variantIdx] = (updated[variantIdx] || []).map(c =>
+                        c === combo
+                            ? { ...c, origUrl: this.activeComboUrl, noBgUrl: e.url, url: e.url }
+                            : c
+                    );
+                    this.variantCombos = updated;
+                    this.activeComboUrl = e.url;
                     this._stopLoading();
                 },
                 error: (e) => { this._onError(e.message); },
@@ -656,20 +662,18 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         },
 
         async doRestoreVariantBg() {
-            if (this.isLoading) return;
-            const idx = this.selectedVariant ?? 0;
-            const v = this.variants[idx];
-            // Instant UI swap — both URLs are already known after first removal
-            const updated = [...this.variants];
-            updated[idx] = { ...v, url: v.origUrl, ts: Date.now() };
-            this.variants = updated;
-            // Sync server session in background so finalize uses the correct image
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fd.append("column_id", this.colIdx);
-            fd.append("selected_idx", idx);
-            fetch("/restore-bg/variant", { method: "POST", body: fd })
-                .catch(() => this._onError("Failed to sync variant state."));
+            if (this.isLoading || !this.activeComboUrl) return;
+            const variantIdx = this.selectedVariant ?? 0;
+            const combo = this.activeComboObj;
+            if (!combo?.origUrl) return;
+
+            // Instant swap — origUrl was captured when bg was first removed.
+            const updated = { ...this.variantCombos };
+            updated[variantIdx] = (updated[variantIdx] || []).map(c =>
+                c === combo ? { ...c, url: c.origUrl } : c
+            );
+            this.variantCombos = updated;
+            this.activeComboUrl = combo.origUrl;
         },
 
         // Apply a preset dispatched from the global presets panel

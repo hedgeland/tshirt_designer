@@ -972,14 +972,16 @@
 
                                             <!-- Variant-level BG removal -->
                                             <div class="flex gap-2 flex-wrap items-center">
+                                                <!-- Show Remove BG when active combo exists and bg hasn't been removed yet -->
                                                 <button @click="doRemoveVariantBg()" :disabled="isLoading"
-                                                    x-show="!(selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl)"
-                                                    aria-label="Remove background from selected variant"
+                                                    x-show="activeComboUrl && !activeComboObj?.origUrl"
+                                                    aria-label="Remove background from rendered image"
                                                     class="px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                                     <span aria-hidden="true">✂️</span> Remove BG
                                                 </button>
+                                                <!-- Show Undo BG when bg has been removed (origUrl is stored on the combo) -->
                                                 <button @click="doRestoreVariantBg()" :disabled="isLoading"
-                                                    x-show="selectedVariantObj?.noBgUrl && selectedVariantObj?.url === selectedVariantObj?.noBgUrl"
+                                                    x-show="activeComboUrl && activeComboObj?.origUrl"
                                                     aria-label="Restore original background"
                                                     class="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                                     <span aria-hidden="true">↩</span> Undo BG

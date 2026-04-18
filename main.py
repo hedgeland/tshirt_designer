@@ -770,6 +770,64 @@ async def remove_variant_bg(
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
+@app.post("/remove-bg/combo")
+async def remove_combo_bg(
+    combo_url: str = Form(...),
+    bg_color: str = Form(...),
+    bg_tolerance: int = Form(...),
+    edge_erode: int = Form(...),
+    decontaminate: int = Form(...),
+):
+    """Remove the background from a rendered combo image identified by its URL path.
+
+    Combos are file-backed; the _no_bg file on disk acts as the cache — if it already
+    exists we skip reprocessing and return it immediately.
+    """
+    async def stream():
+        # Strip leading slash and resolve to an absolute path, rejecting anything
+        # outside OUTPUT_DIR to prevent path-traversal.
+        clean = combo_url.lstrip("/")
+        abs_path = Path(clean).resolve()
+        if not abs_path.is_relative_to(Path(OUTPUT_DIR).resolve()):
+            yield sse({"type": "error", "message": "Invalid combo path."})
+            return
+
+        no_bg_path_str = _no_bg_path(clean)
+        no_bg_abs = Path(no_bg_path_str).resolve() if no_bg_path_str else None
+
+        # Return the cached _no_bg file if it already exists on disk.
+        if no_bg_abs and no_bg_abs.exists():
+            yield sse({"type": "combo_bg_removed", "url": f"/{no_bg_path_str}"})
+            return
+
+        if not abs_path.exists():
+            yield sse({"type": "error", "message": "Combo file not found."})
+            return
+
+        yield sse({"type": "status", "message": "Removing background..."})
+        try:
+            img = await asyncio.to_thread(lambda: Image.open(abs_path).convert("RGBA"))
+            result = await asyncio.to_thread(
+                remove_background_color,
+                img,
+                bg_color,
+                tolerance=bg_tolerance,
+                erode_px=edge_erode,
+                decontaminate=decontaminate,
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        if no_bg_abs:
+            await asyncio.to_thread(result.save, str(no_bg_abs), "PNG")
+
+        url = f"/{no_bg_path_str}" if no_bg_path_str else ""
+        yield sse({"type": "combo_bg_removed", "url": url})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
 @app.post("/remove-bg/final")
 async def remove_final_bg(
     session_id: str = Form(...),
