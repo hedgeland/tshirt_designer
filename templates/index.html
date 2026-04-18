@@ -832,7 +832,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="flex items-center gap-2">
+                                            <div class="flex items-center gap-2 flex-wrap">
                                             <select x-model="aspectRatio"
                                                 class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                 <template x-for="r in cfg.aspectRatios" :key="r">
@@ -844,6 +844,14 @@
                                                 {% for s in brainstorm_sizes %}
                                                 <option value="{{ s }}">{{ s }}</option>
                                                 {% endfor %}
+                                            </select>
+                                            <!-- Variant count selector — mirrors the settings slider but inline for quick access -->
+                                            <select x-model.number="numVariants"
+                                                title="Number of variants to generate"
+                                                class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                <template x-for="n in [1,2,3,4,5]" :key="n">
+                                                    <option :value="n" x-text="n + (n === 1 ? ' variant' : ' variants')"></option>
+                                                </template>
                                             </select>
                                             <button @click="doGenerate()" :disabled="isLoading"
                                                 title="Generate image variants from the concept"
