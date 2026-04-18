@@ -48,7 +48,8 @@ from config import (
 from src import presets, printify
 from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
-from src.image import finalize_image as finalize_design, generate_image
+from src.image import finalize_image as finalize_design
+from src.image import generate_image
 from src.output import (
     archive_files,
     archive_theme,
@@ -117,7 +118,15 @@ templates = Jinja2Templates(directory="templates")
 sessions: dict[str, dict] = {}
 
 # Column fields that are JSON-serializable (PIL images and other binary objects excluded).
-_SERIALIZABLE_COLUMN_KEYS = {"theme", "concepts", "prompts", "variant_size", "image_paths", "selected_idx", "final_path"}
+_SERIALIZABLE_COLUMN_KEYS = {
+    "theme",
+    "concepts",
+    "prompts",
+    "variant_size",
+    "image_paths",
+    "selected_idx",
+    "final_path",
+}
 
 
 def init_column_state() -> dict:
@@ -126,8 +135,8 @@ def init_column_state() -> dict:
         "theme": "",
         "concepts": [],
         "prompts": [],
-        "images": [],           # PIL Images kept in memory for bg removal + finalize
-        "image_paths": [],      # on-disk paths, used to build static URLs
+        "images": [],  # PIL Images kept in memory for bg removal + finalize
+        "image_paths": [],  # on-disk paths, used to build static URLs
         "selected_idx": None,
         "final_image": None,
         "final_path": None,
@@ -139,7 +148,7 @@ def get_session(session_id: str) -> dict:
     """Return the session-level dict (columns list + max_columns). Creates if missing."""
     if session_id not in sessions:
         sessions[session_id] = {
-            "columns": [init_column_state()],   # start with one column
+            "columns": [init_column_state()],  # start with one column
             "max_columns": MAX_COLUMNS,
             "min_columns": 1,
         }
@@ -401,7 +410,9 @@ async def generate(
 
         # Save a prompt sidecar alongside the variants so every generation is documented
         if paths:
-            sidecar_path = Path(paths[0]).parent / f"prompts_{Path(paths[0]).stem.split('_', 2)[-1]}.md"
+            sidecar_path = (
+                Path(paths[0]).parent / f"prompts_{Path(paths[0]).stem.split('_', 2)[-1]}.md"
+            )
             sidecar = templates.get_template("variant_prompts.md").render(
                 theme=theme,
                 concept=concept.strip(),
@@ -422,6 +433,7 @@ async def generate(
                 "original_images": list(images),  # preserved so bg removal is undoable
                 "original_image_paths": list(paths),
                 "no_bg_variant_cache": {},  # cleared on each new generate
+                "finalize_cache": {},       # cleared on each new generate; keyed by idx:aspect:size
                 "selected_idx": 0 if num_variants == 1 else None,
                 "final_image": None,
                 "final_path": None,
@@ -469,10 +481,27 @@ async def finalize(
             return
 
         idx = selected_idx if 0 <= selected_idx < len(images) else 0
+
+        # Return the previously generated file if this exact combo was already finalized
+        cache_key = f"{idx}:{aspect_ratio}:{final_size}"
+        finalize_cache = session.get("finalize_cache", {})
+        cached = finalize_cache.get(cache_key)
+        if cached and Path(cached["path"]).exists():
+            final_img = Image.open(cached["path"]).copy()
+            session["final_image"] = final_img
+            session["final_path"] = cached["path"]
+            session["original_final"] = final_img
+            session["original_final_path"] = cached["path"]
+            session["no_bg_final_cache"] = None
+            yield sse({"type": "final", "url": cached["url"]})
+            return
+
         variant = images[idx]
         bg_was_removed = _has_transparency(variant)
 
-        yield sse({"type": "status", "message": f"Generating {final_size} ({aspect_ratio}) design..."})
+        yield sse(
+            {"type": "status", "message": f"Generating {final_size} ({aspect_ratio}) design..."}
+        )
 
         try:
             final_img = await asyncio.to_thread(
@@ -516,13 +545,18 @@ async def finalize(
         )
         prompt_path.write_text(sidecar, encoding="utf-8")
 
+        final_url = f"/{final_path}"
         session["final_image"] = final_img
         session["final_path"] = str(final_path)
         session["original_final"] = final_img  # preserved so bg removal is undoable
         session["original_final_path"] = str(final_path)
         session["no_bg_final_cache"] = None  # stale on each new finalize
 
-        yield sse({"type": "final", "url": f"/{final_path}"})
+        # Cache so re-selecting this combo skips regeneration
+        finalize_cache = session.setdefault("finalize_cache", {})
+        finalize_cache[cache_key] = {"path": str(final_path), "url": final_url}
+
+        yield sse({"type": "final", "url": final_url})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -642,7 +676,9 @@ async def remove_final_bg(
 
 
 @app.post("/restore-bg/variant")
-async def restore_variant_bg(session_id: str = Form(...), column_id: int = Form(0), selected_idx: int = Form(...)):
+async def restore_variant_bg(
+    session_id: str = Form(...), column_id: int = Form(0), selected_idx: int = Form(...)
+):
     session = get_column(session_id, column_id)
     originals = session.get("original_images", [])
     orig_paths = session.get("original_image_paths", [])
@@ -684,7 +720,9 @@ async def restore_final_bg(session_id: str = Form(...), column_id: int = Form(0)
 
 
 @app.post("/apply-cached-bg/variant")
-async def apply_cached_variant_bg(session_id: str = Form(...), column_id: int = Form(0), selected_idx: int = Form(...)):
+async def apply_cached_variant_bg(
+    session_id: str = Form(...), column_id: int = Form(0), selected_idx: int = Form(...)
+):
     """Swap session to the cached no-bg variant without re-running the algorithm."""
     session = get_column(session_id, column_id)
     cache = session.get("no_bg_variant_cache", {})
@@ -1091,11 +1129,12 @@ async def session_columns(session_id: str):
     """
     sess = get_session(session_id)
     serializable_keys = _SERIALIZABLE_COLUMN_KEYS
-    cols = [
-        {k: col.get(k) for k in serializable_keys}
-        for col in sess["columns"]
-    ]
-    return {"columns": cols, "max_columns": sess["max_columns"], "min_columns": sess.get("min_columns", 1)}
+    cols = [{k: col.get(k) for k in serializable_keys} for col in sess["columns"]]
+    return {
+        "columns": cols,
+        "max_columns": sess["max_columns"],
+        "min_columns": sess.get("min_columns", 1),
+    }
 
 
 @app.post("/session/remove-column")
@@ -1115,7 +1154,11 @@ async def remove_column(session_id: str = Form(...), column_id: int = Form(...))
     # Return the compacted list so the client can reassign indices in one step
     serializable_keys = _SERIALIZABLE_COLUMN_KEYS
     cols = [{k: col.get(k) for k in serializable_keys} for col in columns]
-    return {"columns": cols, "max_columns": sess["max_columns"], "min_columns": sess.get("min_columns", 1)}
+    return {
+        "columns": cols,
+        "max_columns": sess["max_columns"],
+        "min_columns": sess.get("min_columns", 1),
+    }
 
 
 @app.post("/session/max-columns")
