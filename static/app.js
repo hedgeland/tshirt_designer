@@ -468,7 +468,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             });
         },
 
-        async doGenerateDirect() {
+        doGenerateDirect() {
             if (this.isLoading || !this.theme.trim()) return;
             // Skip brainstorm — use the theme text as the concept directly
             this.directMode = true;
@@ -480,8 +480,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedVariant = null;
             this.finalUrl = null;
             this.loadedImageRes = null;
-            this.step = 2;  // step >= 2 satisfies the directMode badge condition; doGenerate() advances to 3
-            await this.doGenerate();
+            // Advance to step 3 so the aspect ratio/resolution selectors and Generate button are visible,
+            // but don't auto-generate — let the user configure first
+            this.step = 3;
         },
 
         async doGenerate() {
