@@ -864,7 +864,7 @@ async def remove_final_bg(
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
                 return
-            no_bg_path = _no_bg_path(final_path)
+            no_bg_path = _no_bg_path(final_path or "")
             if no_bg_path:
                 await asyncio.to_thread(result.save, no_bg_path, "PNG")
             session["no_bg_final_cache"] = (result, no_bg_path)
