@@ -1,4 +1,4 @@
-"""Save generated images to disk under output/<theme>/concept_N/variant_N_<ts>.png."""
+"""Save generated images to disk under output/<theme>/concept_N/variant_N_ARxAR_SIZE.png."""
 
 import io
 import zipfile
@@ -243,20 +243,27 @@ def safe_theme_name(theme: str) -> str:
     return f"{sanitized[:10]}_{ts}"
 
 
-def timestamp() -> str:
-    """Return a sortable timestamp string for use in filenames."""
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+def save_variants(
+    theme: str,
+    concept_idx: int,
+    images: list[Image.Image],
+    aspect_ratio: str,
+    size: str,
+) -> tuple[list[str], Path]:
+    """Save variant images with deterministic filenames encoding the aspect/size combo.
 
-
-def save_variants(theme: str, concept_idx: int, images: list[Image.Image]) -> list[str]:
+    Returns (paths, concept_dir) so the caller can store concept_dir in session for
+    subsequent /render calls on the same variant set.
+    """
+    ar_safe = aspect_ratio.replace(":", "x")  # "1:1" → "1x1", filesystem-safe
     dir_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / f"concept_{concept_idx + 1}"
-    dir_path.mkdir(parents=True, exist_ok=True)  # create nested dirs if they don't exist
+    dir_path.mkdir(parents=True, exist_ok=True)
 
-    ts = timestamp()  # one timestamp per batch so variants are grouped by generation run
     paths = []
     for i, img in enumerate(images):
-        path = dir_path / f"variant_{i + 1}_{ts}.png"
+        # Deterministic filename: file existence on disk IS the cache
+        path = dir_path / f"variant_{i + 1}_{ar_safe}_{size}.png"
         img.save(path, "PNG")
         paths.append(str(path))
 
-    return paths  # caller uses these to build static URLs for the UI
+    return paths, dir_path

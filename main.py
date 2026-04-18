@@ -125,6 +125,7 @@ _SERIALIZABLE_COLUMN_KEYS = {
     "image_paths",
     "selected_idx",
     "final_path",
+    "concept_dir",  # str path — needed by /render to locate/save variant files after page reload
 }
 
 
@@ -134,10 +135,11 @@ def init_column_state() -> dict:
         "theme": "",
         "concepts": [],
         "prompts": [],
-        "images": [],  # PIL Images kept in memory for bg removal + finalize
+        "images": [],  # PIL Images kept in memory for bg removal
         "image_paths": [],  # on-disk paths, used to build static URLs
         "selected_idx": None,
-        "final_image": None,
+        "concept_dir": None,  # str path to concept_N/ dir; set by /generate, used by /render
+        "final_image": None,  # kept for /finalize backward compat during transition
         "final_path": None,
         "reference_image": None,
     }
@@ -199,6 +201,7 @@ def _scan_existing_finals(theme_dir: Path, idx: int) -> list[dict]:
 
     Parses deterministic filenames of the form final_v{idx}_{ar_safe}_{size}.png
     and returns [{size, aspectRatio, url}] sorted by size descending.
+    NOTE: deprecated — used only by the legacy /finalize endpoint during transition.
     """
     results = []
     for p in theme_dir.glob(f"final_v{idx}_*.png"):
@@ -213,6 +216,30 @@ def _scan_existing_finals(theme_dir: Path, idx: int) -> list[dict]:
             "aspectRatio": ar_safe.replace("x", ":"),
             "url": f"/{p}",
         })
+    return results
+
+
+def _scan_variant_combos(concept_dir: Path, variant_num: int) -> list[dict]:
+    """Return all rendered combos for variant_num (1-indexed) in concept_dir.
+
+    Parses variant_{N}_{ar_safe}_{size}.png filenames.
+    Returns [{size, aspectRatio, url}] sorted largest-first by size.
+    """
+    size_order = {"512": 0, "1K": 1, "2K": 2, "4K": 3}
+    results = []
+    for p in concept_dir.glob(f"variant_{variant_num}_*.png"):
+        if "_no_bg" in p.name:
+            continue
+        parts = p.stem.split("_")  # ["variant", str(N), ar_safe, size]
+        if len(parts) != 4:
+            continue
+        ar_safe, size = parts[2], parts[3]
+        results.append({
+            "size": size,
+            "aspectRatio": ar_safe.replace("x", ":"),
+            "url": f"/{p}",
+        })
+    results.sort(key=lambda r: size_order.get(r["size"], -1), reverse=True)
     return results
 
 
@@ -427,13 +454,13 @@ async def generate(
         except ValueError:
             concept_idx = 0
 
-        paths = await asyncio.to_thread(save_variants, theme, concept_idx, images)
+        paths, concept_dir = await asyncio.to_thread(
+            save_variants, theme, concept_idx, images, aspect_ratio, variant_size
+        )
 
-        # Save a prompt sidecar alongside the variants so every generation is documented
+        # Save a prompt sidecar alongside the variants; overwritten if user re-generates
         if paths:
-            sidecar_path = (
-                Path(paths[0]).parent / f"prompts_{Path(paths[0]).stem.split('_', 2)[-1]}.md"
-            )
+            sidecar_path = concept_dir / "prompts.md"
             sidecar = templates.get_template("variant_prompts.md").render(
                 theme=theme,
                 concept=concept.strip(),
@@ -454,6 +481,7 @@ async def generate(
                 "original_images": list(images),  # preserved so bg removal is undoable
                 "original_image_paths": list(paths),
                 "no_bg_variant_cache": {},  # cleared on each new generate
+                "concept_dir": str(concept_dir),  # /render uses this to locate/save combos
                 "selected_idx": 0 if num_variants == 1 else None,
                 "final_image": None,
                 "final_path": None,
@@ -463,9 +491,10 @@ async def generate(
             }
         )
 
-        # paths are like "output/theme/concept_1/variant_1.png" — prepend / for URL
+        # Build initial combo list: each variant starts with one combo (the generated size+ar)
+        combo_lists = [_scan_variant_combos(concept_dir, i + 1) for i in range(len(images))]
         urls = [f"/{p}" for p in paths]
-        yield sse({"type": "variants", "urls": urls})
+        yield sse({"type": "variants", "urls": urls, "combo_lists": combo_lists})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -584,6 +613,95 @@ async def finalize(
         session["no_bg_final_cache"] = None  # stale on each new finalize
 
         yield sse({"type": "final", "url": final_url, "existing_finals": _scan_existing_finals(theme_dir, idx)})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@app.post("/render")
+async def render_combo(
+    session_id: str = Form(...),
+    column_id: int = Form(0),
+    variant_idx: int = Form(...),  # 0-indexed, matching session["images"]
+    aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
+    size: str = Form(FINAL_SIZE),
+):
+    """Render a variant at a new aspect-ratio/size combo.
+
+    Uses the smallest existing render of that variant as a reference image so the
+    model preserves composition rather than starting from scratch.  The filename
+    variant_N_ARxAR_SIZE.png is deterministic, so file existence == cache hit.
+    """
+
+    async def stream():
+        session = get_column(session_id, column_id)
+        concept_dir_str = session.get("concept_dir")
+        if not concept_dir_str:
+            yield sse({"type": "error", "message": "Generate variants first."})
+            return
+
+        concept_dir = Path(concept_dir_str)
+        ar_safe = aspect_ratio.replace(":", "x")
+        variant_num = variant_idx + 1  # filenames are 1-indexed
+        target_path = concept_dir / f"variant_{variant_num}_{ar_safe}_{size}.png"
+
+        # Disk cache hit — no API call needed
+        if target_path.exists():
+            combos = _scan_variant_combos(concept_dir, variant_num)
+            yield sse({"type": "render", "url": f"/{target_path}", "combos": combos, "variant_idx": variant_idx})
+            return
+
+        # Find smallest existing render as reference to anchor the composition
+        existing_renders: list[tuple[int, Path]] = []
+        for p in concept_dir.glob(f"variant_{variant_num}_*.png"):
+            if "_no_bg" in p.name:
+                continue
+            parts = p.stem.split("_")
+            if len(parts) == 4:
+                sz = parts[3]
+                px = SIZE_PX.get(sz, 0)
+                existing_renders.append((px, p))
+
+        reference_img: Image.Image | None = None
+        if existing_renders:
+            smallest_path = min(existing_renders, key=lambda x: x[0])[1]
+            try:
+                reference_img = Image.open(smallest_path).copy()
+            except Exception:
+                pass
+
+        prompts = session.get("prompts", [])
+        prompt = prompts[variant_idx] if variant_idx < len(prompts) else ""
+
+        yield sse({"type": "status", "message": f"Rendering variant {variant_num} at {size} ({aspect_ratio})..."})
+
+        try:
+            if reference_img is not None:
+                rendered = await asyncio.to_thread(
+                    finalize_design,
+                    prompt,
+                    reference_img,
+                    GOOGLE_API_KEY,
+                    size=size,
+                    aspect_ratio=aspect_ratio,
+                )
+            else:
+                # No existing render to reference — generate fresh (shouldn't normally happen)
+                rendered = await asyncio.to_thread(
+                    generate_image,
+                    prompt,
+                    GOOGLE_API_KEY,
+                    size=size,
+                    aspect_ratio=aspect_ratio,
+                )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        concept_dir.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(rendered.save, str(target_path), "PNG")
+
+        combos = _scan_variant_combos(concept_dir, variant_num)
+        yield sse({"type": "render", "url": f"/{target_path}", "combos": combos, "variant_idx": variant_idx})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
