@@ -206,12 +206,11 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 if (e.detail.colIdx === this.colIdx) this._applyPreset(e.detail);
             });
 
-            // Keep regenSize pointing at a valid option (not the size already finalized at)
+            // Keep regenSize and finalSize pointing at a valid option (not the size already finalized at)
             this.$watch('finalizedSize', (val) => {
-                if (this.regenSize === val) {
-                    // Prefer the highest available resolution, not just any different one
-                    this.regenSize = cfg.finalSizes.filter(s => s !== val).at(-1) || cfg.finalSizes[0];
-                }
+                const best = cfg.finalSizes.filter(s => s !== val).at(-1) || cfg.finalSizes[0];
+                if (this.regenSize === val) this.regenSize = best;
+                if (this.finalSize === val) this.finalSize = best;
             });
 
         },

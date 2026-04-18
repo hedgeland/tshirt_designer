@@ -947,17 +947,21 @@
                                                     <option :value="r" x-text="r"></option>
                                                 </template>
                                             </select>
-                                            <select x-model="finalSize"
+                                            <select @change="finalSize = $event.target.value"
                                                 class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                {% for s in final_sizes %}
-                                                <option value="{{ s }}">{{ s }}</option>
-                                                {% endfor %}
+                                                <template x-for="s in cfg.finalSizes" :key="s">
+                                                    <option :value="s" :selected="s === finalSize" :disabled="s === finalizedSize" x-text="s === finalizedSize ? s + ' (current)' : s"></option>
+                                                </template>
                                             </select>
                                             <button @click="doFinalize()"
-                                                :disabled="isLoading || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
-                                                :title="(loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
+                                                :disabled="isLoading || finalSize === finalizedSize || (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)"
+                                                :title="finalSize === finalizedSize
+                                            ? `Already finalized at ${finalSize} — pick a different resolution`
+                                            : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
                                             ? `Already at ${finalSize} — change Final resolution in settings`
-                                            : `Re-generate selected variant at ${finalSize}`" x-text="(loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
+                                            : `Finalize selected variant at ${finalSize}`" x-text="finalSize === finalizedSize
+                                            ? `✨ ${finalSize} — already finalized`
+                                            : (loadedImageRes && (cfg.sizePx[finalSize] ?? 0) <= loadedImageRes.width)
                                             ? `✨ ${finalSize} — already at this resolution`
                                             : `✨ Finalize at ${finalSize}`"
                                                 class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
