@@ -104,7 +104,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // Separate size picker for re-generate (step 5); defaults to 4K and always
         // excludes the size the image was already finalized at.
         regenSize: "4K",
-        existingFinals: [],   // [{size, aspectRatio, url}] — combos already on disk for the selected variant
+        existingFinals: [],      // [{size, aspectRatio, url}] for the current variant — drives disable logic
+        finalsByVariant: {},     // persists existingFinals per variant idx across variant switches
 
         // ── Prompt templates ───────────────────────────────────────────────
         // Populated from cfg defaults; replaced when user applies a preset from the global panel.
@@ -209,20 +210,23 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 if (e.detail.colIdx === this.colIdx) this._applyPreset(e.detail);
             });
 
-            // Keep regenSize and finalSize away from the already-finalized combo.
-            // Must re-check on both finalizedSize changes (new finalize) and aspectRatio changes
-            // (user may switch aspect ratio to match a previously-finalized combo).
+            // Keep regenSize and finalSize away from any already-rendered combo.
+            // Checks both the most recent finalize AND the full existingFinals list.
+            // Re-runs on finalizedSize changes (new finalize) and aspectRatio changes.
             const recheckSizeSelectors = () => {
-                const blocked = (s) => s === this.finalizedSize && this.aspectRatio === this.finalizedAspectRatio;
+                const blocked = (s) => this.existingFinals.some(f => f.size === s && f.aspectRatio === this.aspectRatio);
                 const best = cfg.finalSizes.filter(s => !blocked(s)).at(-1) || cfg.finalSizes[0];
                 if (blocked(this.regenSize)) this.regenSize = best;
                 if (blocked(this.finalSize)) this.finalSize = best;
             };
             this.$watch('finalizedSize', recheckSizeSelectors);
             this.$watch('aspectRatio', recheckSizeSelectors);
+            this.$watch('existingFinals', recheckSizeSelectors);
 
-            // Clear existing finals when user switches to a different variant (different idx = different files)
-            this.$watch('selectedVariant', () => { this.existingFinals = []; });
+            // Restore per-variant finals when switching variants; clear on unknown variant
+            this.$watch('selectedVariant', (val) => {
+                this.existingFinals = this.finalsByVariant[val ?? 0] || [];
+            });
 
         },
 
@@ -376,7 +380,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this._noBgFinalUrl = null;
             this.finalTs = 0;
             this.finalizedSize = "";
-            this.existingFinals = [];
+            this.existingFinals = []; this.finalsByVariant = {};
             this.error = "";
             this.theme = displayTheme;
             this.variants = [{ url, origUrl: url, noBgUrl: null, ts: Date.now() }];
@@ -492,7 +496,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedVariant = null;
             this.finalUrl = null;
             this.loadedImageRes = null;
-            this.existingFinals = [];
+            this.existingFinals = []; this.finalsByVariant = {};
             // Advance to step 3 so the aspect ratio/resolution selectors and Generate button are visible,
             // but don't auto-generate — let the user configure first
             this.step = 3;
@@ -508,7 +512,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedVariant = null;
             this.finalUrl = null;
             this.loadedImageRes = null;
-            this.existingFinals = [];
+            this.existingFinals = []; this.finalsByVariant = {};
             this.step = Math.max(this.step, 3);
 
             const fd = new FormData();
@@ -570,7 +574,11 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this.finalTs = Date.now();
                     this.finalizedSize = size;
                     this.finalizedAspectRatio = this.aspectRatio;
-                    this.existingFinals = e.existing_finals ?? this.existingFinals;
+                    if (e.existing_finals) {
+                        const vidx = this.selectedVariant ?? 0;
+                        this.finalsByVariant[vidx] = e.existing_finals;
+                        this.existingFinals = e.existing_finals;
+                    }
                     this.step = 5;
                     this._stopLoading();
                 },
