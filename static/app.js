@@ -209,7 +209,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             // Keep regenSize pointing at a valid option (not the size already finalized at)
             this.$watch('finalizedSize', (val) => {
                 if (this.regenSize === val) {
-                    this.regenSize = cfg.finalSizes.find(s => s !== val) || cfg.finalSizes[0];
+                    // Prefer the highest available resolution, not just any different one
+                    this.regenSize = cfg.finalSizes.filter(s => s !== val).at(-1) || cfg.finalSizes[0];
                 }
             });
 
