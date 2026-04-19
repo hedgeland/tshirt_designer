@@ -536,11 +536,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                         const combos = {};
                         e.combo_lists.forEach((list, i) => { combos[i] = list; });
                         this.variantCombos = combos;
-                        // Auto-select the first combo for a single-variant generation
-                        if (e.urls.length === 1 && e.combo_lists[0]?.length > 0) {
-                            this.activeComboUrl = e.combo_lists[0][0].url;
-                            this.activeComboSize = e.combo_lists[0][0].size;
-                        }
+                        // Don't auto-select activeComboUrl — the thumbnail grid already shows
+                        // the generated image; auto-selecting would display it twice and cause
+                        // BG removal to appear broken (combo updates but thumbnail doesn't).
+                        // The user activates a combo by clicking a combo pill.
                     }
                     this.step = 4;
                     this._stopLoading();
