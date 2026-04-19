@@ -1332,8 +1332,11 @@ function designer() {
                 if (f.no_bg_url) files.push([f.no_bg_url, f.no_bg_size]);
             });
             (theme.images || []).forEach(v => {
-                files.push([v.url, v.size]);
-                if (v.no_bg_url) files.push([v.no_bg_url, v.no_bg_size]);
+                // Walk all renders so manage-mode select-all captures every AR/size file.
+                (v.renders || [{ url: v.url, size: v.size, no_bg_url: v.no_bg_url, no_bg_size: v.no_bg_size }]).forEach(r => {
+                    files.push([r.url, r.size]);
+                    if (r.no_bg_url) files.push([r.no_bg_url, r.no_bg_size]);
+                });
             });
             return files;
         },

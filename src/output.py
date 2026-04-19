@@ -1,6 +1,7 @@
 """Save generated images to disk under output/<theme>/concept_N/variant_N_ARxAR_SIZE.png."""
 
 import io
+import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -82,32 +83,62 @@ def scan_output() -> list[dict]:
                 "height": h,
             })
 
-        # Collect all variant PNGs from every concept_* subdirectory into a flat list,
-        # newest first — the browser no longer groups by concept.
-        images_with_stat = []
+        # Group variant PNGs by (concept_dir, variant_N) so each slot shows one tile
+        # with per-render download pills instead of a separate tile per AR/size combo.
+        _RES_ORDER = {"512": 0, "1K": 1, "2K": 2, "4K": 3}
+        groups: dict[tuple, list] = {}
         for concept_dir in theme_dir.iterdir():
             if not concept_dir.is_dir() or not concept_dir.name.startswith("concept_"):
                 continue
             for v in concept_dir.glob("variant_*.png"):
-                if "_no_bg" not in v.name:
-                    images_with_stat.append((v, v.stat()))
+                if "_no_bg" in v.name:
+                    continue
+                m = re.match(r"variant_(\d+)_(.+)_([^_]+)$", v.stem)
+                if not m:
+                    continue
+                key = (concept_dir.name, int(m.group(1)))
+                groups.setdefault(key, []).append((v, v.stat(), m.group(2), m.group(3)))
 
         images = []
-        for v, v_stat in sorted(images_with_stat, key=lambda x: x[1].st_mtime, reverse=True):
-            no_bg = v.with_name(v.stem + "_no_bg.png")
-            size = v_stat.st_size
-            ts = datetime.fromtimestamp(v_stat.st_mtime).strftime("%Y-%m-%d %H:%M")
-            no_bg_size, no_bg_url = _opt_stat(no_bg)
-            theme_bytes += size + no_bg_size
-            vw, vh = _dims(v)
+        # Sort groups by the most-recent mtime across all their renders, newest first.
+        for (_concept, _n), renders in sorted(
+            groups.items(),
+            key=lambda kv: max(r[1].st_mtime for r in kv[1]),
+            reverse=True,
+        ):
+            # Within a group: ascending resolution so pills read 512 → 1K → 2K → 4K.
+            renders_sorted = sorted(renders, key=lambda r: (_RES_ORDER.get(r[3], -1), r[2]))
+
+            render_list = []
+            for v, v_stat, ar_safe, res in renders_sorted:
+                no_bg = v.with_name(v.stem + "_no_bg.png")
+                size = v_stat.st_size
+                no_bg_size, no_bg_url = _opt_stat(no_bg)
+                theme_bytes += size + no_bg_size
+                vw, vh = _dims(v)
+                render_list.append({
+                    "url": _url(v),
+                    "size": size,
+                    "no_bg_url": no_bg_url,
+                    "no_bg_size": no_bg_size,
+                    "ar": ar_safe.replace("x", ":"),  # "1x1" → "1:1" for display
+                    "res": res,
+                    "width": vw,
+                    "height": vh,
+                })
+
+            # Representative thumbnail = highest-resolution render (last after sort).
+            rep = render_list[-1]
+            ts = datetime.fromtimestamp(renders_sorted[-1][1].st_mtime).strftime("%Y-%m-%d %H:%M")
             images.append({
-                "url": _url(v),
-                "size": size,
-                "no_bg_url": no_bg_url,
-                "no_bg_size": no_bg_size,
+                "url": rep["url"],
+                "size": rep["size"],
+                "no_bg_url": rep["no_bg_url"],
+                "no_bg_size": rep["no_bg_size"],
                 "ts": ts,
-                "width": vw,
-                "height": vh,
+                "width": rep["width"],
+                "height": rep["height"],
+                "renders": render_list,
             })
 
         if finals or images:

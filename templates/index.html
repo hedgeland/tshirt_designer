@@ -408,12 +408,20 @@
                                                             <p class="text-[10px] text-slate-300 px-1.5 pt-1 leading-tight"
                                                                 x-text="v.width + '×' + v.height"></p>
                                                             <div class="flex gap-1 flex-wrap p-1.5 pt-0.5">
-                                                                <a :href="v.url" download title="Download PNG"
-                                                                    @click.stop
-                                                                    class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-indigo-300 hover:bg-slate-600 transition-colors">⬇</a>
-                                                                <a x-show="v.no_bg_url" :href="v.no_bg_url" download
-                                                                    title="Download no-background version" @click.stop
-                                                                    class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-slate-300 hover:bg-slate-600 transition-colors">no bg</a>
+                                                                <!-- One download pill per render (AR · res), plus no-bg if available -->
+                                                                <template x-for="(r, ri) in (v.renders || [])" :key="ri">
+                                                                    <span class="contents">
+                                                                        <a :href="r.url" download
+                                                                            :title="'Download ' + r.ar + ' ' + r.res"
+                                                                            @click.stop
+                                                                            class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-indigo-300 hover:bg-slate-600 transition-colors"
+                                                                            x-text="r.ar + ' · ' + r.res"></a>
+                                                                        <a x-show="r.no_bg_url" :href="r.no_bg_url" download
+                                                                            :title="'Download ' + r.ar + ' ' + r.res + ' no bg'"
+                                                                            @click.stop
+                                                                            class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-slate-400 hover:bg-slate-600 transition-colors">no bg</a>
+                                                                    </span>
+                                                                </template>
                                                                 <button
                                                                     @click.stop="loadToVariants(v.url, v.width, v.height, theme.theme)"
                                                                     title="Load to active column"
