@@ -665,7 +665,8 @@ async def render_combo(
         if existing_renders:
             smallest_path = min(existing_renders, key=lambda x: x[0])[1]
             try:
-                reference_img = Image.open(smallest_path).copy()
+                with Image.open(smallest_path) as _ref:
+                    reference_img = _ref.copy()
             except Exception:
                 pass
 
@@ -1034,7 +1035,7 @@ async def session_set_reference_image(
     session_id: str = Form(...),
     column_id: int = Form(0),
     reference_path: str = Form(""),
-    reference_file: UploadFile = File(None),
+    reference_file: UploadFile | None = File(None),
 ):
     """Store a reference image in session for use during variant generation.
 
