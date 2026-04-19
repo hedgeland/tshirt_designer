@@ -412,20 +412,12 @@
                                                                 <p class="text-[10px] text-slate-300 px-1.5 pt-1 leading-tight"
                                                                     x-text="v.width + '×' + v.height"></p>
                                                                 <div class="flex gap-1 p-1.5 pt-0.5">
-                                                                    <!-- Single render: ⬇ downloads directly; multiple: toggles popover -->
-                                                                    <template x-if="(v.renders || []).length === 1">
-                                                                        <a :href="(v.renders[0] || v).url" download
-                                                                            @click.stop="$store.downloadedUrls[(v.renders[0] || v).url] = true"
-                                                                            title="Download"
-                                                                            class="text-xs px-1 py-0.5 rounded bg-slate-700/80 hover:bg-emerald-700 transition-colors"
-                                                                            :class="$store.downloadedUrls[(v.renders[0] || v).url] ? 'text-slate-500' : 'text-emerald-300'">⬇</a>
-                                                                    </template>
-                                                                    <template x-if="(v.renders || []).length !== 1">
-                                                                        <button @click.stop="showDl = !showDl"
-                                                                            :class="showDl ? 'bg-emerald-700 text-white' : 'bg-slate-700/80 text-emerald-300 hover:bg-emerald-700'"
-                                                                            title="Download renders"
-                                                                            class="text-xs px-1 py-0.5 rounded transition-colors">⬇</button>
-                                                                    </template>
+                                                                    <a :href="(v.renders||[]).length === 1 ? v.renders[0].url : '#'"
+                                                                        :download="(v.renders||[]).length === 1"
+                                                                        @click.stop="(v.renders||[]).length === 1 ? ($store.downloadedUrls[v.renders[0].url] = true) : ($event.preventDefault(), showDl = !showDl)"
+                                                                        title="Download"
+                                                                        class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-emerald-300 hover:bg-emerald-700 transition-colors"
+                                                                        :class="showDl && (v.renders||[]).length !== 1 ? 'bg-emerald-700 text-white' : (v.renders||[]).length === 1 && $store.downloadedUrls[v.renders[0].url] ? '!text-slate-500' : ''">⬇</a>
                                                                     <button @click.stop="loadToVariants(v.url, v.width, v.height, theme.theme)"
                                                                         title="Load to active column"
                                                                         class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-emerald-300 hover:bg-emerald-700 transition-colors">↑</button>
