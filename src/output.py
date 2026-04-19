@@ -111,8 +111,16 @@ def scan_output() -> list[dict]:
             })
 
         if finals or images:
+            # Dir name format: {text}_{YYYYMMDD}_{HHMMSS} — extract date for display.
+            parts = theme_dir.name.rsplit("_", 2)
+            if len(parts) == 3 and parts[1].isdigit() and len(parts[1]) == 8:
+                d = parts[1]
+                display_name = f"{parts[0]} - {d[4:6]}/{d[6:8]}/{d[2:4]}"
+            else:
+                display_name = theme_dir.name  # fallback for dirs not matching the pattern
+
             themes.append({
-                "theme": theme_dir.name.replace("_", " ").strip(),
+                "theme": display_name,
                 "dir_name": theme_dir.name,
                 "theme_size_bytes": theme_bytes,
                 "finals": finals,
