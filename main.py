@@ -460,15 +460,35 @@ async def generate(
 
         # Save a prompt sidecar alongside the variants; overwritten if user re-generates
         if paths:
+            # Mirror the instruction prefix that generate_image prepends when a reference
+            # image is present, so the sidecar shows the exact text sent to the model.
+            if ref_image is not None:
+                if reference_mode == "copy":
+                    instruction = (
+                        "Use the provided image as a compositional reference — "
+                        "recreate a similar layout, subject placement, and design structure. "
+                        "Apply it to this design: "
+                    )
+                else:
+                    instruction = (
+                        "Use the provided image as a visual style reference only. "
+                        "Do not reproduce its subject matter or composition. "
+                        "Match its color palette, line weight, and graphic aesthetic, "
+                        "then apply that style to this design: "
+                    )
+                full_prompts = [instruction + p for p in prompts]
+            else:
+                full_prompts = prompts
+
             sidecar_path = concept_dir / "prompts.md"
             sidecar = templates.get_template("variant_prompts.md").render(
                 theme=theme,
                 concept=concept.strip(),
-                variant_count=len(prompts),
+                variant_count=len(full_prompts),
                 size=variant_size,
                 aspect_ratio=aspect_ratio,
                 generated=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                prompts=prompts,
+                prompts=full_prompts,
             )
             await asyncio.to_thread(sidecar_path.write_text, sidecar, "utf-8")
 
