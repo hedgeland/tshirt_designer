@@ -391,8 +391,10 @@
                                             <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Variants</p>
                                             <div class="grid grid-cols-4 gap-1.5">
                                                 <template x-for="(v, vi) in theme.images" :key="vi">
-                                                    <!-- Wrapper owns popover state; @click.outside closes it when user clicks away -->
-                                                    <div x-data="{ showDl: false }" class="relative" @click.outside="showDl = false">
+                                                    <!-- Wrapper owns popover state; closes on outside click or Escape -->
+                                                    <div x-data="{ showDl: false }" class="relative"
+                                                        @click.outside="showDl = false"
+                                                        @keydown.escape.window="showDl = false">
                                                         <div class="bg-slate-700 rounded overflow-hidden relative group"
                                                             :class="isSelected(v.url) ? 'ring-2 ring-indigo-400' : ''"
                                                             @click="if (manageMode) toggleFile(v.url, v.size); else if (browserMode === 'reference') setReferenceFromBrowser(v.url)"
@@ -404,16 +406,24 @@
                                                             </div>
                                                             <img :src="v.url" alt=""
                                                                 class="w-full aspect-square object-contain bg-slate-900 block">
-                                                            <!-- Hover action overlay — minimal: download toggle, load, ref -->
+                                                            <!-- Hover action overlay — minimal: download, load, ref -->
                                                             <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto bg-gradient-to-t from-slate-900/95 via-slate-900/50 to-transparent flex flex-col justify-end"
                                                                 :class="(manageMode || browserMode === 'reference') ? '!opacity-0 !pointer-events-none' : ''">
                                                                 <p class="text-[10px] text-slate-300 px-1.5 pt-1 leading-tight"
                                                                     x-text="v.width + '×' + v.height"></p>
                                                                 <div class="flex gap-1 p-1.5 pt-0.5">
-                                                                    <button @click.stop="showDl = !showDl"
-                                                                        :class="showDl ? 'bg-indigo-600 text-white' : 'bg-slate-700/80 text-indigo-300 hover:bg-slate-600'"
-                                                                        title="Download renders"
-                                                                        class="text-xs px-1 py-0.5 rounded transition-colors">⬇</button>
+                                                                    <!-- Single render: ⬇ downloads directly; multiple: toggles popover -->
+                                                                    <template x-if="(v.renders || []).length === 1">
+                                                                        <a :href="(v.renders[0] || v).url" download @click.stop
+                                                                            title="Download"
+                                                                            class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-indigo-300 hover:bg-slate-600 transition-colors">⬇</a>
+                                                                    </template>
+                                                                    <template x-if="(v.renders || []).length !== 1">
+                                                                        <button @click.stop="showDl = !showDl"
+                                                                            :class="showDl ? 'bg-indigo-600 text-white' : 'bg-slate-700/80 text-indigo-300 hover:bg-slate-600'"
+                                                                            title="Download renders"
+                                                                            class="text-xs px-1 py-0.5 rounded transition-colors">⬇</button>
+                                                                    </template>
                                                                     <button @click.stop="loadToVariants(v.url, v.width, v.height, theme.theme)"
                                                                         title="Load to active column"
                                                                         class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-emerald-300 hover:bg-emerald-700 transition-colors">↑</button>
@@ -423,17 +433,17 @@
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <!-- Download popover — outside overflow-hidden so it isn't clipped by the tile -->
+                                                        <!-- Download popover — stays open until Escape or outside click -->
                                                         <div x-show="showDl" x-cloak
                                                             class="absolute bottom-full left-0 mb-1 z-30 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-2 min-w-max">
                                                             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Download</p>
                                                             <template x-for="(r, ri) in (v.renders || [])" :key="ri">
                                                                 <div class="flex items-center gap-1 mb-1 last:mb-0">
-                                                                    <a :href="r.url" download @click.stop="showDl = false"
+                                                                    <a :href="r.url" download @click.stop
                                                                         :title="'Download ' + r.ar + ' ' + r.res"
                                                                         class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-indigo-300 hover:bg-slate-600 transition-colors"
                                                                         x-text="r.ar + ' · ' + r.res"></a>
-                                                                    <a x-show="r.no_bg_url" :href="r.no_bg_url" download @click.stop="showDl = false"
+                                                                    <a x-show="r.no_bg_url" :href="r.no_bg_url" download @click.stop
                                                                         :title="'No-bg ' + r.ar + ' ' + r.res"
                                                                         class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400 hover:bg-slate-600 transition-colors">no bg</a>
                                                                 </div>
