@@ -1113,6 +1113,12 @@ function designer() {
                 this.columns = [{ id: 0, initialState: {} }];
             }
 
+            // After a hard reload the server session is empty, so we may have fewer
+            // columns than minColumns. Pad up to the floor before rendering.
+            while (this.columns.length < this.minColumns) {
+                this.columns.push({ id: this.columns.length, initialState: {} });
+            }
+
             // Publish column count to a global Alpine store so column components can
             // disable the close button reactively without needing parent scope access.
             Alpine.store('columnCount', this.columns.length);
