@@ -77,11 +77,11 @@
         <!-- ── Header ──────────────────────────────────────────────────────────── -->
         <header class="bg-slate-700 border-b border-slate-200 px-5 py-3 flex items-center gap-4 flex-shrink-0">
             <span class="text-xl" aria-hidden="true">👕</span>
-            <div class="flex-1 min-w-0">
+            <div class="min-w-0">
                 <h1 class="text-base font-semibold leading-tight">T-Shirt Design Generator</h1>
                 <p class="text-xs text-slate-300">Brainstorm → Select → Generate · Gemini 3.1 Flash Image Preview</p>
             </div>
-            <!-- Column controls -->
+            <!-- Column controls — immediately right of app name -->
             <div class="flex items-center gap-3 flex-shrink-0">
                 <label class="flex items-center gap-1.5 text-xs text-slate-300">
                     Min columns
@@ -516,7 +516,7 @@
 
                         <!-- ── Per-column settings panel — absolute overlay so it floats over column content ── -->
                         <div x-show="settingsOpen" x-transition @click.outside="settingsOpen = false"
-                            class="absolute left-0 top-[41px] z-20 w-4/5 max-w-sm bg-slate-700/90 border-b border-r border-slate-600 overflow-y-auto backdrop-blur-sm shadow-xl"
+                            class="absolute inset-x-0 mx-auto top-[41px] z-20 w-4/5 max-w-sm bg-slate-700/90 border-b border-x border-slate-600 overflow-y-auto backdrop-blur-sm shadow-xl"
                             style="max-height: 60vh">
                             <div class="p-4 space-y-4">
 
