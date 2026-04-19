@@ -82,41 +82,41 @@ def scan_output() -> list[dict]:
                 "height": h,
             })
 
-        concepts = []
-        for concept_dir in sorted(theme_dir.iterdir(), key=lambda p: p.name):
+        # Collect all variant PNGs from every concept_* subdirectory into a flat list,
+        # newest first — the browser no longer groups by concept.
+        images_with_stat = []
+        for concept_dir in theme_dir.iterdir():
             if not concept_dir.is_dir() or not concept_dir.name.startswith("concept_"):
                 continue
-            variants = []
-            variants_with_stat = [
-                (v, v.stat()) for v in concept_dir.glob("variant_*.png")
-                if "_no_bg" not in v.name
-            ]
-            for v, v_stat in sorted(variants_with_stat, key=lambda x: x[1].st_mtime, reverse=True):
-                no_bg = v.with_name(v.stem + "_no_bg.png")
-                size = v_stat.st_size
-                ts = datetime.fromtimestamp(v_stat.st_mtime).strftime("%Y-%m-%d %H:%M")
-                no_bg_size, no_bg_url = _opt_stat(no_bg)
-                theme_bytes += size + no_bg_size
-                vw, vh = _dims(v)
-                variants.append({
-                    "url": _url(v),
-                    "size": size,
-                    "no_bg_url": no_bg_url,
-                    "no_bg_size": no_bg_size,
-                    "ts": ts,
-                    "width": vw,
-                    "height": vh,
-                })
-            if variants:
-                concepts.append({"name": concept_dir.name.replace("_", " ").title(), "variants": variants})
+            for v in concept_dir.glob("variant_*.png"):
+                if "_no_bg" not in v.name:
+                    images_with_stat.append((v, v.stat()))
 
-        if finals or concepts:
+        images = []
+        for v, v_stat in sorted(images_with_stat, key=lambda x: x[1].st_mtime, reverse=True):
+            no_bg = v.with_name(v.stem + "_no_bg.png")
+            size = v_stat.st_size
+            ts = datetime.fromtimestamp(v_stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+            no_bg_size, no_bg_url = _opt_stat(no_bg)
+            theme_bytes += size + no_bg_size
+            vw, vh = _dims(v)
+            images.append({
+                "url": _url(v),
+                "size": size,
+                "no_bg_url": no_bg_url,
+                "no_bg_size": no_bg_size,
+                "ts": ts,
+                "width": vw,
+                "height": vh,
+            })
+
+        if finals or images:
             themes.append({
                 "theme": theme_dir.name.replace("_", " ").strip(),
                 "dir_name": theme_dir.name,
                 "theme_size_bytes": theme_bytes,
                 "finals": finals,
-                "concepts": concepts,
+                "images": images,
             })
 
     return themes

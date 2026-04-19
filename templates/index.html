@@ -385,17 +385,12 @@
                                         </div>
                                     </template>
 
-                                    <!-- Concepts -->
-                                    <template x-for="(concept, ci) in theme.concepts" :key="ci">
+                                    <!-- Variants (flat — all concept subdirs merged, newest first) -->
+                                    <template x-if="theme.images && theme.images.length > 0">
                                         <div>
-                                            <button @click="concept.expanded = !concept.expanded"
-                                                :aria-expanded="concept.expanded"
-                                                class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 hover:text-slate-200 transition-colors">
-                                                <span aria-hidden="true" x-text="concept.expanded ? '▼' : '▶'"></span>
-                                                <span x-text="`${concept.name} (${concept.variants.length})`"></span>
-                                            </button>
-                                            <div x-show="concept.expanded" class="grid grid-cols-4 gap-1.5">
-                                                <template x-for="(v, vi) in concept.variants" :key="vi">
+                                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Variants</p>
+                                            <div class="grid grid-cols-4 gap-1.5">
+                                                <template x-for="(v, vi) in theme.images" :key="vi">
                                                     <div class="bg-slate-700 rounded overflow-hidden relative group"
                                                         :class="isSelected(v.url) ? 'ring-2 ring-indigo-400' : ''"
                                                         @click="if (manageMode) toggleFile(v.url, v.size); else if (browserMode === 'reference') setReferenceFromBrowser(v.url)"
@@ -403,8 +398,7 @@
                                                         <!-- Manage-mode selection overlay -->
                                                         <div x-show="manageMode && isSelected(v.url)"
                                                             class="absolute inset-0 z-10 bg-indigo-500/30 flex items-center justify-center pointer-events-none">
-                                                            <span
-                                                                class="text-white text-2xl drop-shadow-lg font-bold">✓</span>
+                                                            <span class="text-white text-2xl drop-shadow-lg font-bold">✓</span>
                                                         </div>
                                                         <img :src="v.url" alt=""
                                                             class="w-full aspect-square object-contain bg-slate-900 block">
@@ -419,8 +413,7 @@
                                                                     class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-indigo-300 hover:bg-slate-600 transition-colors">⬇</a>
                                                                 <a x-show="v.no_bg_url" :href="v.no_bg_url" download
                                                                     title="Download no-background version" @click.stop
-                                                                    class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-slate-300 hover:bg-slate-600 transition-colors">no
-                                                                    bg</a>
+                                                                    class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-slate-300 hover:bg-slate-600 transition-colors">no bg</a>
                                                                 <button
                                                                     @click.stop="loadToVariants(v.url, v.width, v.height, theme.theme)"
                                                                     title="Load to active column"

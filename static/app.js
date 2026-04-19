@@ -1289,7 +1289,6 @@ function designer() {
                 this.browserThemes = data.map((t, ti) => ({
                     ...t,
                     expanded: ti === 0,
-                    concepts: t.concepts.map(c => ({ ...c, expanded: false })),
                 }));
                 this.storageStats = {
                     totalBytes: data.reduce((s, t) => s + t.theme_size_bytes, 0),
@@ -1332,10 +1331,10 @@ function designer() {
                 files.push([f.png_url, f.png_size]);
                 if (f.no_bg_url) files.push([f.no_bg_url, f.no_bg_size]);
             });
-            theme.concepts.forEach(c => c.variants.forEach(v => {
+            (theme.images || []).forEach(v => {
                 files.push([v.url, v.size]);
                 if (v.no_bg_url) files.push([v.no_bg_url, v.no_bg_size]);
-            }));
+            });
             return files;
         },
 
