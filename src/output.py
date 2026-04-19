@@ -115,7 +115,8 @@ def scan_output() -> list[dict]:
             parts = theme_dir.name.rsplit("_", 2)
             if len(parts) == 3 and parts[1].isdigit() and len(parts[1]) == 8:
                 d = parts[1]
-                display_name = f"{parts[0]} - {d[4:6]}/{d[6:8]}/{d[2:4]}"
+                t = parts[2]
+                display_name = f"{parts[0]} - {d[4:6]}/{d[6:8]}/{d[2:4]} {t[0:2]}:{t[2:4]}:{t[4:6]}"
             else:
                 display_name = theme_dir.name  # fallback for dirs not matching the pattern
 
