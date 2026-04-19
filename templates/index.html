@@ -417,7 +417,7 @@
                                                                         @click.stop="(v.renders||[]).length === 1 ? ($store.downloadedUrls[v.renders[0].url] = true) : ($event.preventDefault(), showDl = !showDl)"
                                                                         title="Download"
                                                                         class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-emerald-300 hover:bg-emerald-700 transition-colors"
-                                                                        :class="showDl && (v.renders||[]).length !== 1 ? 'bg-emerald-700 text-white' : (v.renders||[]).length === 1 && $store.downloadedUrls[v.renders[0].url] ? '!text-slate-500' : ''">↓</a>
+                                                                        :class="showDl && (v.renders||[]).length !== 1 ? 'bg-emerald-700 text-white' : (v.renders||[]).every(r => $store.downloadedUrls[r.url]) ? '!text-slate-500' : ''">↓</a>
                                                                     <button @click.stop="loadToVariants(v.url, v.width, v.height, theme.theme)"
                                                                         title="Load to active column"
                                                                         class="text-xs px-1 py-0.5 rounded bg-slate-700/80 text-emerald-300 hover:bg-emerald-700 transition-colors">↑</button>
