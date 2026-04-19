@@ -1168,7 +1168,7 @@ function designer() {
         // Rebuilds the columns array from the server's compacted response so indices
         // stay in sync after the gap is closed.
         async closeColumn(colIdx) {
-            if (this.columns.length <= this.minColumns) return; // guard — button should already be disabled
+            if (this.columns.length <= 1) return; // guard — can't close the last column
             // Read live Alpine state from the column DOM to decide whether to confirm
             const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
             const colData = el?._x_dataStack?.[0];
@@ -1187,6 +1187,16 @@ function designer() {
             // starting at 0; _restoreInitialState in each columnDesigner handles the re-mount.
             this.columns = data.columns.map((state, i) => ({ id: i, initialState: state }));
             Alpine.store('columnCount', this.columns.length);
+            // If closing dropped below the minColumns floor, lower it to match so the
+            // preference doesn't re-add the column on next load.
+            if (this.columns.length < this.minColumns) {
+                this.minColumns = this.columns.length;
+                localStorage.setItem('designer_min_columns', this.minColumns);
+                const fd2 = new FormData();
+                fd2.append("session_id", this.sessionId);
+                fd2.append("min_columns", this.minColumns);
+                fetch("/session/min-columns", { method: "POST", body: fd2 });
+            }
         },
 
         // Persist the user's max-columns preference to the server; trims excess columns.

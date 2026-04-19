@@ -504,10 +504,10 @@
                                 <span aria-hidden="true">📁</span>
                             </button>
                             <!-- Close column button — disabled while loading or when it's the only column -->
-                            <button @click="requestClose()" :disabled="isLoading || $store.columnCount <= $store.minColumns"
+                            <button @click="requestClose()" :disabled="isLoading || $store.columnCount <= 1"
                                 title="Close column"
                                 class="flex items-center justify-center w-6 h-6 text-sm rounded transition-colors"
-                                :class="(isLoading || $store.columnCount <= $store.minColumns)
+                                :class="(isLoading || $store.columnCount <= 1)
                                     ? 'text-slate-600 cursor-not-allowed'
                                     : 'text-slate-400 hover:text-red-400 hover:bg-slate-600'">
                                 ×
