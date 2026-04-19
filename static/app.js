@@ -1078,6 +1078,25 @@ function designer() {
                     // Clamp to the configured hard cap in case server state differs
                     this.maxColumns = data.max_columns ?? cfg.maxColumns;
                     this.minColumns = data.min_columns ?? 1;
+
+                    // Override with localStorage values when they exist — they survive new
+                    // tabs and server restarts, whereas the server session resets to defaults.
+                    const lsMax = parseInt(localStorage.getItem('designer_max_columns'), 10);
+                    const lsMin = parseInt(localStorage.getItem('designer_min_columns'), 10);
+                    if (!isNaN(lsMax)) {
+                        this.maxColumns = Math.max(1, Math.min(lsMax, cfg.maxColumns));
+                        const fdMax = new FormData();
+                        fdMax.append("session_id", this.sessionId);
+                        fdMax.append("max_columns", this.maxColumns);
+                        fetch("/session/max-columns", { method: "POST", body: fdMax });
+                    }
+                    if (!isNaN(lsMin)) {
+                        this.minColumns = Math.max(1, Math.min(lsMin, this.maxColumns));
+                        const fdMin = new FormData();
+                        fdMin.append("session_id", this.sessionId);
+                        fdMin.append("min_columns", this.minColumns);
+                        fetch("/session/min-columns", { method: "POST", body: fdMin });
+                    }
                     Alpine.store('minColumns', this.minColumns);
                     // Re-create the column list from persisted server state; each entry
                     // carries its initialState so columnDesigner can restore the workflow step.
@@ -1208,6 +1227,7 @@ function designer() {
             fd.append("session_id", this.sessionId);
             fd.append("max_columns", this.maxColumns);
             await fetch("/session/max-columns", { method: "POST", body: fd });
+            localStorage.setItem('designer_max_columns', this.maxColumns);
         },
 
         // Persist the user's min-columns floor to the server
@@ -1216,6 +1236,7 @@ function designer() {
             fd.append("session_id", this.sessionId);
             fd.append("min_columns", this.minColumns);
             await fetch("/session/min-columns", { method: "POST", body: fd });
+            localStorage.setItem('designer_min_columns', this.minColumns);
             // Bring column count up to the new floor if needed
             while (this.columns.length < this.minColumns) {
                 await this.addColumn();
