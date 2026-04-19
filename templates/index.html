@@ -488,8 +488,7 @@
                     <!-- Each column is a fully independent Alpine component with its own workflow state -->
                     <div x-data="columnDesigner(col.id, sessionId, cfg, col.initialState || {})" :data-col-idx="col.id"
                         @click.capture="Alpine.store('activeColIdx', colIdx)"
-                        class="min-w-[480px] flex-1 flex flex-col border-r border-slate-600 last:border-r-0 overflow-hidden relative"
-                        :class="$store.activeColIdx === colIdx ? 'bg-indigo-950' : 'bg-slate-800'">
+                        class="min-w-[480px] flex-1 flex flex-col border-r border-slate-600 last:border-r-0 overflow-hidden bg-slate-800 relative">
 
                         <!-- Column header — highlighted when this column is the active browser target -->
                         <div class="border-b border-slate-600 px-3 py-2 flex items-center gap-2 flex-shrink-0 transition-colors"
