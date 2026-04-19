@@ -10,6 +10,8 @@ document.addEventListener('alpine:init', () => {
     // Tracks which column was last clicked — drives the active-column visual
     Alpine.store('activeColIdx', 0);
     Alpine.store('presetsOpen', false);
+    // Tracks which image URLs were downloaded this browser session; cleared on close.
+    Alpine.store('downloadedUrls', {});
 });
 
 
@@ -1137,7 +1139,10 @@ function designer() {
 
             // Keep browserOpen store in sync — column headers combine it with activeColIdx
             // to highlight the active column whenever the browser is open.
-            this.$watch('showBrowser', (v) => Alpine.store('browserOpen', v));
+            this.$watch('showBrowser', (v) => {
+                Alpine.store('browserOpen', v);
+                if (!v) Alpine.store('downloadedUrls', {}); // reset on close
+            });
             this.$watch('showPresetsPanel', (v) => Alpine.store('presetsOpen', v));
             this.$watch('minColumns', (v) => Alpine.store('minColumns', v));
         },
