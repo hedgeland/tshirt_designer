@@ -247,7 +247,7 @@
                         <button @click="reloadBrowser()" :disabled="browserLoading" aria-label="Refresh output browser"
                             title="Refresh"
                             class="text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-colors text-xs px-1.5">↺</button>
-                        <button @click="closeBrowser()" aria-label="Close output browser"
+                        <button @click="browserPinned = false; showBrowser = false; browserMode = null" aria-label="Close output browser"
                             title="Close"
                             class="text-slate-400 hover:text-slate-200 transition-colors text-lg leading-none">✕</button>
                     </div>
