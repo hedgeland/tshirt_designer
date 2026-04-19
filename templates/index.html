@@ -202,11 +202,11 @@
             </div><!-- /presets wrapper -->
 
             <!-- ── Output Browser — right-side panel ──────────────────────────── -->
-            <div x-data="{ browserPinned: false }"
-                class="absolute top-0 right-0 h-full z-20 overflow-hidden opacity-95 transition-[width] duration-200"
+            <div class="absolute top-0 right-0 h-full z-20 overflow-hidden opacity-95 transition-[width] duration-200"
                 :style="`width: ${showBrowser ? 500 : 30}px`"
                 @mouseenter="showBrowser = true; if (browserThemes.length === 0) reloadBrowser()"
-                @mouseleave="if (!browserPinned && $event.clientX < window.innerWidth - 1) { showBrowser = false; browserMode = null }">
+                @click.outside="closeBrowser()"
+                @keydown.escape.window="closeBrowser()">
 
                 <!-- Tab handle -->
                 <div class="absolute top-1/2 -translate-y-1/2 w-5 h-14 bg-slate-700 border border-r-0 border-slate-600 rounded-l-lg flex items-center justify-center cursor-pointer opacity-95 z-10"
@@ -247,7 +247,7 @@
                         <button @click="reloadBrowser()" :disabled="browserLoading" aria-label="Refresh output browser"
                             title="Refresh"
                             class="text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-colors text-xs px-1.5">↺</button>
-                        <button @click="showBrowser = false; browserMode = null" aria-label="Close output browser"
+                        <button @click="closeBrowser()" aria-label="Close output browser"
                             title="Close"
                             class="text-slate-400 hover:text-slate-200 transition-colors text-lg leading-none">✕</button>
                     </div>

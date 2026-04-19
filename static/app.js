@@ -1018,6 +1018,7 @@ function designer() {
 
         // ── Output browser ────────────────────────────────────────────────
         showBrowser: false,
+        browserPinned: false,   // when true, no close trigger works until unpinned first
         browserMode: null,      // null = normal, "reference" = picking a reference image
         browserTargetColIdx: 0, // which column's button triggered this browser open
         browserThemes: [],
@@ -1264,10 +1265,17 @@ function designer() {
         },
 
         // ── Output browser ─────────────────────────────────────────────────
+        closeBrowser() {
+            // No-op while pinned — user must unpin first.
+            if (this.browserPinned) return;
+            this.showBrowser = false;
+            this.browserMode = null;
+        },
+
         openBrowser(colIdx) {
             // Toggle closed if this column's browser button is clicked while already open
             if (this.showBrowser && this.browserMode === null && this.browserTargetColIdx === (colIdx ?? 0)) {
-                this.showBrowser = false;
+                this.closeBrowser();
                 return;
             }
             this.browserMode = null;
@@ -1428,7 +1436,7 @@ function designer() {
             window.dispatchEvent(new CustomEvent('col-load-image', {
                 detail: { colIdx: Alpine.store('activeColIdx'), url, width, height, displayTheme },
             }));
-            this.showBrowser = false;
+            this.closeBrowser();
         },
 
         // Dispatch a set-reference event to the currently active column
@@ -1436,7 +1444,7 @@ function designer() {
             window.dispatchEvent(new CustomEvent('col-set-reference', {
                 detail: { colIdx: Alpine.store('activeColIdx'), imageUrl },
             }));
-            this.showBrowser = false;
+            this.closeBrowser();
         },
 
         // ── Presets panel actions ──────────────────────────────────────────
