@@ -127,9 +127,10 @@ def scan_output() -> list[dict]:
                     "height": vh,
                 })
 
-            # Representative thumbnail = highest-resolution render (last after sort).
-            rep = render_list[-1]
-            ts = datetime.fromtimestamp(renders_sorted[-1][1].st_mtime).strftime("%Y-%m-%d %H:%M")
+            # Representative thumbnail = lowest-resolution render (first after sort) — smallest
+            # file size loads fastest in the browser grid.
+            rep = render_list[0]
+            ts = datetime.fromtimestamp(renders_sorted[0][1].st_mtime).strftime("%Y-%m-%d %H:%M")
             images.append({
                 "url": rep["url"],
                 "size": rep["size"],
