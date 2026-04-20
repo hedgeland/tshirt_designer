@@ -576,7 +576,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             fd.append("variant_size", this.variantSize);
             fd.append("reference_mode", this.referenceMode);
             fd.append("direct_mode", this.directMode);
-            fd.append("theme", this.theme.trim());
+            fd.append("theme_form", this.theme.trim());
 
             await streamSSE("/generate", fd, {
                 status: (e) => { this.loadingMsg = e.message; },

@@ -389,7 +389,7 @@ async def generate(
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
     reference_mode: str = Form("style"),
     direct_mode: bool = Form(False),
-    theme: str = Form(""),  # sent by client; used to seed session theme when brainstorm was skipped
+    theme_form: str = Form(""),  # sent by client; used to seed session theme when brainstorm was skipped
 ):
     async def stream():
         if not GOOGLE_API_KEY:
@@ -456,19 +456,18 @@ async def generate(
 
         # Use original_concept to find which concept slot to save into
         concepts = session.get("concepts", [])
-        # In direct mode the client sends theme as a form field; fall back to session theme
+        # In direct mode the client sends theme_form; fall back to session theme
         # (set by /brainstorm) so the output dir always has a meaningful name.
-        resolved_theme = session.get("theme", "") or theme.strip() or "unknown"
+        active_theme = session.get("theme", "") or theme_form.strip() or "unknown"
         if not session.get("theme"):
-            session["theme"] = resolved_theme
-        theme = resolved_theme
+            session["theme"] = active_theme
         try:
             concept_idx = concepts.index(original_concept.strip())
         except ValueError:
             concept_idx = 0
 
         paths, concept_dir = await asyncio.to_thread(
-            save_variants, theme, concept_idx, images, aspect_ratio, variant_size
+            save_variants, active_theme, concept_idx, images, aspect_ratio, variant_size
         )
 
         # Save a prompt sidecar alongside the variants; overwritten if user re-generates
@@ -495,7 +494,7 @@ async def generate(
 
             sidecar_path = concept_dir / "prompts.md"
             sidecar = templates.get_template("variant_prompts.md").render(
-                theme=theme,
+                theme=active_theme,
                 concept=concept.strip(),
                 variant_count=len(full_prompts),
                 size=variant_size,
