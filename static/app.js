@@ -657,7 +657,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             const sourceUrl = sourceVariant.origUrl || sourceVariant.url;
 
             this.loadingStep = 4;
-            this._startLoading(`Applying edits at ${this.editSize} (${this.editAspectRatio})...`);
+            this._startLoading(`Generating iteration at ${this.editSize} (${this.editAspectRatio})...`);
 
             // Compute rootIdx here so it can be sent to the server for persistence
             const parentIdx = this.selectedVariant ?? 0;

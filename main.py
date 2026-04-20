@@ -791,7 +791,7 @@ async def edit_variant(
         ar_safe = aspect_ratio.replace(":", "x")
         save_path = concept_dir / f"variant_{next_variant_num}_{ar_safe}_{size}.png"
 
-        yield sse({"type": "status", "message": f"Applying edits at {size} ({aspect_ratio})..."})
+        yield sse({"type": "status", "message": f"Generating iteration at {size} ({aspect_ratio})..."})
 
         try:
             source_img = await asyncio.to_thread(lambda: Image.open(str(source_path)).copy())
