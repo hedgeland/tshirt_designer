@@ -1024,17 +1024,12 @@
                                                 </template>
                                             </div>
 
-                                            <!-- Active combo actions — download, Printify, and BG removal all in one row -->
+                                            <!-- Active combo actions — download and BG removal -->
                                             <div x-show="activeComboUrl" class="flex gap-2 flex-wrap items-center">
                                                 <a :href="activeComboUrl" download
                                                     :title="`Download ${activeComboSize} PNG`"
                                                     class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                                                     x-text="`⬇ ${activeComboSize} PNG`"></a>
-                                                <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                                    :disabled="isLoading || (pNeedsUpscale && !pOverrideMinRes)"
-                                                    x-text="(pNeedsUpscale && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
-                                                    :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                                                    class="px-3 py-1.5 text-white text-xs font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
                                                 <!-- Remove BG when bg hasn't been stripped yet -->
                                                 <button @click="doRemoveVariantBg()" :disabled="isLoading"
                                                     x-show="!activeComboObj?.origUrl"
@@ -1052,12 +1047,25 @@
                                             </div>
 
                                             <!-- ── Iterative edit controls ───────────────────────── -->
-                                            <!-- Edit prompt targets the currently selected variant; result is appended as a new variant -->
+                                            <!-- Edit prompt — size/aspect are independent from the render combo settings -->
                                             <div class="flex flex-col gap-2 border-t border-slate-600 pt-3">
-                                                <span class="text-xs text-slate-400">Edit variant
-                                                    <span x-text="(selectedVariant ?? 0) + 1"></span>
-                                                    at <span x-text="renderSize"></span> · <span x-text="aspectRatio"></span>:
-                                                </span>
+                                                <div class="flex gap-2 flex-wrap items-center">
+                                                    <span class="text-xs text-slate-400">Edit variant
+                                                        <span x-text="(selectedVariant ?? 0) + 1"></span>:
+                                                    </span>
+                                                    <select x-model="editAspectRatio"
+                                                        class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                        <template x-for="r in cfg.aspectRatios" :key="r">
+                                                            <option :value="r" x-text="r"></option>
+                                                        </template>
+                                                    </select>
+                                                    <select @change="editSize = $event.target.value"
+                                                        class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                                                        <template x-for="s in cfg.finalSizes" :key="s">
+                                                            <option :value="s" :selected="s === editSize" x-text="s"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
                                                 <textarea x-model="editPrompt" rows="2"
                                                     placeholder="Describe your changes (e.g. make the wings gold, remove the border)"
                                                     :disabled="isLoading"
@@ -1104,6 +1112,12 @@
                                                         ? `✨ ${renderSize} · ${aspectRatio} — already rendered`
                                                         : `✨ Render at ${renderSize}`"
                                                     class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                                <!-- Publish button lives here — render at the right size first, then publish -->
+                                                <button x-show="cfg.printifyEnabled" @click="openPrintify()"
+                                                    :disabled="isLoading || (pNeedsUpscale && !pOverrideMinRes)"
+                                                    x-text="(pNeedsUpscale && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
+                                                    :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                                                    class="px-3 py-1.5 text-white text-xs font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
                                             </div>
 
                                             <div x-show="cfg.printifyEnabled">

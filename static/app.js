@@ -115,7 +115,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         variantSize: cfg.defaultVariantSize,
         generatedVariantSize: null,        // set when variants arrive; drives step-4 title badge
         generatedVariantAspectRatio: null, // aspect ratio used when variants were generated
-        renderSize: cfg.defaultFinalSize,  // size picker for rendering new combos in step 4
+        renderSize: cfg.defaultFinalSize,  // size picker for rendering new combos / publishing
+        editSize: cfg.defaultFinalSize,    // size for iterative edits — independent of render combo settings
+        editAspectRatio: cfg.defaultAspectRatio, // aspect ratio for edits — independent of render combo settings
 
         // ── Unified render state ───────────────────────────────────────────
         // variantCombos[i] = [{size, aspectRatio, url}] for all renders of variant i.
@@ -633,15 +635,15 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             const sourceUrl = sourceVariant.origUrl || sourceVariant.url;
 
             this.loadingStep = 4;
-            this._startLoading(`Applying edits at ${this.renderSize} (${this.aspectRatio})...`);
+            this._startLoading(`Applying edits at ${this.editSize} (${this.editAspectRatio})...`);
 
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
             fd.append("column_id", this.colIdx);
             fd.append("source_url", sourceUrl);
             fd.append("edit_prompt", this.editPrompt.trim());
-            fd.append("size", this.renderSize);
-            fd.append("aspect_ratio", this.aspectRatio);
+            fd.append("size", this.editSize);
+            fd.append("aspect_ratio", this.editAspectRatio);
 
             await streamSSE("/stream/edit", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
