@@ -1439,18 +1439,18 @@
                                                                  cursor: pDrag ? 'grabbing' : 'grab',
                                                              }">
                                                     </div>
-                                                    <p :class="pImageOutOfBounds ? 'visible' : 'invisible'" role="alert"
-                                                        class="mt-1.5 text-xs font-semibold text-red-600">
-                                                        <span aria-hidden="true">⚠</span> Image outside of print area!
-                                                    </p>
-                                                    <!-- Resolution + aspect ratio — red/bold with ! when below 4K -->
-                                                    <p class="mt-1 text-xs"
-                                                        :class="activeComboSize && cfg.sizePx[activeComboSize] < cfg.sizePx['4K'] ? 'text-red-600 font-bold' : 'text-slate-500'"
+                                                    <!-- Resolution + aspect ratio — centered under preview; red when below 4K -->
+                                                    <p class="mt-1 text-xs font-bold text-center"
+                                                        :class="activeComboSize && cfg.sizePx[activeComboSize] < cfg.sizePx['4K'] ? 'text-red-600' : 'text-slate-500'"
                                                         x-text="activeComboSize && aspectRatio
                                                             ? (cfg.sizePx[activeComboSize] < cfg.sizePx['4K']
                                                                 ? '! ' + activeComboSize + ' · ' + aspectRatio
                                                                 : activeComboSize + ' · ' + aspectRatio)
                                                             : ''">
+                                                    </p>
+                                                    <p :class="pImageOutOfBounds ? 'visible' : 'invisible'" role="alert"
+                                                        class="mt-1 text-xs font-semibold text-red-600 text-center">
+                                                        <span aria-hidden="true">⚠</span> Image outside of print area!
                                                     </p>
                                                 </div>
 
