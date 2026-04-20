@@ -814,6 +814,7 @@
                                             <div>
                                                 <label class="text-xs block mb-1">Edit concept (optional)</label>
                                                 <textarea x-model="editedConcept" rows="2"
+                                                    @keydown.enter.prevent="doGenerate()"
                                                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
                                             </div>
                                             <!-- Reference image (same controls as Step 1) -->
@@ -1062,8 +1063,7 @@
                                                 <textarea x-model="editPrompt" rows="2"
                                                     placeholder="Describe your changes (e.g. make the wings gold, remove the border)"
                                                     :disabled="isLoading"
-                                                    @keydown.enter.prevent.ctrl="doEditVariant()"
-                                                    @keydown.enter.prevent.meta="doEditVariant()"
+                                                    @keydown.enter.prevent="doEditVariant()"
                                                     class="w-full text-xs rounded-md px-2 py-1.5 border border-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none disabled:opacity-50"></textarea>
                                                 <button @click="doEditVariant()"
                                                     :disabled="isLoading || !editPrompt.trim()"
