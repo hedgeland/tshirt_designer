@@ -541,11 +541,15 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                         const combos = {};
                         e.combo_lists.forEach((list, i) => { combos[i] = list; });
                         this.variantCombos = combos;
-                        // Don't auto-select activeComboUrl — the thumbnail grid already shows
-                        // the generated image; auto-selecting would display it twice and cause
-                        // BG removal to appear broken (combo updates but thumbnail doesn't).
-                        // The user activates a combo by clicking a combo pill.
                     }
+                    // The selectedVariant watcher fires asynchronously after Alpine's reactive
+                    // flush, at which point variantCombos is already populated — so it would
+                    // auto-select the first combo and show the image twice. $nextTick runs after
+                    // the watcher, giving us a chance to clear the auto-selection.
+                    this.$nextTick(() => {
+                        this.activeComboUrl = null;
+                        this.activeComboSize = "";
+                    });
                     this.step = 4;
                     this._stopLoading();
                 },
