@@ -143,12 +143,16 @@ def scan_output() -> list[dict]:
             })
 
         if finals or images:
-            # Dir name format: {text}_{YYYYMMDD}_{HHMMSS} — extract date for display.
+            # Dir name format: {text}_{YYYYMMDD}_{HHMMSS} — extract date and first 3 theme words.
             parts = theme_dir.name.rsplit("_", 2)
             if len(parts) == 3 and parts[1].isdigit() and len(parts[1]) == 8:
                 d = parts[1]
                 t = parts[2]
-                display_name = f"{parts[0]} - {d[4:6]}/{d[6:8]}/{d[2:4]} {t[0:2]}:{t[2:4]}:{t[4:6]}"
+                ts_str = f"{d[4:6]}/{d[6:8]}/{d[2:4]} {t[0:2]}:{t[2:4]}:{t[4:6]}"
+                # Split prefix on underscores, drop empty tokens, take first 3 words
+                words = [w for w in parts[0].split("_") if w][:3]
+                prefix = " ".join(words) if words else parts[0]
+                display_name = f"{prefix} - {ts_str}"
             else:
                 display_name = theme_dir.name  # fallback for dirs not matching the pattern
 
@@ -275,13 +279,17 @@ def load_image_to_session(session: dict, image_url: str, display_theme: str) -> 
 
 
 def safe_theme_name(theme: str) -> str:
-    """Return a short, filesystem-safe directory name: first 10 sanitized chars + YYYYMMDD_HHMMSS."""
+    """Return a filesystem-safe directory name: sanitized theme text + YYYYMMDD_HHMMSS.
+
+    Full theme text is preserved (not truncated) so the browser can extract the
+    first 3 meaningful words for display.  Non-alphanumeric chars become underscores.
+    """
     sanitized = "".join(
         c if c.isalnum() or c in ("-", "_") else "_"
         for c in theme.strip().replace(" ", "_")
     )
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"{sanitized[:10]}_{ts}"
+    return f"{sanitized}_{ts}"
 
 
 def save_variants(
