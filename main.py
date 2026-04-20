@@ -389,6 +389,7 @@ async def generate(
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
     reference_mode: str = Form("style"),
     direct_mode: bool = Form(False),
+    theme: str = Form(""),  # sent by client; used to seed session theme when brainstorm was skipped
 ):
     async def stream():
         if not GOOGLE_API_KEY:
@@ -455,7 +456,12 @@ async def generate(
 
         # Use original_concept to find which concept slot to save into
         concepts = session.get("concepts", [])
-        theme = session.get("theme", "unknown")
+        # In direct mode the client sends theme as a form field; fall back to session theme
+        # (set by /brainstorm) so the output dir always has a meaningful name.
+        resolved_theme = session.get("theme", "") or theme.strip() or "unknown"
+        if not session.get("theme"):
+            session["theme"] = resolved_theme
+        theme = resolved_theme
         try:
             concept_idx = concepts.index(original_concept.strip())
         except ValueError:
