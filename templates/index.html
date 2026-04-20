@@ -938,24 +938,24 @@
                                             <span class="text-slate-400">— finalize at higher resolution to
                                                 upscale</span>
                                         </div>
-                                        <!-- Variant grid — always visible so user can switch variants at any time -->
+                                        <!-- Variant grid — only original (non-iteration) variants; original indices preserved for selectedVariant -->
                                         <div class="grid gap-2" :class="{
-                                     'grid-cols-1 max-w-xs': variants.length === 1,
-                                     'grid-cols-2': variants.length === 2,
-                                     'grid-cols-3': variants.length === 3,
-                                     'grid-cols-4': variants.length >= 4
+                                     'grid-cols-1 max-w-xs': variants.filter(v => !v.isIteration).length === 1,
+                                     'grid-cols-2': variants.filter(v => !v.isIteration).length === 2,
+                                     'grid-cols-3': variants.filter(v => !v.isIteration).length === 3,
+                                     'grid-cols-4': variants.filter(v => !v.isIteration).length >= 4
                                  }">
-                                            <template x-for="(v, i) in variants" :key="i">
-                                                <div @click="selectedVariant = i" role="button" tabindex="0"
-                                                    :aria-pressed="selectedVariant === i"
-                                                    :aria-label="`Variant ${i + 1}${selectedVariant === i ? ', selected' : ', click to select'}`"
-                                                    @keydown.enter.prevent="selectedVariant = i"
-                                                    @keydown.space.prevent="selectedVariant = i"
+                                            <template x-for="v in variants.map((v, i) => ({...v, _origIdx: i})).filter(v => !v.isIteration)" :key="v._origIdx">
+                                                <div @click="selectedVariant = v._origIdx" role="button" tabindex="0"
+                                                    :aria-pressed="selectedVariant === v._origIdx"
+                                                    :aria-label="`Variant ${v._origIdx + 1}${selectedVariant === v._origIdx ? ', selected' : ', click to select'}`"
+                                                    @keydown.enter.prevent="selectedVariant = v._origIdx"
+                                                    @keydown.space.prevent="selectedVariant = v._origIdx"
                                                     class="relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                                    :class="selectedVariant === i ? 'border-indigo-500 shadow-md' : 'border-slate-200 hover:border-slate-300'">
+                                                    :class="selectedVariant === v._origIdx ? 'border-indigo-500 shadow-md' : 'border-slate-200 hover:border-slate-300'">
                                                     <img :src="v.url + '?t=' + v.ts" alt=""
                                                         class="w-full aspect-square object-contain bg-slate-100 block">
-                                                    <div aria-hidden="true" x-show="selectedVariant === i"
+                                                    <div aria-hidden="true" x-show="selectedVariant === v._origIdx"
                                                         class="absolute top-1.5 right-1.5 bg-indigo-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow">
                                                         ✓</div>
                                                     <span x-show="generatedVariantSize"
