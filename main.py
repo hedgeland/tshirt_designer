@@ -126,6 +126,7 @@ _SERIALIZABLE_COLUMN_KEYS = {
     "prompts",
     "variant_size",
     "image_paths",
+    "original_image_paths",  # N original variants; anything beyond this in image_paths is an iteration
     "selected_idx",
     "final_path",
     "concept_dir",  # str path — needed by /render to locate/save variant files after page reload

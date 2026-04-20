@@ -337,12 +337,25 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
             // Restore variant thumbnails from saved paths (PIL images are gone after reload;
             // the static files are still on disk so the URLs remain valid).
+            // original_image_paths holds the N brainstorm variants; anything appended beyond
+            // that count in image_paths is an edit iteration — mark it so it stays out of the
+            // main gallery and shows in the iterations panel instead.
             if (Array.isArray(state.image_paths) && state.image_paths.length) {
-                this.variants = state.image_paths.map(p => ({
-                    url: "/" + p.replace(/^\//, ""), origUrl: "/" + p.replace(/^\//, ""), noBgUrl: null, ts: 0,
+                const origCount = Array.isArray(state.original_image_paths)
+                    ? state.original_image_paths.length
+                    : state.image_paths.length;  // fallback: treat all as originals (old sessions)
+                this.variants = state.image_paths.map((p, i) => ({
+                    url: "/" + p.replace(/^\//, ""),
+                    origUrl: "/" + p.replace(/^\//, ""),
+                    noBgUrl: null,
+                    ts: i >= origCount ? 1 : 0,  // non-zero ts so iterations render in the list
+                    isIteration: i >= origCount,
+                    rootIdx: i >= origCount ? Math.max(0, origCount - 1) : undefined,
                 }));
                 if (state.selected_idx != null) this.selectedVariant = state.selected_idx;
                 if (state.variant_size) this.generatedVariantSize = state.variant_size;
+                // Re-enable edit mode if iterations exist so the iterations panel is visible
+                if (state.image_paths.length > origCount) this.editModeActive = true;
             }
 
             // Advance the step indicator to match the most progressed phase (4 is the max)
