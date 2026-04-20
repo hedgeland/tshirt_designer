@@ -975,11 +975,11 @@
                                                     alt="Latest edit result"
                                                     class="w-full aspect-square object-contain rounded-lg border border-slate-500 bg-slate-100 block">
                                             </div>
-                                            <!-- Scrollable history of previous variants, newest first -->
+                                            <!-- All variants sorted newest-first; clicking any selects it as the active image -->
                                             <div class="w-40 flex-shrink-0">
-                                                <p class="text-xs text-slate-400 mb-1.5 font-medium">Previous</p>
+                                                <p class="text-xs text-slate-400 mb-1.5 font-medium">Iterations</p>
                                                 <ul class="space-y-1.5 overflow-y-auto max-h-64 pr-1">
-                                                    <template x-for="h in editHistory" :key="h.url">
+                                                    <template x-for="h in [...variants].sort((a, b) => b.ts - a.ts)" :key="h.url">
                                                         <li>
                                                             <button @click="selectedVariant = variants.findIndex(v => v.url === h.url)"
                                                                 :class="variants[selectedVariant]?.url === h.url ? 'text-white font-semibold' : 'text-indigo-300 hover:text-indigo-100'"
