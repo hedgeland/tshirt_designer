@@ -1481,6 +1481,7 @@
                                                         </div>
                                                         <img :src="(activeComboUrl || selectedVariantObj?.url) ? (activeComboUrl || selectedVariantObj?.url) : ''"
                                                             alt="Design placement preview" tabindex="0"
+                                                            draggable="false"
                                                             title="Drag to reposition — or use arrow keys (Shift for 10px steps)"
                                                             @mousedown.prevent="startDrag($event)"
                                                             @keydown.arrow-left.prevent="nudgeDrag(-1, 0)"
