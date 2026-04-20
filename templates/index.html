@@ -1007,8 +1007,8 @@
 
                                             <!-- Active combo image + actions -->
                                             <div x-show="activeComboUrl" class="space-y-2">
-                                                <!-- Wrap image in relative container so the label can be positioned over it -->
-                                                <div class="relative inline-block max-w-xs w-full">
+                                                <!-- Hide the image in edit mode — the edit layout already shows the variant above -->
+                                                <div x-show="!editModeActive" class="relative inline-block max-w-xs w-full">
                                                     <img :src="activeComboUrl" alt="Active render"
                                                         class="w-full rounded-lg border border-slate-200 bg-slate-100 block">
                                                     <span x-show="activeComboSize"
