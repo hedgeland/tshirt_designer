@@ -667,16 +667,21 @@
                                         <!-- Theme textarea — full width -->
                                         <label :for="'theme-input-' + col.id" class="sr-only">Design theme</label>
                                         <textarea :id="'theme-input-' + col.id" x-model="theme" x-ref="themeInput"
-                                            @keydown.enter.prevent="doBrainstorm()" @focus="$el.select()" rows="2"
+                                            @keydown.enter.prevent="doGenerateDirect()" @focus="$el.select()" rows="2"
                                             placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
                                             class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"></textarea>
 
                                         <!-- Action row: Brainstorm + Direct on left, reference image controls on right -->
                                         <div class="flex items-center gap-2 flex-wrap">
-                                            <!-- Generate buttons -->
+                                            <!-- Generate buttons — Go Direct is default (Enter key) -->
+                                            <button @click="doGenerateDirect()" :disabled="isLoading || !theme.trim()"
+                                                title="Generate image variants from prompt as is, skip the brainstorming"
+                                                class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                <span aria-hidden="true">🎨</span> Go Direct!
+                                            </button>
                                             <button @click="doBrainstorm()" :disabled="isLoading || !theme.trim()"
                                                 title="Create prompts from your theme"
-                                                class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                                 <svg x-show="isLoading && loadingStep === 1" aria-hidden="true"
                                                     class="animate-spin h-3 w-3 flex-shrink-0" fill="none"
                                                     viewBox="0 0 24 24">
@@ -686,11 +691,6 @@
                                                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                                 </svg>
                                                 <span aria-hidden="true">🧠</span> Brainstorm
-                                            </button>
-                                            <button @click="doGenerateDirect()" :disabled="isLoading || !theme.trim()"
-                                                title="Generate image variants from prompt as is, skip the brainstorming"
-                                                class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                <span aria-hidden="true">🎨</span> Go Direct!
                                             </button>
 
                                             <div class="flex-1"></div>
