@@ -344,14 +344,19 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 const origCount = Array.isArray(state.original_image_paths)
                     ? state.original_image_paths.length
                     : state.image_paths.length;  // fallback: treat all as originals (old sessions)
-                this.variants = state.image_paths.map((p, i) => ({
-                    url: "/" + p.replace(/^\//, ""),
-                    origUrl: "/" + p.replace(/^\//, ""),
-                    noBgUrl: null,
-                    ts: i >= origCount ? 1 : 0,  // non-zero ts so iterations render in the list
-                    isIteration: i >= origCount,
-                    rootIdx: i >= origCount ? Math.max(0, origCount - 1) : undefined,
-                }));
+                // iteration_roots[j] is the rootIdx for the j-th iteration (0-based among iterations only)
+                const iterRoots = Array.isArray(state.iteration_roots) ? state.iteration_roots : [];
+                this.variants = state.image_paths.map((p, i) => {
+                    const isIter = i >= origCount;
+                    return {
+                        url: "/" + p.replace(/^\//, ""),
+                        origUrl: "/" + p.replace(/^\//, ""),
+                        noBgUrl: null,
+                        ts: isIter ? 1 : 0,  // non-zero so iterations render in the list
+                        isIteration: isIter,
+                        rootIdx: isIter ? (iterRoots[i - origCount] ?? Math.max(0, origCount - 1)) : undefined,
+                    };
+                });
                 if (state.selected_idx != null) this.selectedVariant = state.selected_idx;
                 if (state.variant_size) this.generatedVariantSize = state.variant_size;
                 // Re-enable edit mode if iterations exist so the iterations panel is visible
@@ -653,6 +658,11 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.loadingStep = 4;
             this._startLoading(`Applying edits at ${this.editSize} (${this.editAspectRatio})...`);
 
+            // Compute rootIdx here so it can be sent to the server for persistence
+            const parentIdx = this.selectedVariant ?? 0;
+            const parentVariant = this.variants[parentIdx];
+            const rootIdx = parentVariant?.isIteration ? parentVariant.rootIdx : parentIdx;
+
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
             fd.append("column_id", this.colIdx);
@@ -660,6 +670,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             fd.append("edit_prompt", this.editPrompt.trim());
             fd.append("size", this.editSize);
             fd.append("aspect_ratio", this.editAspectRatio);
+            fd.append("root_idx", rootIdx);
 
             await streamSSE("/stream/edit", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
@@ -667,11 +678,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     const ts = Date.now();
                     // Append the new variant and auto-select it so the user can immediately
                     // see the result and continue editing or render at a higher resolution.
-                    // parentIdx records the direct parent; rootIdx traces to the non-iteration
-                    // ancestor so the full edit chain is always visible when the original is selected.
-                    const parentIdx = this.selectedVariant ?? 0;
-                    const parentVariant = this.variants[parentIdx];
-                    const rootIdx = parentVariant?.isIteration ? parentVariant.rootIdx : parentIdx;
+                    // rootIdx was computed before the request so the server could persist it.
                     this.variants.push({ url: e.url, origUrl: e.url, noBgUrl: null, ts, parentIdx, rootIdx, isIteration: true });
                     const newIdx = e.index;
                     const updated = { ...this.variantCombos };

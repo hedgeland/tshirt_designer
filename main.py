@@ -127,6 +127,7 @@ _SERIALIZABLE_COLUMN_KEYS = {
     "variant_size",
     "image_paths",
     "original_image_paths",  # N original variants; anything beyond this in image_paths is an iteration
+    "iteration_roots",       # rootIdx for each iteration in order; parallel to image_paths[len(original_image_paths):]
     "selected_idx",
     "final_path",
     "concept_dir",  # str path — needed by /render to locate/save variant files after page reload
@@ -741,6 +742,7 @@ async def edit_variant(
     edit_prompt: str = Form(...),  # user-supplied change description
     size: str = Form(BRAINSTORM_SIZE),
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
+    root_idx: int = Form(0),       # index of the non-iteration ancestor; persisted so reload can restore the chain
 ):
     """Apply iterative edits to an existing variant and append the result as a new variant.
 
@@ -803,10 +805,13 @@ async def edit_variant(
 
         await asyncio.to_thread(edited_img.save, str(save_path), "PNG")
 
-        # Append to session so /render can index into images[] and prompts[] by variant_idx
+        # Append to session so /render can index into images[] and prompts[] by variant_idx.
+        # iteration_roots[j] mirrors the j-th appended iteration's rootIdx so the client
+        # can reconstruct the edit chain correctly after a page reload.
         session.setdefault("images", []).append(edited_img)
         session.setdefault("image_paths", []).append(str(save_path))
         session.setdefault("prompts", []).append(edit_prompt.strip())
+        session.setdefault("iteration_roots", []).append(root_idx)
 
         new_idx = len(session["images"]) - 1
         combos = _scan_variant_combos(concept_dir, next_variant_num)
