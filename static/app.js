@@ -21,8 +21,6 @@ document.addEventListener('alpine:init', () => {
 document.addEventListener('keydown', (e) => {
     if (!e.ctrlKey) return;
     if (e.key !== ']' && e.key !== '[') return;
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     e.preventDefault();
     const count = Alpine.store('columnCount');
     if (count < 2) return; // nothing to cycle when there's only one column
