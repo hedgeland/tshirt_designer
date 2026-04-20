@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
@@ -723,6 +724,88 @@ async def render_combo(
 
         combos = _scan_variant_combos(concept_dir, variant_num)
         yield sse({"type": "render", "url": f"/{target_path}", "combos": combos, "variant_idx": variant_idx})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@app.post("/stream/edit")
+async def edit_variant(
+    session_id: str = Form(...),
+    column_id: int = Form(0),
+    source_url: str = Form(...),   # URL of the variant to edit, e.g. /output/theme/concept_0/variant_1_1x1_512.png
+    edit_prompt: str = Form(...),  # user-supplied change description
+    size: str = Form(BRAINSTORM_SIZE),
+    aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
+):
+    """Apply iterative edits to an existing variant and append the result as a new variant.
+
+    Sends the source image + edit prompt to Gemini with reference_mode="edit" so the model
+    applies only the requested changes while preserving everything else.  The result is saved
+    using the standard variant_N_ARxAR_SIZE.png convention so /render can treat it identically
+    to any brainstorm variant.
+    """
+    async def stream():
+        if not GOOGLE_API_KEY:
+            yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
+            return
+        if not edit_prompt.strip():
+            yield sse({"type": "error", "message": "Enter an edit description."})
+            return
+
+        # Resolve the URL to a disk path by stripping the leading slash
+        source_path = Path(source_url.lstrip("/"))
+        if not source_path.exists():
+            yield sse({"type": "error", "message": f"Source image not found: {source_url}"})
+            return
+
+        session = get_column(session_id, column_id)
+
+        # Determine where to save the result.  Prefer the stored concept_dir (set by /generate);
+        # fall back to the source image's parent directory for browser-loaded images.
+        concept_dir_str = session.get("concept_dir")
+        if concept_dir_str:
+            concept_dir = Path(concept_dir_str)
+        else:
+            concept_dir = source_path.parent
+            # Persist this fallback so /render can find edits on the same run
+            session["concept_dir"] = str(concept_dir)
+
+        concept_dir.mkdir(parents=True, exist_ok=True)
+
+        # Assign the next sequential variant number so the file matches the variant_N_* pattern
+        # that _scan_variant_combos and /render both expect
+        current_image_count = len(session.get("images", []))
+        next_variant_num = current_image_count + 1  # 1-indexed to match existing variant filenames
+        ar_safe = aspect_ratio.replace(":", "x")
+        save_path = concept_dir / f"variant_{next_variant_num}_{ar_safe}_{size}.png"
+
+        yield sse({"type": "status", "message": f"Applying edits at {size} ({aspect_ratio})..."})
+
+        try:
+            source_img = await asyncio.to_thread(lambda: Image.open(str(source_path)).copy())
+            edited_img = await asyncio.to_thread(
+                generate_image,
+                edit_prompt.strip(),
+                GOOGLE_API_KEY,
+                size=size,
+                aspect_ratio=aspect_ratio,
+                reference_image=source_img,
+                reference_mode="edit",
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        await asyncio.to_thread(edited_img.save, str(save_path), "PNG")
+
+        # Append to session so /render can index into images[] and prompts[] by variant_idx
+        session.setdefault("images", []).append(edited_img)
+        session.setdefault("image_paths", []).append(str(save_path))
+        session.setdefault("prompts", []).append(edit_prompt.strip())
+
+        new_idx = len(session["images"]) - 1
+        combos = _scan_variant_combos(concept_dir, next_variant_num)
+        yield sse({"type": "edit_variant", "url": f"/{save_path}", "index": new_idx, "combos": combos})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 

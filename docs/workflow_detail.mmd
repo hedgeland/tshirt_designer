@@ -70,6 +70,9 @@ graph TD
         VariantChoice -- "Undo Remove BG" --> RestoreBGVariant[POST /restore-bg/variant column_id scoped Restore original from session cache]
         RestoreBGVariant --> ComboGallery
 
+        VariantChoice -- "Edit variant" --> EditVariant[POST /stream/edit column_id scoped Load source variant as reference apply edit prompt at chosen size save as variant_N_ARxAR_SIZE.png append to variants list]
+        EditVariant --> ViewVariants
+
         VariantChoice -- "Rerender" --> RerenderVariants([Back to Prompt Building])
         VariantChoice -- "Publish" --> ReadyToPublish([Proceed to Publish])
     end
@@ -133,6 +136,7 @@ graph TD
     style ServeExisting fill:#cfe2ff,stroke:#0d6efd
     style RemoveBGVariant fill:#cfe2ff,stroke:#0d6efd
     style RestoreBGVariant fill:#cfe2ff,stroke:#0d6efd
+    style EditVariant fill:#cfe2ff,stroke:#0d6efd
     style SelectShop fill:#cfe2ff,stroke:#0d6efd
     style SelectBlueprint fill:#cfe2ff,stroke:#0d6efd
     style SelectProvider fill:#cfe2ff,stroke:#0d6efd

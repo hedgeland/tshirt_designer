@@ -79,6 +79,14 @@ def generate_image(
                 "recreate a similar layout, subject placement, and design structure. "
                 "Apply it to this design: "
             )
+        elif reference_mode == "edit":
+            # Treat the image as the design to modify rather than a style/composition anchor.
+            # The prompt describes the changes; everything else should be preserved.
+            instruction = (
+                "Apply the following changes to the provided image and return the modified design. "
+                "Preserve all other visual elements — composition, color palette, style, and subject matter — exactly as they appear. "
+                "Changes: "
+            )
         else:  # "style"
             instruction = (
                 "Use the provided image as a visual style reference only. "

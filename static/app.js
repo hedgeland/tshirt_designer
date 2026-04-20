@@ -112,6 +112,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         variantsTemplate: cfg.variantsTemplate,
         styleTemplate: cfg.styleTemplate,
 
+        // ── Edit state ────────────────────────────────────────────────────
+        editPrompt: "",         // user's change description for iterative editing
+
         // ── Reference image state ─────────────────────────────────────────
         refImageUrl: null,      // preview URL when a reference image is set; null otherwise
         referenceMode: "style", // "style" = borrow aesthetic only; "copy" = replicate composition
@@ -577,6 +580,46 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     // Auto-select the newly rendered combo as active
                     this.activeComboUrl = e.url;
                     this.activeComboSize = size;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
+        async doEditVariant() {
+            if (this.isLoading || !this.editPrompt.trim()) return;
+
+            // Use the selected variant's thumbnail URL as the source image for editing.
+            // origUrl is the un-bg-removed version, which avoids sending transparent pixels
+            // that would just be flattened to white on the server.
+            const sourceVariant = this.variants[this.selectedVariant ?? 0];
+            if (!sourceVariant) return;
+            const sourceUrl = sourceVariant.origUrl || sourceVariant.url;
+
+            this.loadingStep = 4;
+            this._startLoading(`Applying edits at ${this.renderSize} (${this.aspectRatio})...`);
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            fd.append("source_url", sourceUrl);
+            fd.append("edit_prompt", this.editPrompt.trim());
+            fd.append("size", this.renderSize);
+            fd.append("aspect_ratio", this.aspectRatio);
+
+            await streamSSE("/stream/edit", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                edit_variant: (e) => {
+                    const ts = Date.now();
+                    // Append the new variant and auto-select it so the user can immediately
+                    // see the result and continue editing or render at a higher resolution.
+                    this.variants.push({ url: e.url, origUrl: e.url, noBgUrl: null, ts });
+                    const newIdx = e.index;
+                    const updated = { ...this.variantCombos };
+                    updated[newIdx] = e.combos || [];
+                    this.variantCombos = updated;
+                    this.selectedVariant = newIdx;
+                    this.editPrompt = "";  // clear so the user types a fresh instruction next time
                     this._stopLoading();
                 },
                 error: (e) => { this._onError(e.message); },
