@@ -1469,16 +1469,6 @@
                                                         class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Preview</label>
                                                     <div class="relative overflow-hidden rounded border border-slate-300 bg-slate-100 select-none"
                                                         :style="{ width: '220px', height: Math.round(220 * pPrintHeight / pPrintWidth) + 'px' }">
-                                                        <div class="absolute inset-x-0 top-1/2 border-dashed transition-all duration-75"
-                                                            :class="(pPrintHeight && Math.abs(pYPx + pScale*pPrintWidth/2 - pPrintHeight/2) <= 5)
-                                                                     ? 'border-t-2 border-red-500 opacity-90'
-                                                                     : pDrag ? 'border-t border-slate-400 opacity-50' : 'opacity-0'">
-                                                        </div>
-                                                        <div class="absolute inset-y-0 left-1/2 border-dashed transition-all duration-75"
-                                                            :class="(pPrintWidth && Math.abs(pXPx + pScale*pPrintWidth/2 - pPrintWidth/2) <= 5)
-                                                                     ? 'border-l-2 border-red-500 opacity-90'
-                                                                     : pDrag ? 'border-l border-slate-400 opacity-50' : 'opacity-0'">
-                                                        </div>
                                                         <img :src="(activeComboUrl || selectedVariantObj?.url) ? (activeComboUrl || selectedVariantObj?.url) : ''"
                                                             alt="Design placement preview" tabindex="0"
                                                             draggable="false"
@@ -1497,7 +1487,19 @@
                                                                  left: Math.round(pXPx * 220 / pPrintWidth) + 'px',
                                                                  top: Math.round(pYPx * 220 / pPrintWidth) + 'px',
                                                                  cursor: pDrag ? 'grabbing' : 'grab',
+                                                                 opacity: pDrag ? 0.6 : 1,
                                                              }">
+                                                        <!-- Guides render after the img so they overlay it; pointer-events-none so drag still targets the img -->
+                                                        <div class="absolute inset-x-0 top-1/2 border-dashed transition-all duration-75 pointer-events-none"
+                                                            :class="(pPrintHeight && Math.abs(pYPx + pScale*pPrintWidth/2 - pPrintHeight/2) <= 5)
+                                                                     ? 'border-t-2 border-red-500 opacity-90'
+                                                                     : pDrag ? 'border-t border-slate-400 opacity-50' : 'opacity-0'">
+                                                        </div>
+                                                        <div class="absolute inset-y-0 left-1/2 border-dashed transition-all duration-75 pointer-events-none"
+                                                            :class="(pPrintWidth && Math.abs(pXPx + pScale*pPrintWidth/2 - pPrintWidth/2) <= 5)
+                                                                     ? 'border-l-2 border-red-500 opacity-90'
+                                                                     : pDrag ? 'border-l border-slate-400 opacity-50' : 'opacity-0'">
+                                                        </div>
                                                     </div>
                                                     <!-- Resolution + aspect ratio — centered under preview; red when below 4K -->
                                                     <p class="mt-1 text-xs font-bold text-center"
