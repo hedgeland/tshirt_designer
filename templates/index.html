@@ -1061,7 +1061,7 @@
                                                     </select>
                                                     <select @change="editSize = $event.target.value"
                                                         class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                        <template x-for="s in cfg.finalSizes" :key="s">
+                                                        <template x-for="s in cfg.editSizes" :key="s">
                                                             <option :value="s" :selected="s === editSize" x-text="s"></option>
                                                         </template>
                                                     </select>

@@ -64,6 +64,9 @@ BRAINSTORM_SIZE = "512"   # 512px is enough for concept evaluation — saves tok
 FINAL_SIZES = ["1K", "2K", "4K"]
 FINAL_SIZE = "1K"         # full quality for approved final design
 
+EDIT_SIZES = ["512", "1K", "2K", "4K"]  # iteration edits include 512 for fast drafts
+EDIT_SIZE = "512"         # default edit resolution — cheap for iteration, bump up before publishing
+
 # Maps Gemini size tokens to their square pixel dimension.
 # Add new entries here if the model gains higher-resolution support (e.g. "8K": 8192).
 SIZE_PX: dict[str, int] = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}

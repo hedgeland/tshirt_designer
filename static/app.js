@@ -116,7 +116,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         generatedVariantSize: null,        // set when variants arrive; drives step-4 title badge
         generatedVariantAspectRatio: null, // aspect ratio used when variants were generated
         renderSize: cfg.defaultFinalSize,  // size picker for rendering new combos / publishing
-        editSize: "512",                   // default edit size — fast for iteration; user can bump up before submitting
+        editSize: cfg.editSize,            // default edit size — fast for iteration; user can bump up before submitting
         editAspectRatio: cfg.defaultAspectRatio, // aspect ratio for edits — independent of render combo settings
 
         // ── Unified render state ───────────────────────────────────────────
