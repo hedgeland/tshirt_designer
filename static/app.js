@@ -15,6 +15,27 @@ document.addEventListener('alpine:init', () => {
 });
 
 
+// ── Column cycling keyboard shortcuts ────────────────────────────────────────
+// Ctrl+] → next column, Ctrl+[ → previous column. Wraps around.
+// Guard: skip when focus is inside an input/textarea so the keys still work normally there.
+document.addEventListener('keydown', (e) => {
+    if (!e.ctrlKey) return;
+    if (e.key !== ']' && e.key !== '[') return;
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    e.preventDefault();
+    const count = Alpine.store('columnCount');
+    if (count < 2) return; // nothing to cycle when there's only one column
+    const current = Alpine.store('activeColIdx');
+    const next = e.key === ']'
+        ? (current + 1) % count          // forward, wrap around
+        : (current - 1 + count) % count; // backward, wrap around
+    Alpine.store('activeColIdx', next);
+    // Scroll the newly active column header into view
+    const header = document.querySelector(`[data-col-idx="${next}"]`);
+    header?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+});
+
 // ── SSE helper ────────────────────────────────────────────────────────────────
 // Streams a POST request as Server-Sent Events and dispatches each parsed event
 // to the matching handler in `handlers`. Uses fetch + ReadableStream rather than
