@@ -1023,33 +1023,27 @@
                                                 </template>
                                             </div>
 
-                                            <!-- Active combo actions — image already shown in the preview above -->
-                                            <div x-show="activeComboUrl" class="space-y-2">
-                                                <div class="flex gap-2 flex-wrap items-center">
-                                                    <a :href="activeComboUrl" download
-                                                        :title="`Download ${activeComboSize} PNG`"
-                                                        class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                                                        x-text="`⬇ ${activeComboSize} PNG`"></a>
-                                                    <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                                        :disabled="isLoading || (pNeedsUpscale && !pOverrideMinRes)"
-                                                        x-text="(pNeedsUpscale && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
-                                                        :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                                                        class="px-3 py-1.5 text-white text-xs font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                                </div>
-                                            </div>
-
-                                            <!-- Variant-level BG removal -->
-                                            <div class="flex gap-2 flex-wrap items-center">
-                                                <!-- Show Remove BG when active combo exists and bg hasn't been removed yet -->
+                                            <!-- Active combo actions — download, Printify, and BG removal all in one row -->
+                                            <div x-show="activeComboUrl" class="flex gap-2 flex-wrap items-center">
+                                                <a :href="activeComboUrl" download
+                                                    :title="`Download ${activeComboSize} PNG`"
+                                                    class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                                                    x-text="`⬇ ${activeComboSize} PNG`"></a>
+                                                <button x-show="cfg.printifyEnabled" @click="openPrintify()"
+                                                    :disabled="isLoading || (pNeedsUpscale && !pOverrideMinRes)"
+                                                    x-text="(pNeedsUpscale && !pOverrideMinRes) ? `👕 ${cfg.printifyMinSize} Required` : pOverrideMinRes ? '👕 Printify (override)' : '👕 Printify'"
+                                                    :class="pOverrideMinRes ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                                                    class="px-3 py-1.5 text-white text-xs font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                                <!-- Remove BG when bg hasn't been stripped yet -->
                                                 <button @click="doRemoveVariantBg()" :disabled="isLoading"
-                                                    x-show="activeComboUrl && !activeComboObj?.origUrl"
+                                                    x-show="!activeComboObj?.origUrl"
                                                     aria-label="Remove background from rendered image"
                                                     class="px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                                     <span aria-hidden="true">✂️</span> Remove BG
                                                 </button>
-                                                <!-- Show Undo BG when bg has been removed (origUrl is stored on the combo) -->
+                                                <!-- Undo BG when origUrl is stored on the combo -->
                                                 <button @click="doRestoreVariantBg()" :disabled="isLoading"
-                                                    x-show="activeComboUrl && activeComboObj?.origUrl"
+                                                    x-show="activeComboObj?.origUrl"
                                                     aria-label="Restore original background"
                                                     class="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                                     <span aria-hidden="true">↩</span> Undo BG
