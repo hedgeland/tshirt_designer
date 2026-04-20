@@ -206,9 +206,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 ));
             }
 
-            // Bound drag handlers — stored so removeEventListener can match by identity
-            this._boundDragMove = this._onDragMove.bind(this);
-            this._boundDragUp = this._onDragUp.bind(this);
+            // No bound drag handlers needed — startDrag captures `this` via closure instead
 
             // Keep "Align to Top" preset in sync when scale or allowance changes
             this.$watch('pScale', () => {
@@ -940,51 +938,51 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         },
 
         startDrag(e) {
-            const scale = 220 / this.pPrintWidth;  // preview px per print px
-            const designPx = this.pDesignPx;
-            // Cache all per-drag constants so _onDragMove doesn't recompute on every mousemove
-            this.pDrag = {
+            // Alpine's x-teleport creates a different scope proxy than init()'s `this`, so
+            // _boundDragMove bound in init() can't see state set here. Capture self = this
+            // (the teleported proxy) in a closure so all drag handlers share the same context.
+            const self = this;
+            const scale = 220 / self.pPrintWidth;  // preview px per print px
+            const designPx = self.pDesignPx;
+            const drag = {
                 startX: e.clientX,
                 startY: e.clientY,
-                startPX: this.pXPx,
-                startPY: this.pYPx,
+                startPX: self.pXPx,
+                startPY: self.pYPx,
                 scale,
-                designPx,
                 snapThreshold: 8 / scale,  // 8 screen px → print px; feels consistent across sizes
-                centerX: Math.round((this.pPrintWidth - designPx) / 2),
-                centerY: Math.round((this.pPrintHeight - designPx) / 2),
+                centerX: Math.round((self.pPrintWidth - designPx) / 2),
+                centerY: Math.round((self.pPrintHeight - designPx) / 2),
                 minX: -(designPx - 1),
-                maxX: this.pPrintWidth - 1,
+                maxX: self.pPrintWidth - 1,
                 minY: -(designPx - 1),
-                maxY: this.pPrintHeight - 1,
+                maxY: self.pPrintHeight - 1,
             };
-            document.addEventListener('mousemove', this._boundDragMove);
-            document.addEventListener('mouseup', this._boundDragUp);
-        },
+            self.pDrag = drag;  // reactive: drives cursor style and snap guide visibility
 
-        _onDragMove(e) {
-            if (!this.pDrag) return;
-            const { scale, snapThreshold, centerX, centerY, minX, maxX, minY, maxY } = this.pDrag;
+            function onMove(ev) {
+                const { scale, snapThreshold, centerX, centerY, minX, maxX, minY, maxY } = drag;
+                const rawX = drag.startPX + (ev.clientX - drag.startX) / scale;
+                const rawY = drag.startPY + (ev.clientY - drag.startY) / scale;
+                // Clamp so at least 1 print-pixel of the image stays inside the print area
+                let x = Math.round(Math.min(Math.max(rawX, minX), maxX));
+                let y = Math.round(Math.min(Math.max(rawY, minY), maxY));
+                // Snap to center when within threshold
+                if (Math.abs(rawX - centerX) <= snapThreshold) x = centerX;
+                if (Math.abs(rawY - centerY) <= snapThreshold) y = centerY;
+                self.pXPx = x;
+                self.pYPx = y;
+                self.pIsTopPreset = false;
+            }
 
-            const rawX = this.pDrag.startPX + (e.clientX - this.pDrag.startX) / scale;
-            const rawY = this.pDrag.startPY + (e.clientY - this.pDrag.startY) / scale;
-            // Clamp so at least 1 print-pixel of the image stays inside the print area
-            let x = Math.round(Math.min(Math.max(rawX, minX), maxX));
-            let y = Math.round(Math.min(Math.max(rawY, minY), maxY));
+            function onUp() {
+                self.pDrag = null;
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
 
-            // Snap to center when within threshold
-            if (Math.abs(rawX - centerX) <= snapThreshold) x = centerX;
-            if (Math.abs(rawY - centerY) <= snapThreshold) y = centerY;
-
-            this.pXPx = x;
-            this.pYPx = y;
-            this.pIsTopPreset = false;
-        },
-
-        _onDragUp() {
-            this.pDrag = null;
-            document.removeEventListener('mousemove', this._boundDragMove);
-            document.removeEventListener('mouseup', this._boundDragUp);
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
         },
 
         // Keyboard nudge for the placement preview image; dx/dy in print pixels
