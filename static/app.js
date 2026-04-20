@@ -198,9 +198,12 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             // re-generated, but text state and saved file paths survive the reload.
             this._restoreInitialState(initialState);
 
-            // Focus the theme input only for the first column to avoid competing focus
+            // Focus the theme input only for the first column to avoid competing focus.
+            // Double-tick + setTimeout handles x-cloak removal and x-for template rendering delays.
             if (this.colIdx === 0) {
-                this.$nextTick(() => this.$refs.themeInput?.focus());
+                this.$nextTick(() => this.$nextTick(() =>
+                    setTimeout(() => this.$refs.themeInput?.focus(), 50)
+                ));
             }
 
             // Bound drag handlers — stored so removeEventListener can match by identity
