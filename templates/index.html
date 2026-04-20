@@ -109,8 +109,7 @@
             <!-- ── Presets Panel — left-side panel ────────────────────────────── -->
             <div x-data="{ presetsPinned: false }"
                 class="absolute top-0 left-0 h-full z-20 overflow-hidden opacity-95 transition-[width] duration-200"
-                :style="`width: ${showPresetsPanel ? 460 : 30}px`"
-                @mouseenter="showPresetsPanel = true"
+                :style="`width: ${showPresetsPanel ? 460 : 30}px`" @mouseenter="showPresetsPanel = true"
                 @mouseleave="if (!presetsPinned && $event.clientX > 0) closePresetsPanel(true)">
 
                 <!-- Tab handle — rounded right, sticks out toward columns -->
@@ -945,7 +944,9 @@
                                      'grid-cols-3': variants.filter(v => !v.isIteration).length === 3,
                                      'grid-cols-4': variants.filter(v => !v.isIteration).length >= 4
                                  }">
-                                            <template x-for="v in variants.map((v, i) => ({...v, _origIdx: i})).filter(v => !v.isIteration)" :key="v._origIdx">
+                                            <template
+                                                x-for="v in variants.map((v, i) => ({...v, _origIdx: i})).filter(v => !v.isIteration)"
+                                                :key="v._origIdx">
                                                 <div @click="selectedVariant = v._origIdx" role="button" tabindex="0"
                                                     :aria-pressed="selectedVariant === v._origIdx"
                                                     :aria-label="`Variant ${v._origIdx + 1}${selectedVariant === v._origIdx ? ', selected' : ', click to select'}`"
@@ -973,7 +974,8 @@
                                 <section x-show="(step >= 4 || loadedImageRes) && selectedVariant !== null" x-transition
                                     class="rounded-xl shadow-sm p-4">
                                     <div class="flex items-center justify-between mb-3">
-                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">5 · Iterations</h2>
+                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">5 ·
+                                            Iterations</h2>
                                         <button @click="sCollapsed[5] = !sCollapsed[5]" :aria-expanded="!sCollapsed[5]"
                                             class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
                                             <svg :class="sCollapsed[5] ? '-rotate-90' : ''"
@@ -993,11 +995,14 @@
                                                     class="w-full aspect-square object-contain rounded-lg border border-slate-500 bg-slate-100 block">
                                             </div>
                                             <!-- Iterations list — full edit chain for the selected variant's root, sorted newest-first, with the original at the bottom -->
-                                            <div x-show="(() => { const cur = selectedVariant ?? 0; const rIdx = variants[cur]?.isIteration ? variants[cur].rootIdx : cur; return variants.some(h => h.isIteration && h.rootIdx === rIdx); })()" class="w-40 flex-shrink-0">
+                                            <div x-show="(() => { const cur = selectedVariant ?? 0; const rIdx = variants[cur]?.isIteration ? variants[cur].rootIdx : cur; return variants.some(h => h.isIteration && h.rootIdx === rIdx); })()"
+                                                class="w-40 flex-shrink-0">
                                                 <p class="text-xs text-slate-400 mb-1.5 font-medium">Iterations</p>
                                                 <ul class="space-y-1.5 overflow-y-auto max-h-64 pr-1">
                                                     <!-- Build list: all iterations sharing the same root, newest-first, plus the original appended -->
-                                                    <template x-for="h in (() => { const cur = selectedVariant ?? 0; const rIdx = variants[cur]?.isIteration ? variants[cur].rootIdx : cur; const iters = variants.map((v,i) => ({...v, _origIdx: i})).filter(v => v.isIteration && v.rootIdx === rIdx).sort((a,b) => b.ts - a.ts); return [...iters, {...variants[rIdx], _origIdx: rIdx, _isRoot: true}]; })()" :key="h.url">
+                                                    <template
+                                                        x-for="h in (() => { const cur = selectedVariant ?? 0; const rIdx = variants[cur]?.isIteration ? variants[cur].rootIdx : cur; const iters = variants.map((v,i) => ({...v, _origIdx: i})).filter(v => v.isIteration && v.rootIdx === rIdx).sort((a,b) => b.ts - a.ts); return [...iters, {...variants[rIdx], _origIdx: rIdx, _isRoot: true}]; })()"
+                                                        :key="h.url">
                                                         <li>
                                                             <button @click="selectedVariant = h._origIdx"
                                                                 :class="selectedVariant === h._origIdx ? 'text-white font-semibold' : 'text-indigo-300 hover:text-indigo-100'"
@@ -1050,7 +1055,7 @@
                                             <!-- Edit prompt — size/aspect are independent from the render combo settings -->
                                             <div class="flex flex-col gap-2 border-t border-slate-600 pt-3">
                                                 <div class="flex gap-2 flex-wrap items-center">
-                                                    <span class="text-xs text-slate-400">Edit variant
+                                                    <span class="text-xs text-slate-400">Edit/Iterate Variant
                                                         <span x-text="(selectedVariant ?? 0) + 1"></span>:
                                                     </span>
                                                     <select x-model="editAspectRatio"
@@ -1062,14 +1067,14 @@
                                                     <select @change="editSize = $event.target.value"
                                                         class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                         <template x-for="s in cfg.editSizes" :key="s">
-                                                            <option :value="s" :selected="s === editSize" x-text="s"></option>
+                                                            <option :value="s" :selected="s === editSize" x-text="s">
+                                                            </option>
                                                         </template>
                                                     </select>
                                                 </div>
                                                 <textarea x-model="editPrompt" rows="2"
                                                     placeholder="Describe your changes (e.g. make the wings gold, remove the border)"
-                                                    :disabled="isLoading"
-                                                    @keydown.enter.prevent="doEditVariant()"
+                                                    :disabled="isLoading" @keydown.enter.prevent="doEditVariant()"
                                                     class="w-full text-xs rounded-md px-2 py-1.5 border border-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none disabled:opacity-50"></textarea>
                                                 <button @click="doEditVariant()"
                                                     :disabled="isLoading || !editPrompt.trim()"
@@ -1112,6 +1117,19 @@
                                                         ? `✨ ${renderSize} · ${aspectRatio} — already rendered`
                                                         : `✨ Render at ${renderSize}`"
                                                     class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                                <!-- Remove BG before publishing — mirrors the combo-actions buttons above -->
+                                                <button @click="doRemoveVariantBg()" :disabled="isLoading"
+                                                    x-show="activeComboUrl && !activeComboObj?.origUrl"
+                                                    aria-label="Remove background from rendered image"
+                                                    class="px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                    <span aria-hidden="true">✂️</span> Remove BG
+                                                </button>
+                                                <button @click="doRestoreVariantBg()" :disabled="isLoading"
+                                                    x-show="activeComboUrl && activeComboObj?.origUrl"
+                                                    aria-label="Restore original background"
+                                                    class="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                                    <span aria-hidden="true">↩</span> Undo BG
+                                                </button>
                                                 <!-- Publish button lives here — render at the right size first, then publish -->
                                                 <button x-show="cfg.printifyEnabled" @click="openPrintify()"
                                                     :disabled="isLoading || (pNeedsUpscale && !pOverrideMinRes)"
