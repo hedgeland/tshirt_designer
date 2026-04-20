@@ -133,6 +133,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         // ── Edit state ────────────────────────────────────────────────────
         editPrompt: "",         // user's change description for iterative editing
+        editModeActive: false,  // true after the first variant edit completes; switches gallery to single-image + history layout
+        editHistory: [],        // [{url, ts}] — all variants that existed before the latest edit, sorted newest first
 
         // ── Reference image state ─────────────────────────────────────────
         refImageUrl: null,      // preview URL when a reference image is set; null otherwise
@@ -311,6 +313,14 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.loadingStep = 0;
         },
 
+        // Format a Unix-ms timestamp as a short locale date+time string for edit history links.
+        formatEditTs(ts) {
+            return new Date(ts).toLocaleString([], {
+                month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+            });
+        },
+
         // Apply server-persisted column state on init.  Determines which workflow
         // step to show based on what data is available (final > variants > concepts > theme).
         _restoreInitialState(state) {
@@ -389,6 +399,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.activeComboUrl = null;
             this.activeComboSize = "";
             this.error = "";
+            this.editModeActive = false;
+            this.editHistory = [];
             this.theme = displayTheme;
             this.variants = [{ url, origUrl: url, noBgUrl: null, ts: Date.now() }];
             this.selectedVariant = 0;
@@ -473,6 +485,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.variantCombos = {};
             this.activeComboUrl = null;
             this.activeComboSize = "";
+            this.editModeActive = false;
+            this.editHistory = [];
             this.loadedImageRes = null;
             this.step = 1;
 
@@ -506,6 +520,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.variantCombos = {};
             this.activeComboUrl = null;
             this.activeComboSize = "";
+            this.editModeActive = false;
+            this.editHistory = [];
             this.loadedImageRes = null;
             // Advance to step 3 so the aspect ratio/resolution selectors and Generate button are visible,
             // but don't auto-generate — let the user configure first
@@ -523,6 +539,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.variantCombos = {};
             this.activeComboUrl = null;
             this.activeComboSize = "";
+            this.editModeActive = false;
+            this.editHistory = [];
             this.loadedImageRes = null;
             this.step = Math.max(this.step, 3);
 
@@ -619,6 +637,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             if (!sourceVariant) return;
             const sourceUrl = sourceVariant.origUrl || sourceVariant.url;
 
+            // Snapshot all current variants before the edit so we can add them to the
+            // history sidebar once the new result arrives.
+            const variantsBeforeEdit = this.variants.map(v => ({ url: v.url, ts: v.ts }));
+
             this.loadingStep = 4;
             this._startLoading(`Applying edits at ${this.renderSize} (${this.aspectRatio})...`);
 
@@ -643,6 +665,14 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this.variantCombos = updated;
                     this.selectedVariant = newIdx;
                     this.editPrompt = "";  // clear so the user types a fresh instruction next time
+
+                    // Merge pre-edit variants into history, deduplicating by URL, keeping newest first.
+                    const existingUrls = new Set(this.editHistory.map(h => h.url));
+                    const newEntries = variantsBeforeEdit.filter(v => !existingUrls.has(v.url));
+                    this.editHistory = [...newEntries, ...this.editHistory]
+                        .sort((a, b) => b.ts - a.ts);
+                    this.editModeActive = true;
+
                     this._stopLoading();
                 },
                 error: (e) => { this._onError(e.message); },

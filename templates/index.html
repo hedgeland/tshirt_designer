@@ -938,7 +938,8 @@
                                             <span class="text-slate-400">— finalize at higher resolution to
                                                 upscale</span>
                                         </div>
-                                        <div class="grid gap-2" :class="{
+                                        <!-- Normal grid — hidden once the user has made at least one edit -->
+                                        <div x-show="!editModeActive" class="grid gap-2" :class="{
                                      'grid-cols-1 max-w-xs': variants.length === 1,
                                      'grid-cols-2': variants.length === 2,
                                      'grid-cols-3': variants.length === 3,
@@ -964,6 +965,29 @@
                                                         style="text-shadow: 0 0 3px #000, 0 0 3px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"></span>
                                                 </div>
                                             </template>
+                                        </div>
+
+                                        <!-- Edit-mode layout — replaces grid after the first variant edit -->
+                                        <div x-show="editModeActive" class="flex gap-4 items-start">
+                                            <!-- Latest edited variant image -->
+                                            <div class="flex-1 min-w-0">
+                                                <img :src="(variants[selectedVariant ?? 0]?.url ?? '') + '?t=' + (variants[selectedVariant ?? 0]?.ts ?? 0)"
+                                                    alt="Latest edit result"
+                                                    class="w-full rounded-lg border border-slate-500 bg-slate-100 block object-contain">
+                                            </div>
+                                            <!-- Scrollable history of previous variants, newest first -->
+                                            <div class="w-40 flex-shrink-0">
+                                                <p class="text-xs text-slate-400 mb-1.5 font-medium">Previous</p>
+                                                <ul class="space-y-1.5 overflow-y-auto max-h-64 pr-1">
+                                                    <template x-for="h in editHistory" :key="h.url">
+                                                        <li>
+                                                            <a :href="h.url" target="_blank" rel="noopener"
+                                                                class="text-xs text-indigo-300 hover:text-indigo-100 underline break-words"
+                                                                x-text="formatEditTs(h.ts)"></a>
+                                                        </li>
+                                                    </template>
+                                                </ul>
+                                            </div>
                                         </div>
                                         <!-- ── Combo gallery for selected variant ────────────────── -->
                                         <div class="mt-4 space-y-3">
