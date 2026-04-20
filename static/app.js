@@ -621,7 +621,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             const existing = this.variantCombos[idx] || [];
             if (existing.some(c => c.size === size && c.aspectRatio === this.aspectRatio)) return;
 
-            this.loadingStep = 4;
+            this.loadingStep = 5;
             this._startLoading(`Rendering variant ${idx + 1} at ${size} (${this.aspectRatio})...`);
 
             const fd = new FormData();
@@ -751,7 +751,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 return;
             }
 
-            this.loadingStep = 4;
+            this.loadingStep = 5;
             this._startLoading("Removing background...");
 
             const fd = this._bgFormData();
