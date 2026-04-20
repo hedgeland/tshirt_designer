@@ -981,9 +981,10 @@
                                                 <ul class="space-y-1.5 overflow-y-auto max-h-64 pr-1">
                                                     <template x-for="h in editHistory" :key="h.url">
                                                         <li>
-                                                            <a :href="h.url" target="_blank" rel="noopener"
-                                                                class="text-xs text-indigo-300 hover:text-indigo-100 underline break-words"
-                                                                x-text="formatEditTs(h.ts)"></a>
+                                                            <button @click="selectedVariant = variants.findIndex(v => v.url === h.url)"
+                                                                :class="variants[selectedVariant]?.url === h.url ? 'text-white font-semibold' : 'text-indigo-300 hover:text-indigo-100'"
+                                                                class="text-xs underline text-left w-full"
+                                                                x-text="formatEditTs(h.ts)"></button>
                                                         </li>
                                                     </template>
                                                 </ul>
