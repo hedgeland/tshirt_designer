@@ -649,9 +649,12 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     const ts = Date.now();
                     // Append the new variant and auto-select it so the user can immediately
                     // see the result and continue editing or render at a higher resolution.
-                    // parentIdx records which variant this was derived from so the iterations
-                    // list in Step 5 can filter to only the selected variant's children.
-                    this.variants.push({ url: e.url, origUrl: e.url, noBgUrl: null, ts, parentIdx: this.selectedVariant ?? 0, isIteration: true });
+                    // parentIdx records the direct parent; rootIdx traces to the non-iteration
+                    // ancestor so the full edit chain is always visible when the original is selected.
+                    const parentIdx = this.selectedVariant ?? 0;
+                    const parentVariant = this.variants[parentIdx];
+                    const rootIdx = parentVariant?.isIteration ? parentVariant.rootIdx : parentIdx;
+                    this.variants.push({ url: e.url, origUrl: e.url, noBgUrl: null, ts, parentIdx, rootIdx, isIteration: true });
                     const newIdx = e.index;
                     const updated = { ...this.variantCombos };
                     updated[newIdx] = e.combos || [];

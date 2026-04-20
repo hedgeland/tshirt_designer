@@ -992,16 +992,17 @@
                                                     alt="Selected variant"
                                                     class="w-full aspect-square object-contain rounded-lg border border-slate-500 bg-slate-100 block">
                                             </div>
-                                            <!-- Iterations list — children of the selected variant, sorted newest-first -->
-                                            <div x-show="variants.some(h => h.parentIdx === (selectedVariant ?? 0))" class="w-40 flex-shrink-0">
+                                            <!-- Iterations list — full edit chain for the selected variant's root, sorted newest-first, with the original at the bottom -->
+                                            <div x-show="(() => { const cur = selectedVariant ?? 0; const rIdx = variants[cur]?.isIteration ? variants[cur].rootIdx : cur; return variants.some(h => h.isIteration && h.rootIdx === rIdx); })()" class="w-40 flex-shrink-0">
                                                 <p class="text-xs text-slate-400 mb-1.5 font-medium">Iterations</p>
                                                 <ul class="space-y-1.5 overflow-y-auto max-h-64 pr-1">
-                                                    <template x-for="h in [...variants].filter(h => h.parentIdx === (selectedVariant ?? 0)).sort((a, b) => b.ts - a.ts)" :key="h.url">
+                                                    <!-- Build list: all iterations sharing the same root, newest-first, plus the original appended -->
+                                                    <template x-for="h in (() => { const cur = selectedVariant ?? 0; const rIdx = variants[cur]?.isIteration ? variants[cur].rootIdx : cur; const iters = variants.map((v,i) => ({...v, _origIdx: i})).filter(v => v.isIteration && v.rootIdx === rIdx).sort((a,b) => b.ts - a.ts); return [...iters, {...variants[rIdx], _origIdx: rIdx, _isRoot: true}]; })()" :key="h.url">
                                                         <li>
-                                                            <button @click="selectedVariant = variants.findIndex(v => v.url === h.url)"
-                                                                :class="variants[selectedVariant]?.url === h.url ? 'text-white font-semibold' : 'text-indigo-300 hover:text-indigo-100'"
+                                                            <button @click="selectedVariant = h._origIdx"
+                                                                :class="selectedVariant === h._origIdx ? 'text-white font-semibold' : 'text-indigo-300 hover:text-indigo-100'"
                                                                 class="text-xs underline text-left w-full"
-                                                                x-text="formatEditTs(h.ts)"></button>
+                                                                x-text="h._isRoot ? 'Original' : formatEditTs(h.ts)"></button>
                                                         </li>
                                                     </template>
                                                 </ul>
