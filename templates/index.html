@@ -971,7 +971,7 @@
                                         <div x-show="editModeActive" class="flex gap-4 items-start">
                                             <!-- Latest edited variant image — max-w-xs matches single-variant grid size -->
                                             <div class="max-w-xs w-full flex-shrink-0">
-                                                <img :src="(variants[selectedVariant ?? 0]?.url ?? '') + '?t=' + (variants[selectedVariant ?? 0]?.ts ?? 0)"
+                                                <img :src="activeComboUrl || ((variants[selectedVariant ?? 0]?.url ?? '') + '?t=' + (variants[selectedVariant ?? 0]?.ts ?? 0))"
                                                     alt="Latest edit result"
                                                     class="w-full aspect-square object-contain rounded-lg border border-slate-500 bg-slate-100 block">
                                             </div>
