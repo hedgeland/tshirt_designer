@@ -1503,6 +1503,21 @@ async def set_min_columns(session_id: str = Form(...), min_columns: int = Form(.
     return {"min_columns": clamped}
 
 
+@app.post("/session/select-variant")
+async def select_variant(
+    session_id: str = Form(...),
+    column_id: int = Form(0),
+    selected_idx: int = Form(...),
+):
+    """Persist the user's variant selection so it survives a hard refresh.
+
+    Called fire-and-forget from the client's selectedVariant watcher; no response body needed.
+    """
+    session = get_column(session_id, column_id)
+    session["selected_idx"] = selected_idx
+    return {}
+
+
 if __name__ == "__main__":
     import uvicorn
 

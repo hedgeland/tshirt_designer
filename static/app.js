@@ -246,6 +246,15 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     this.activeComboUrl = null;
                     this.activeComboSize = "";
                 }
+                // Persist selection so hard refresh restores the correct variant + iteration chain.
+                // Skip null — that's a reset on new generate, not a meaningful user selection.
+                if (val !== null) {
+                    const fd = new FormData();
+                    fd.append("session_id", this.sessionId);
+                    fd.append("column_id", this.colIdx);
+                    fd.append("selected_idx", val);
+                    fetch("/session/select-variant", { method: "POST", body: fd });
+                }
             });
 
         },
