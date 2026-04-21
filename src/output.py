@@ -186,14 +186,28 @@ def delete_files(paths: list[str]) -> dict:
             errors.append(str(e))
 
     # Prune empty directories bottom-up.
+    # Collect first, then remove — modifying a directory while iterating it is
+    # undefined behaviour on some filesystems and can raise StopIteration early.
+    empty_concept_dirs = []
     for theme_dir in Path(OUTPUT_DIR).iterdir():
         if not theme_dir.is_dir():
             continue
         for concept_dir in theme_dir.iterdir():
             if concept_dir.is_dir() and not any(concept_dir.iterdir()):
-                concept_dir.rmdir()
-        if not any(theme_dir.iterdir()):
-            theme_dir.rmdir()
+                empty_concept_dirs.append(concept_dir)
+    for concept_dir in empty_concept_dirs:
+        try:
+            concept_dir.rmdir()
+        except OSError:
+            pass  # already gone or not empty; safe to skip
+
+    # Re-scan theme dirs after child removal
+    for theme_dir in Path(OUTPUT_DIR).iterdir():
+        if theme_dir.is_dir() and not any(theme_dir.iterdir()):
+            try:
+                theme_dir.rmdir()
+            except OSError:
+                pass
 
     return {"deleted": deleted, "freed_bytes": freed, "errors": errors}
 
