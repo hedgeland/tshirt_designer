@@ -1136,47 +1136,18 @@
                                     </div>
                                     <div x-show="!sCollapsed[6]">
                                         <div class="space-y-3">
-                                            <!-- Render new combo controls — final step before publishing -->
+                                            <!-- Finalize: single 4K render button — all iteration (aspect ratio, resolution, bg) happens in step 5 -->
                                             <div class="flex gap-2 flex-wrap items-center">
-                                                <span class="text-xs text-slate-400">Render Final Image For
-                                                    Publishing:</span>
-                                                <select x-model="aspectRatio"
-                                                    class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                    <template x-for="r in cfg.aspectRatios" :key="r">
-                                                        <option :value="r" x-text="r"></option>
-                                                    </template>
-                                                </select>
-                                                <select @change="renderSize = $event.target.value"
-                                                    class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                                                    <template x-for="s in cfg.finalSizes" :key="s">
-                                                        <option :value="s" :selected="s === renderSize"
-                                                            :disabled="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === s && c.aspectRatio === aspectRatio)"
-                                                            x-text="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === s && c.aspectRatio === aspectRatio) ? s + ' ✓' : s">
-                                                        </option>
-                                                    </template>
-                                                </select>
-                                                <button @click="doRender()"
-                                                    :disabled="isLoading || (variantCombos[selectedVariant ?? 0] || []).some(c => c.size === renderSize && c.aspectRatio === aspectRatio)"
-                                                    :title="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === renderSize && c.aspectRatio === aspectRatio)
-                                                        ? 'Already rendered — click the pill above to select it'
-                                                        : `Render at ${renderSize} · ${aspectRatio}`" x-text="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === renderSize && c.aspectRatio === aspectRatio)
-                                                        ? `✨ ${renderSize} · ${aspectRatio} — already rendered`
-                                                        : `✨ Render at ${renderSize}`"
+                                                <button @click="doRender('4K')"
+                                                    :disabled="isLoading || (variantCombos[selectedVariant ?? 0] || []).some(c => c.size === '4K' && c.aspectRatio === aspectRatio)"
+                                                    :title="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === '4K' && c.aspectRatio === aspectRatio)
+                                                        ? 'Already rendered at 4K — click the pill above to select it'
+                                                        : 'Render final image at 4K for publishing'"
+                                                    x-text="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === '4K' && c.aspectRatio === aspectRatio)
+                                                        ? '✨ 4K — already rendered'
+                                                        : '✨ Render at 4K'"
                                                     class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                                <!-- Remove BG before publishing — mirrors the combo-actions buttons above -->
-                                                <button @click="doRemoveVariantBg()" :disabled="isLoading"
-                                                    x-show="activeComboUrl && !activeComboObj?.origUrl"
-                                                    aria-label="Remove background from rendered image"
-                                                    class="px-3 py-1.5 bg-blue-400 text-white text-xs font-medium rounded-lg hover:bg-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                    <span aria-hidden="true">✂️</span> Remove BG
-                                                </button>
-                                                <button @click="doRestoreVariantBg()" :disabled="isLoading"
-                                                    x-show="activeComboUrl && activeComboObj?.origUrl"
-                                                    aria-label="Restore original background"
-                                                    class="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                                    <span aria-hidden="true">↩</span> Undo BG
-                                                </button>
-                                                <!-- Publish button lives here — render at the right size first, then publish -->
+                                                <!-- Publish button lives here — render at 4K first, then publish -->
                                                 <button x-show="cfg.printifyEnabled" @click="openPrintify()"
                                                     :disabled="isLoading"
                                                     x-text="pNeedsUpscale ? `👕 ${cfg.printifyMinSize} Required` : '👕 Printify'"
