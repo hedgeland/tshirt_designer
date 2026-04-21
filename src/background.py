@@ -71,6 +71,9 @@ def remove_background_color(
     Order matters: normalize before fill (cleaner seeds), decontaminate before erode
     (operates on full edge width), erode last (tightens the mask).
     """
+    if not 0 <= tolerance <= 255:
+        raise ValueError(f"tolerance must be between 0 and 255, got {tolerance}")
+
     img = image.convert("RGBA")
     arr = np.array(img)
 
