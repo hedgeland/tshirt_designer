@@ -48,6 +48,11 @@ def test_get_unknown_preset_returns_404():
     assert response.status_code == 404
 
 
+_C = "Give me {num_concepts} ideas for {theme}."
+_V = "Create {num_variants} variants for: {concept}."
+_S = "Use {bg_color} background with max {max_colors} colors."
+
+
 def test_save_and_delete_preset(tmp_path, monkeypatch):
     import src.presets as presets_module
     monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
@@ -55,9 +60,9 @@ def test_save_and_delete_preset(tmp_path, monkeypatch):
     # Save
     response = client.post("/presets", data={
         "name": "Test Preset",
-        "concepts": "concepts tmpl",
-        "variants": "variants tmpl",
-        "style": "style tmpl",
+        "concepts": _C,
+        "variants": _V,
+        "style": _S,
     })
     assert response.status_code == 200
     assert "Test Preset" in response.json()["names"]
@@ -72,9 +77,9 @@ def test_save_preset_rejects_builtin_name():
     from src.presets import BUILTIN_NAME
     response = client.post("/presets", data={
         "name": BUILTIN_NAME,
-        "concepts": "a",
-        "variants": "b",
-        "style": "c",
+        "concepts": _C,
+        "variants": _V,
+        "style": _S,
     })
     assert response.status_code == 200
     assert "error" in response.json()
@@ -116,3 +121,40 @@ def test_analysis_final_returns_default_when_no_image():
     data = response.json()
     assert data["content_top"] == 0.0
     assert data["content_bottom"] == 1.0
+
+
+def test_separate_sessions_are_isolated():
+    """State added to session A must not appear in session B."""
+    sid_a = "test-session-a-isolation"
+    sid_b = "test-session-b-isolation"
+
+    # Add a column to session A only
+    r = client.post("/columns", data={"session_id": sid_a})
+    assert r.status_code == 200
+    assert r.json()["count"] == 2
+
+    # Session B should still have its initial single column
+    r = client.get("/session/columns", params={"session_id": sid_b})
+    assert r.status_code == 200
+    assert len(r.json()["columns"]) == 1
+
+
+def test_columns_in_same_session_are_isolated():
+    """State written to column 0 must not appear in column 1 of the same session."""
+    sid = "test-session-col-isolation"
+
+    # Add a second column
+    client.post("/columns", data={"session_id": sid})
+
+    # Write selected_idx to column 0
+    client.post("/session/select-variant", data={
+        "session_id": sid,
+        "column_id": 0,
+        "selected_idx": 7,
+    })
+
+    # Column 1 must have its own independent selected_idx (None / unset)
+    r = client.get("/session/columns", params={"session_id": sid})
+    cols = r.json()["columns"]
+    assert cols[0]["selected_idx"] == 7
+    assert cols[1]["selected_idx"] is None

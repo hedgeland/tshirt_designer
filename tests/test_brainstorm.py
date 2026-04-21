@@ -61,3 +61,17 @@ def test_empty_response_returns_empty_list():
     with patch("src.brainstorm.get_client", return_value=_patched_client("")):
         result = generate_concepts("theme", "key", TEMPLATE)
     assert result == []
+
+
+def test_short_response_logs_warning(caplog):
+    """When the model returns fewer concepts than requested a warning is logged."""
+    import logging
+    text = '["Only one"]'
+    with patch("src.brainstorm.get_client", return_value=_patched_client(text)):
+        with caplog.at_level(logging.WARNING, logger="src.brainstorm"):
+            result = generate_concepts("theme", "key", TEMPLATE, num_concepts=5)
+    assert len(result) == 1
+    # caplog.messages contains pre-formatted strings (getMessage() already called)
+    assert any("1" in m and "5" in m for m in caplog.messages), (
+        "Expected a warning mentioning the actual vs requested count"
+    )

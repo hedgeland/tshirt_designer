@@ -84,3 +84,56 @@ def test_different_background_colors():
         result = remove_background_color(img, hex_color, tolerance=5)
         arr = np.array(result)
         assert arr[:, :, 3].max() == 0, f"Background {hex_color} should be fully removed"
+
+
+def test_fully_opaque_image_corners_become_transparent():
+    """A fully opaque solid-color image should have its background removed entirely."""
+    img = Image.new("RGBA", (32, 32), (255, 0, 255, 255))
+    assert img.split()[3].getextrema() == (255, 255)  # confirm fully opaque before removal
+
+    result = remove_background_color(img, "#FF00FF", tolerance=10, erode_px=0, decontaminate=0)
+    arr = np.array(result)
+    assert arr[:, :, 3].max() == 0, "Fully opaque solid bg should become fully transparent"
+
+
+def test_interior_pocket_removed():
+    """Background-colored pixels enclosed by design elements (e.g. letter 'O') are also removed.
+
+    Constructs a frame image:
+      - outer background (magenta)
+      - a ring of design pixels (blue)
+      - inner background pocket (magenta) surrounded by design pixels
+
+    The flood fill only removes edge-connected background. The interior pocket
+    (not reachable from the edge) must be cleared by _remove_interior_bg.
+    """
+    size = 16
+    bg = (255, 0, 255, 255)
+    fg = (0, 0, 255, 255)
+    img = Image.new("RGBA", (size, size), bg)
+
+    # Draw a 2-pixel-wide frame of blue design pixels; inner area stays magenta
+    for y in range(size):
+        for x in range(size):
+            if 3 <= x < size - 3 and 3 <= y < size - 3:
+                if x < 5 or x >= size - 5 or y < 5 or y >= size - 5:
+                    img.putpixel((x, y), fg)
+
+    result = remove_background_color(img, "#FF00FF", tolerance=10, erode_px=0, decontaminate=0)
+    arr = np.array(result)
+
+    # Outer corners — edge-connected background — must be transparent
+    assert arr[0, 0, 3] == 0, "Outer corner should be transparent"
+
+    # Center pixel — interior magenta pocket — must also be transparent
+    cx, cy = size // 2, size // 2
+    assert arr[cy, cx, 3] == 0, "Interior pocket pixel should be transparent"
+
+
+def test_tolerance_out_of_range_raises():
+    """tolerance outside 0–255 should raise ValueError."""
+    img = _solid_image((255, 0, 255, 255))
+    with pytest.raises(ValueError, match="tolerance"):
+        remove_background_color(img, "#FF00FF", tolerance=256)
+    with pytest.raises(ValueError, match="tolerance"):
+        remove_background_color(img, "#FF00FF", tolerance=-1)

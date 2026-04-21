@@ -13,6 +13,11 @@ from src.presets import (
     save_preset,
 )
 
+# Minimal valid templates satisfying the required-placeholder check in save_preset().
+_C = "Give me {num_concepts} ideas for {theme}."
+_V = "Create {num_variants} variants for: {concept}."
+_S = "Use {bg_color} background with max {max_colors} colors."
+
 
 def test_load_builtin_returns_required_keys():
     builtin = load_builtin()
@@ -47,25 +52,25 @@ def test_get_preset_raises_for_unknown(tmp_path, monkeypatch):
 def test_save_and_load_user_preset(tmp_path, monkeypatch):
     monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
 
-    save_preset("My Preset", "concepts tmpl", "variants tmpl", "style tmpl")
+    save_preset("My Preset", _C, _V, _S)
     result = get_preset("My Preset")
 
-    assert result["concepts_prompt"] == "concepts tmpl"
-    assert result["variants_prompt"] == "variants tmpl"
-    assert result["style_suffix"] == "style tmpl"
+    assert result["concepts_prompt"] == _C
+    assert result["variants_prompt"] == _V
+    assert result["style_suffix"] == _S
 
 
 def test_save_preset_appears_in_all_names(tmp_path, monkeypatch):
     monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
 
-    save_preset("Cool Preset", "a", "b", "c")
+    save_preset("Cool Preset", _C, _V, _S)
     assert "Cool Preset" in all_preset_names()
 
 
 def test_delete_preset_removes_it(tmp_path, monkeypatch):
     monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
 
-    save_preset("Temp", "a", "b", "c")
+    save_preset("Temp", _C, _V, _S)
     delete_preset("Temp")
     assert "Temp" not in all_preset_names()
 
@@ -79,18 +84,40 @@ def test_overwriting_existing_preset_does_not_count_toward_limit(tmp_path, monke
     monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
     monkeypatch.setattr(presets_module, "MAX_PRESETS", 1)
 
-    save_preset("Only One", "a", "b", "c")
+    _C2 = "Different {num_concepts} template for {theme}."
+    save_preset("Only One", _C, _V, _S)
     # Overwriting same name should not raise even though limit is 1
-    save_preset("Only One", "x", "y", "z")
-    assert get_preset("Only One")["concepts_prompt"] == "x"
+    save_preset("Only One", _C2, _V, _S)
+    assert get_preset("Only One")["concepts_prompt"] == _C2
 
 
 def test_preset_limit_enforced(tmp_path, monkeypatch):
     monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
     monkeypatch.setattr(presets_module, "MAX_PRESETS", 2)
 
-    save_preset("P1", "a", "b", "c")
-    save_preset("P2", "a", "b", "c")
+    save_preset("P1", _C, _V, _S)
+    save_preset("P2", _C, _V, _S)
 
     with pytest.raises(ValueError, match="limit"):
-        save_preset("P3", "a", "b", "c")
+        save_preset("P3", _C, _V, _S)
+
+
+def test_save_preset_rejects_missing_theme_placeholder(tmp_path, monkeypatch):
+    """Concepts template without {theme} should raise before writing."""
+    monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
+    with pytest.raises(ValueError, match=r"\{theme\}"):
+        save_preset("Bad", "Give me {num_concepts} ideas.", _V, _S)
+
+
+def test_save_preset_rejects_missing_variants_placeholder(tmp_path, monkeypatch):
+    """Variants template without {concept} should raise before writing."""
+    monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
+    with pytest.raises(ValueError, match=r"\{concept\}"):
+        save_preset("Bad", _C, "Create {num_variants} variants.", _S)
+
+
+def test_save_preset_rejects_missing_style_placeholder(tmp_path, monkeypatch):
+    """Style template without {bg_color} should raise before writing."""
+    monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
+    with pytest.raises(ValueError, match=r"\{bg_color\}"):
+        save_preset("Bad", _C, _V, "Max {max_colors} colors.")
