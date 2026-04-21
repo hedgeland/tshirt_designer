@@ -15,6 +15,23 @@ _DEFAULTS_PATH = Path(__file__).parent.parent / "prompts.toml"
 _PRESETS_PATH = Path(__file__).parent.parent / "prompt_presets.json"
 BUILTIN_NAME = "Default (built-in)"
 
+# Required placeholders for each template key — saving a preset that drops any of
+# these would cause a silent KeyError when the template is rendered at generation time.
+_REQUIRED_PLACEHOLDERS: dict[str, list[str]] = {
+    "concepts_prompt": ["{theme}", "{num_concepts}"],
+    "variants_prompt": ["{concept}", "{num_variants}"],
+    "style_suffix": ["{bg_color}", "{max_colors}"],
+}
+
+
+def _validate_template(key: str, template: str) -> None:
+    """Raise ValueError if template is missing any required placeholder."""
+    missing = [p for p in _REQUIRED_PLACEHOLDERS.get(key, []) if p not in template]
+    if missing:
+        raise ValueError(
+            f"Template '{key}' is missing required placeholder(s): {', '.join(missing)}"
+        )
+
 
 def load_builtin() -> dict[str, str]:
     with open(_DEFAULTS_PATH, "rb") as f:
@@ -46,6 +63,12 @@ def get_preset(name: str) -> dict[str, str]:
 
 
 def save_preset(name: str, concepts: str, variants: str, style: str) -> None:
+    # Validate placeholders before writing — a missing {theme} etc. would fail silently
+    # at generation time, far from where the preset was saved.
+    _validate_template("concepts_prompt", concepts)
+    _validate_template("variants_prompt", variants)
+    _validate_template("style_suffix", style)
+
     user_presets = load_user_presets()
     # Overwriting an existing preset is always allowed; only new entries count.
     if name not in user_presets and len(user_presets) >= MAX_PRESETS:
