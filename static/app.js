@@ -185,8 +185,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         pScale: 1.0,                // fraction of print area width the design occupies
         pContentTop: 0,             // fraction of image height above first visible pixel
 
-        pOverrideMinRes: false,     // dev override: skip the resolution gate when testing
-
         pTitle: "",
         pDescription: "",
         pPrice: "29.99",
@@ -1086,7 +1084,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             fd.append("design_y", designY.toFixed(4));
             fd.append("design_scale", scale);
             fd.append("final_url", this.activeComboUrl ?? "");
-            fd.append("override_min_res", this.pOverrideMinRes);
 
             await streamSSE("/printify/publish", fd, {
                 status: (e) => { this.printifyStatus = e.message; },

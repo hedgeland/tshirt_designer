@@ -1324,7 +1324,6 @@ async def printify_publish(
     design_y: float = Form(0.5),
     design_scale: float = Form(0.8),
     final_url: str = Form(""),
-    override_min_res: bool = Form(False),
 ):
     """Upload the session's final image to Printify and create (optionally publish) a product."""
 
@@ -1349,9 +1348,8 @@ async def printify_publish(
 
         # Enforce minimum resolution — open the file and check its actual dimensions
         # rather than trusting the session, so this holds even after a server restart.
-        # override_min_res bypasses this gate for local testing.
         min_px = SIZE_PX.get(PRINTIFY_MIN_SIZE, 0)
-        if min_px and not override_min_res:
+        if min_px:
             img_check = await asyncio.to_thread(Image.open, final_path)
             w, h = img_check.size
             if max(w, h) < min_px:
