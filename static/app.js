@@ -357,6 +357,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 });
                 if (state.selected_idx != null) this.selectedVariant = state.selected_idx;
                 if (state.variant_size) this.generatedVariantSize = state.variant_size;
+                if (state.variant_aspect_ratio) this.generatedVariantAspectRatio = state.variant_aspect_ratio;
                 // Re-enable edit mode if iterations exist so the iterations panel is visible
                 if (state.image_paths.length > origCount) this.editModeActive = true;
             }

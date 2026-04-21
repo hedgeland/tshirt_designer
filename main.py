@@ -125,6 +125,7 @@ _SERIALIZABLE_COLUMN_KEYS = {
     "concepts",
     "prompts",
     "variant_size",
+    "variant_aspect_ratio",  # aspect ratio used when variants were generated; needed to restore gallery label
     "image_paths",
     "original_image_paths",  # N original variants; anything beyond this in image_paths is an iteration
     "iteration_roots",       # rootIdx for each iteration in order; parallel to image_paths[len(original_image_paths):]
@@ -508,6 +509,7 @@ async def generate(
             {
                 "prompts": prompts,
                 "variant_size": variant_size,
+                "variant_aspect_ratio": aspect_ratio,
                 "images": images,
                 "image_paths": paths,
                 "original_images": list(images),  # preserved so bg removal is undoable
