@@ -1147,12 +1147,21 @@
                                                         ? '✨ 4K — already rendered'
                                                         : '✨ Render at 4K'"
                                                     class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
-                                                <!-- Publish button lives here — render at 4K first, then publish -->
+                                                <!-- Publish button — disabled and red when below 4K; override checkbox below unlocks for testing -->
                                                 <button x-show="cfg.printifyEnabled" @click="openPrintify()"
-                                                    :disabled="isLoading"
-                                                    x-text="pNeedsUpscale ? `👕 ${cfg.printifyMinSize} Required` : '👕 Printify'"
-                                                    :class="pNeedsUpscale ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'"
-                                                    class="px-3 py-1.5 text-white text-xs font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
+                                                    :disabled="isLoading || (pNeedsUpscale && !printifyOverride)"
+                                                    :class="pNeedsUpscale && !printifyOverride ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                                                    class="px-3 py-1.5 text-white text-xs font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors">👕 Printify</button>
+                                                <!-- Inline warning — only visible when below minimum resolution -->
+                                                <span x-show="cfg.printifyEnabled && pNeedsUpscale"
+                                                    class="text-xs text-red-500 font-bold"
+                                                    x-text="`${cfg.printifyMinSize} Required`"></span>
+                                            </div>
+                                            <!-- Override checkbox — bottom of section; for testing only -->
+                                            <div x-show="cfg.printifyEnabled && pNeedsUpscale" class="mt-2 flex items-center gap-2">
+                                                <input type="checkbox" id="printifyOverride" x-model="printifyOverride"
+                                                    class="w-3.5 h-3.5 accent-red-500 cursor-pointer">
+                                                <label for="printifyOverride" class="text-xs text-slate-400 cursor-pointer select-none">Override resolution check (testing only)</label>
                                             </div>
                                         </div>
                                         <div class="mt-3" x-show="loadingStep === 5 && (isLoading || error)">
@@ -1596,13 +1605,13 @@
                                         </div>
                                         <div x-show="pSizes.length > 0" class="flex gap-3 px-6 py-4">
                                             <button @click="doPublish(false)"
-                                                :disabled="printifyBusy || selectedVariantCount === 0 || pNeedsUpscale"
+                                                :disabled="printifyBusy || selectedVariantCount === 0 || (pNeedsUpscale && !printifyOverride)"
                                                 class="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                x-text="pNeedsUpscale ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Save as Draft'"></button>
+                                                x-text="(pNeedsUpscale && !printifyOverride) ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Save as Draft'"></button>
                                             <button @click="doPublish(true)"
-                                                :disabled="printifyBusy || selectedVariantCount === 0 || pNeedsUpscale"
+                                                :disabled="printifyBusy || selectedVariantCount === 0 || (pNeedsUpscale && !printifyOverride)"
                                                 class="flex-1 px-4 py-2 text-white text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                x-text="pNeedsUpscale ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Publish to Store'"></button>
+                                                x-text="(pNeedsUpscale && !printifyOverride) ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Publish to Store'"></button>
                                         </div>
                                     </div>
 
