@@ -99,11 +99,13 @@ def create_product(
     design_x: float = 0.5,
     design_y: float = 0.5,
     design_scale: float = 0.8,
+    design_angle: float = 0,
 ) -> str:
     """Create a Printify product draft and return its product ID.
 
     design_x/y are the image center as fractions (0–1) of the print area.
     design_scale is the fraction of the print area width the image occupies.
+    design_angle is clockwise rotation in degrees (0 = no rotation).
     """
     payload = {
         "title": title,
@@ -127,7 +129,7 @@ def create_product(
                                 "x": design_x,
                                 "y": design_y,
                                 "scale": design_scale,
-                                "angle": 0,
+                                "angle": design_angle,
                             }
                         ],
                     }

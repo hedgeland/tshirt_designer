@@ -1405,6 +1405,26 @@
                                                         <input id="design-scale" type="range" min="0.4" max="1.0"
                                                             step="0.05" x-model.number="pScale" class="w-full">
                                                     </div>
+                                                    <!-- Rotation -->
+                                                    <div>
+                                                        <div class="flex justify-between items-baseline mb-1.5">
+                                                            <label for="design-rotate"
+                                                                class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rotation</label>
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-xs font-semibold text-indigo-500"
+                                                                    x-text="pRotateDeg + '°'"></span>
+                                                                <button @click="pRotateDeg = 0"
+                                                                    x-show="pRotateDeg !== 0"
+                                                                    class="text-xs text-indigo-500 hover:text-indigo-700 font-medium">Reset</button>
+                                                            </div>
+                                                        </div>
+                                                        <!-- min/max are −180…180 so 0 sits exactly at center; @input snaps to 0 within ±5° -->
+                                                        <input id="design-rotate" type="range" min="-180" max="180"
+                                                            step="1" x-model.number="pRotateDeg"
+                                                            @input="snapRotation(pRotateDeg)"
+                                                            @dblclick="pRotateDeg = 0"
+                                                            class="w-full">
+                                                    </div>
                                                     <!-- X/Y position -->
                                                     <div x-show="pPrintWidth && pPrintHeight" class="space-y-2">
                                                         <label
@@ -1465,10 +1485,9 @@
                                                         class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Preview</label>
                                                     <div class="relative overflow-hidden rounded border border-slate-300 bg-slate-100 select-none"
                                                         :style="{ width: '220px', height: Math.round(220 * pPrintHeight / pPrintWidth) + 'px' }">
-                                                        <img :src="(activeComboUrl || selectedVariantObj?.url) ? (activeComboUrl || selectedVariantObj?.url) : ''"
-                                                            alt="Design placement preview" tabindex="0"
-                                                            draggable="false"
-                                                            title="Drag to reposition — or use arrow keys (Shift for 10px steps)"
+                                                        <!-- Wrapper: absolutely positioned in canvas, carries the rotation transform.
+                                                             Image and handle are children so both rotate around the design center. -->
+                                                        <div tabindex="0"
                                                             @mousedown.prevent="startDrag($event)"
                                                             @keydown.arrow-left.prevent="nudgeDrag(-1, 0)"
                                                             @keydown.arrow-right.prevent="nudgeDrag(1, 0)"
@@ -1477,14 +1496,36 @@
                                                             @keydown.shift.arrow-left.prevent="nudgeDrag(-10, 0)"
                                                             @keydown.shift.arrow-right.prevent="nudgeDrag(10, 0)"
                                                             @keydown.shift.arrow-up.prevent="nudgeDrag(0, -10)"
-                                                            @keydown.shift.arrow-down.prevent="nudgeDrag(0, 10)" :style="{
-                                                                 position: 'absolute',
-                                                                 width: Math.round(pScale * 220) + 'px',
-                                                                 left: Math.round(pXPx * 220 / pPrintWidth) + 'px',
-                                                                 top: Math.round(pYPx * 220 / pPrintWidth) + 'px',
-                                                                 cursor: pDrag ? 'grabbing' : 'grab',
-                                                                 opacity: pDrag ? 0.6 : 1,
-                                                             }">
+                                                            @keydown.shift.arrow-down.prevent="nudgeDrag(0, 10)"
+                                                            :style="{
+                                                                position: 'absolute',
+                                                                width: Math.round(pScale * 220) + 'px',
+                                                                height: Math.round(pScale * 220) + 'px',
+                                                                left: Math.round(pXPx * 220 / pPrintWidth) + 'px',
+                                                                top: Math.round(pYPx * 220 / pPrintWidth) + 'px',
+                                                                transform: 'rotate(' + pRotateDeg + 'deg)',
+                                                                transformOrigin: 'center',
+                                                                cursor: pDrag ? 'grabbing' : 'grab',
+                                                                opacity: pDrag ? 0.6 : 1,
+                                                            }">
+                                                            <img :src="(activeComboUrl || selectedVariantObj?.url) ? (activeComboUrl || selectedVariantObj?.url) : ''"
+                                                                alt="Design placement preview"
+                                                                draggable="false"
+                                                                title="Drag to reposition · handle to rotate — or use arrow keys (Shift for 10px steps)"
+                                                                style="width:100%;height:100%;display:block;pointer-events:none;">
+                                                            <!-- Rotation handle: circle at top-center of the image; rotates with wrapper.
+                                                                 Hidden during position-drag to reduce clutter. -->
+                                                            <div x-show="!pDrag"
+                                                                @mousedown.stop.prevent="startRotate($event)"
+                                                                title="Drag to rotate"
+                                                                :style="{ cursor: pRotate ? 'grabbing' : 'crosshair' }"
+                                                                class="absolute top-1 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white/90 border-2 border-indigo-500 flex items-center justify-center shadow-sm hover:bg-white hover:border-indigo-700">
+                                                                <svg class="w-3 h-3 text-indigo-600 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                                    <path d="M21 12a9 9 0 1 1-9-9"/>
+                                                                    <polyline points="21 3 21 9 15 9"/>
+                                                                </svg>
+                                                            </div>
+                                                        </div>
                                                         <!-- Guides render after the img so they overlay it; pointer-events-none so drag still targets the img -->
                                                         <div class="absolute inset-x-0 top-1/2 border-dashed transition-all duration-75 pointer-events-none"
                                                             :class="(pPrintHeight && Math.abs(pYPx + pScale*pPrintWidth/2 - pPrintHeight/2) <= 5)

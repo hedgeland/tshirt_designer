@@ -183,8 +183,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // ── Load-from-browser state ───────────────────────────────────────
         loadedImageRes: null,   // {width, height} when variants came from the output browser
 
-        // ── Drag state (Printify placement preview) ───────────────────────
+        // ── Drag / rotate state (Printify placement preview) ──────────────
         pDrag: null,            // null when idle; { startX, startY, startPX, startPY } while dragging
+        pRotate: null,          // null when idle; { centerX, centerY, startAngle } while rotating
+        pRotateDeg: 0,          // current rotation angle in degrees (−180 to 180; 0 = no rotation)
 
         // ── Printify state ─────────────────────────────────────────────────
         showPrintify: false,
@@ -321,8 +323,14 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         get pImageOutOfBounds() {
             if (!this.pPrintWidth || !this.pPrintHeight) return false;
             const designPx = this.pDesignPx;
-            return this.pXPx < 0 || this.pXPx + designPx > this.pPrintWidth
-                || this.pYPx < 0 || this.pYPx + designPx > this.pPrintHeight;
+            const rad = this.pRotateDeg * Math.PI / 180;
+            // Axis-aligned bounding box of a rotated square: each side expands by |cos θ| + |sin θ|
+            const aabb = designPx * (Math.abs(Math.cos(rad)) + Math.abs(Math.sin(rad)));
+            // Check bounding box of the rotated image (centered on the design center)
+            const cx = this.pXPx + designPx / 2;
+            const cy = this.pYPx + designPx / 2;
+            return cx - aabb / 2 < 0 || cx + aabb / 2 > this.pPrintWidth
+                || cy - aabb / 2 < 0 || cy + aabb / 2 > this.pPrintHeight;
         },
 
         get selectedVariantCount() {
@@ -857,6 +865,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pContentTop = 0;
             this.pXPx = 0;
             this.pYPx = this.pTopAllowance;  // pTopAllowance intentionally not reset — persists
+            this.pRotateDeg = 0;
             this.pIsTopPreset = true;
             this.pTitle = this.theme || "Custom T-Shirt";
             this.showPrintify = true;
@@ -1029,6 +1038,47 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             document.addEventListener('mouseup', onUp);
         },
 
+        // Snap rotation angle to 0 when within ±5°; called from slider @input and rotate mousemove
+        snapRotation(raw) {
+            this.pRotateDeg = Math.abs(raw) <= 5 ? 0 : Math.round(raw);
+        },
+
+        startRotate(e) {
+            // Same closure pattern as startDrag — x-teleport proxy mismatch means we must
+            // capture `this` before registering document-level listeners.
+            const self = this;
+
+            // The handle's parent is the image+handle wrapper div; its center == design center.
+            const wrapper = e.currentTarget.parentElement;
+            const rect = wrapper.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top  + rect.height / 2;
+
+            // Record the angle from design center → pointer at drag start so subsequent
+            // moves are expressed as a delta rather than an absolute angle.
+            const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+            const startDeg = self.pRotateDeg;
+
+            self.pRotate = {};  // truthy: drives grabbing cursor on the handle
+
+            function onMove(ev) {
+                const currentAngle = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI;
+                // Wrap result into −180…180 so the slider thumb tracks correctly
+                let raw = startDeg + (currentAngle - startAngle);
+                raw = ((raw + 180) % 360 + 360) % 360 - 180;
+                self.snapRotation(raw);
+            }
+
+            function onUp() {
+                self.pRotate = null;
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        },
+
         // Keyboard nudge for the placement preview image; dx/dy in print pixels
         nudgeDrag(dx, dy) {
             if (!this.pPrintWidth || !this.pPrintHeight) return;
@@ -1119,6 +1169,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             fd.append("design_x", designX.toFixed(4));
             fd.append("design_y", designY.toFixed(4));
             fd.append("design_scale", scale);
+            fd.append("design_angle", this.pRotateDeg);
             fd.append("final_url", this.activeComboUrl ?? "");
 
             await streamSSE("/printify/publish", fd, {

@@ -1445,6 +1445,7 @@ async def printify_publish(
     design_x: float = Form(0.5),
     design_y: float = Form(0.5),
     design_scale: float = Form(0.8),
+    design_angle: float = Form(0),
     final_url: str = Form(""),
 ):
     """Upload the session's final image to Printify and create (optionally publish) a product."""
@@ -1462,6 +1463,9 @@ async def printify_publish(
             return
         if not 0.1 <= design_scale <= 2.0:
             yield sse({"type": "error", "message": "design_scale must be between 0.1 and 2.0."})
+            return
+        if not -360 <= design_angle <= 360:
+            yield sse({"type": "error", "message": "design_angle must be between -360 and 360."})
             return
 
         session = get_column(session_id, column_id)
@@ -1528,6 +1532,7 @@ async def printify_publish(
                 design_x,
                 design_y,
                 design_scale,
+                design_angle,
             )
         except Exception as e:
             yield sse({"type": "error", "message": f"Product creation failed: {e}"})
