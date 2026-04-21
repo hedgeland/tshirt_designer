@@ -33,6 +33,11 @@ MAX_COLORS = 6          # max distinct colors in generated image; 1–8
 MAX_PRESETS = 20        # max number of saved user presets (excludes built-in default)
 MAX_COLUMNS = 6         # hard server-side cap on columns per session; user sets their own limit up to this value
 
+# In-memory session lifecycle: evict sessions idle longer than TTL (seconds).
+# Cleanup runs every INTERVAL seconds on a background asyncio task.
+SESSION_TTL_SECONDS = 2 * 60 * 60       # 2 hours idle before eviction
+SESSION_CLEANUP_INTERVAL = 30 * 60      # sweep frequency: every 30 minutes
+
 # Printify integration — leave PRINTIFY_TOKEN unset to hide publishing features.
 PRINTIFY_TOKEN = os.getenv("PRINTIFY_TOKEN", "")
 # Pre-set your shop ID to skip the shop-selector step in the publish modal.
