@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 
 from config import PRINTIFY_API_TIMEOUT, PRINTIFY_UPLOAD_TIMEOUT
+from src.retry import with_retry
 
 _BASE = "https://api.printify.com/v1"
 _TIMEOUT = PRINTIFY_API_TIMEOUT
@@ -22,9 +23,11 @@ def _h(token: str) -> dict[str, str]:
 
 def list_shops(token: str) -> list[dict]:
     """Return all shops connected to this Printify account."""
-    r = httpx.get(f"{_BASE}/shops.json", headers=_h(token), timeout=_TIMEOUT)
-    r.raise_for_status()
-    return r.json()
+    def _call():
+        r = httpx.get(f"{_BASE}/shops.json", headers=_h(token), timeout=_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    return with_retry(_call)
 
 
 def list_blueprints(token: str) -> list[dict]:
@@ -32,17 +35,21 @@ def list_blueprints(token: str) -> list[dict]:
 
     Each entry has: id, title, brand, model, images.
     """
-    r = httpx.get(f"{_BASE}/catalog/blueprints.json", headers=_h(token), timeout=_TIMEOUT)
-    r.raise_for_status()
-    return r.json()
+    def _call():
+        r = httpx.get(f"{_BASE}/catalog/blueprints.json", headers=_h(token), timeout=_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    return with_retry(_call)
 
 
 def list_print_providers(token: str, blueprint_id: int) -> list[dict]:
     """Return print providers available for a given blueprint."""
     url = f"{_BASE}/catalog/blueprints/{blueprint_id}/print_providers.json"
-    r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
-    r.raise_for_status()
-    return r.json()
+    def _call():
+        r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    return with_retry(_call)
 
 
 def list_variants(token: str, blueprint_id: int, provider_id: int) -> list[dict]:
@@ -54,9 +61,11 @@ def list_variants(token: str, blueprint_id: int, provider_id: int) -> list[dict]
         f"{_BASE}/catalog/blueprints/{blueprint_id}"
         f"/print_providers/{provider_id}/variants.json"
     )
-    r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
-    r.raise_for_status()
-    return r.json().get("variants", [])
+    def _call():
+        r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
+        r.raise_for_status()
+        return r.json().get("variants", [])
+    return with_retry(_call)
 
 
 # ── Publishing ─────────────────────────────────────────────────────────────────
@@ -65,14 +74,16 @@ def upload_image(token: str, image_path: str) -> str:
     """Upload a PNG file to Printify's image library. Returns the image ID."""
     path = Path(image_path)
     encoded = base64.b64encode(path.read_bytes()).decode()
-    r = httpx.post(
-        f"{_BASE}/uploads/images.json",
-        headers=_h(token),
-        json={"file_name": path.name, "contents": encoded},
-        timeout=PRINTIFY_UPLOAD_TIMEOUT,  # 4K PNG uploads can be large
-    )
-    r.raise_for_status()
-    return r.json()["id"]
+    def _call():
+        r = httpx.post(
+            f"{_BASE}/uploads/images.json",
+            headers=_h(token),
+            json={"file_name": path.name, "contents": encoded},
+            timeout=PRINTIFY_UPLOAD_TIMEOUT,  # 4K PNG uploads can be large
+        )
+        r.raise_for_status()
+        return r.json()["id"]
+    return with_retry(_call)
 
 
 def create_product(
@@ -124,23 +135,27 @@ def create_product(
             }
         ],
     }
-    r = httpx.post(
-        f"{_BASE}/shops/{shop_id}/products.json",
-        headers=_h(token),
-        json=payload,
-        timeout=_TIMEOUT,
-    )
-    r.raise_for_status()
-    return r.json()["id"]
+    def _call():
+        r = httpx.post(
+            f"{_BASE}/shops/{shop_id}/products.json",
+            headers=_h(token),
+            json=payload,
+            timeout=_TIMEOUT,
+        )
+        r.raise_for_status()
+        return r.json()["id"]
+    return with_retry(_call)
 
 
 def publish_product(token: str, shop_id: str, product_id: str) -> None:
     """Publish a draft product to the connected store."""
-    r = httpx.post(
-        f"{_BASE}/shops/{shop_id}/products/{product_id}/publish.json",
-        headers=_h(token),
-        # Tell Printify which fields to sync to the connected store.
-        json={"title": True, "description": True, "images": True, "variants": True, "tags": True},
-        timeout=_TIMEOUT,
-    )
-    r.raise_for_status()
+    def _call():
+        r = httpx.post(
+            f"{_BASE}/shops/{shop_id}/products/{product_id}/publish.json",
+            headers=_h(token),
+            # Tell Printify which fields to sync to the connected store.
+            json={"title": True, "description": True, "images": True, "variants": True, "tags": True},
+            timeout=_TIMEOUT,
+        )
+        r.raise_for_status()
+    with_retry(_call)
