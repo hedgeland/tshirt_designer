@@ -257,6 +257,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.$watch('pContentTop', () => {
                 if (this.pIsTopPreset && this.pPrintWidth) this.applyTopPreset();
             });
+            // pTightBounds also arrives async (bg-removed alpha scan); it overrides pContentTop
+            this.$watch('pTightBounds', () => {
+                if (this.pIsTopPreset && this.pPrintWidth) this.applyTopPreset();
+            });
 
             // Receive "load image as variant" events dispatched by the output browser
             window.addEventListener('col-load-image', (e) => {
@@ -1147,10 +1151,13 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         applyTopPreset() {
             if (!this.pPrintWidth) return;
-            // Center horizontally; back out transparent padding so visible content
-            // lands at pTopAllowance from the top of the print area
+            // When bg is removed pTightBounds.top gives pixel-accurate content top from
+            // the alpha scan; fall back to server-side pContentTop for fully-opaque images.
+            const contentTop = this.pTightBounds ? this.pTightBounds.top : this.pContentTop;
+            // Center horizontally; subtract the transparent top padding so visible content
+            // lands exactly pTopAllowance px from the top of the print area.
             this.pXPx = Math.round((this.pPrintWidth - this.pDesignPx) / 2);
-            this.pYPx = Math.round(this.pTopAllowance - this.pContentTop * this.pDesignPx);
+            this.pYPx = Math.round(this.pTopAllowance - contentTop * this.pDesignPx);
             this.pIsTopPreset = true;
         },
 
