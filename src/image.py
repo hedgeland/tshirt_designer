@@ -1,33 +1,13 @@
 """Gemini image generation — brainstorm variants and high-resolution finalization."""
 
 import io
-import time
 
 from google.genai import types
 from PIL import Image
 
 from config import BRAINSTORM_SIZE, DEFAULT_ASPECT_RATIO, FINAL_SIZE, MODEL
 from src.client import get_client
-
-
-def _with_retry(fn, retries: int = 3, base_delay: float = 5.0):
-    """Call fn(), retrying up to `retries` times on transient 5xx / deadline errors.
-
-    4K generation takes 20-40 s and occasionally hits Google's deadline on the first
-    attempt.  A short pause lets the service recover before we try again.
-    Delays: 5 s → 10 s → 20 s (exponential backoff, capped at three attempts).
-    """
-    for attempt in range(retries):
-        try:
-            return fn()
-        except Exception as e:
-            msg = str(e).lower()
-            # Retry on service-unavailable, deadline-exceeded, and generic 5xx signals
-            is_transient = any(k in msg for k in ("503", "unavailable", "deadline", "timeout", "500", "internal"))
-            if is_transient and attempt < retries - 1:
-                time.sleep(base_delay * (2 ** attempt))
-                continue
-            raise
+from src.retry import with_retry
 
 
 def _extract_image(response) -> Image.Image:
@@ -115,7 +95,7 @@ def generate_image(
             ),
         )
 
-    return _extract_image(_with_retry(_call))
+    return _extract_image(with_retry(_call))
 
 
 def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str = FINAL_SIZE, aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> Image.Image:
@@ -149,4 +129,4 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
             ),
         )
 
-    return _extract_image(_with_retry(_call))
+    return _extract_image(with_retry(_call))
