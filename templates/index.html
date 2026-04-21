@@ -1117,8 +1117,13 @@
                                 <section x-show="(step >= 4 || loadedImageRes) && selectedVariant !== null" x-transition
                                     class="rounded-xl shadow-sm p-4">
                                     <div class="flex items-center justify-between mb-3">
-                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100">6 ·
-                                            Finalize</h2>
+                                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 flex items-baseline gap-2">
+                                            <span>6 · Finalize</span>
+                                            <span x-show="activeComboSize"
+                                                :class="(cfg.sizePx[activeComboSize] ?? 0) < cfg.sizePx['4K'] ? 'text-red-400 font-bold' : 'text-slate-400 font-normal'"
+                                                class="normal-case tracking-normal text-xs"
+                                                x-text="`${aspectRatio} @ ${activeComboSize}`"></span>
+                                        </h2>
                                         <button @click="sCollapsed[6] = !sCollapsed[6]" :aria-expanded="!sCollapsed[6]"
                                             class="text-slate-400 hover:text-slate-200 transition-colors p-0.5 rounded">
                                             <svg :class="sCollapsed[6] ? '-rotate-90' : ''"
