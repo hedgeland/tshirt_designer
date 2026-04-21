@@ -38,16 +38,40 @@ document.addEventListener('keydown', (e) => {
 // Streams a POST request as Server-Sent Events and dispatches each parsed event
 // to the matching handler in `handlers`. Uses fetch + ReadableStream rather than
 // EventSource because EventSource only supports GET requests.
-async function streamSSE(url, formData, handlers) {
+//
+// noDataTimeoutMs: abort and fire handlers.error if no data chunk arrives within
+// this window. The timer resets on every received chunk, so long-running but
+// actively-streaming requests (e.g. 4K generation) are not affected.
+async function streamSSE(url, formData, handlers, noDataTimeoutMs = 60000) {
+    const controller = new AbortController();
+    let timeoutId = null;
+
+    // Reset the watchdog timer; called on connection and on each received chunk.
+    const resetTimeout = () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+            controller.abort();
+        }, noDataTimeoutMs);
+    };
+
+    resetTimeout();
+
     let response;
     try {
-        response = await fetch(url, { method: "POST", body: formData });
+        response = await fetch(url, { method: "POST", body: formData, signal: controller.signal });
+        resetTimeout(); // connection established — restart the window
     } catch (err) {
-        if (handlers.error) handlers.error({ message: `Network error: ${err.message}` });
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+            if (handlers.error) handlers.error({ message: "Server stopped responding — please try again." });
+        } else {
+            if (handlers.error) handlers.error({ message: `Network error: ${err.message}` });
+        }
         return;
     }
 
     if (!response.ok) {
+        clearTimeout(timeoutId);
         if (handlers.error) handlers.error({ message: `Request failed: HTTP ${response.status}` });
         return;
     }
@@ -56,22 +80,34 @@ async function streamSSE(url, formData, handlers) {
     const decoder = new TextDecoder();
     let buffer = "";
 
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        // SSE events are separated by blank lines; split on newlines and process complete lines
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? ""; // keep the last (possibly incomplete) line
-        for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            try {
-                const event = JSON.parse(line.slice(6));
-                if (handlers[event.type]) handlers[event.type](event);
-            } catch {
-                // malformed JSON — skip
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            resetTimeout(); // data arrived — push the watchdog window forward
+            buffer += decoder.decode(value, { stream: true });
+            // SSE events are separated by blank lines; split on newlines and process complete lines
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? ""; // keep the last (possibly incomplete) line
+            for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try {
+                    const event = JSON.parse(line.slice(6));
+                    if (handlers[event.type]) handlers[event.type](event);
+                } catch {
+                    // malformed JSON — skip
+                }
             }
         }
+    } catch (err) {
+        // reader.read() throws when the AbortController fires mid-stream
+        if (err.name === 'AbortError') {
+            if (handlers.error) handlers.error({ message: "Server stopped responding — please try again." });
+        } else {
+            if (handlers.error) handlers.error({ message: `Stream error: ${err.message}` });
+        }
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 
