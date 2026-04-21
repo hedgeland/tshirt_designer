@@ -46,6 +46,8 @@ from config import (
     PRINTIFY_SHOP_NAME,
     PRINTIFY_TOKEN,
     SECRET_KEY,
+    SESSION_CLEANUP_INTERVAL,
+    SESSION_TTL_SECONDS,
     SIZE_PX,
 )
 from src import presets, printify
@@ -99,9 +101,41 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-# SessionMiddleware must be added after AuthMiddleware so it runs first (outer wraps inner).
+class OriginCheckMiddleware(BaseHTTPMiddleware):
+    """Reject state-mutating requests whose Origin doesn't match this server.
+
+    Only active when auth is enabled (GOOGLE_CLIENT_ID set); same_site="lax" already
+    mitigates most CSRF risk in local-dev mode, but origin validation closes the remaining
+    gap for authenticated deployments without adding token round-trips.
+    """
+    async def dispatch(self, request: Request, call_next):
+        # Only enforce in auth mode; GET/HEAD/OPTIONS are safe methods.
+        if not GOOGLE_CLIENT_ID or request.method in ("GET", "HEAD", "OPTIONS"):
+            return await call_next(request)
+        path = request.url.path
+        if path in _PUBLIC_PATHS or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
+            return await call_next(request)
+        origin = request.headers.get("origin", "")
+        if origin:
+            # Compare just scheme+host+port; strip any trailing slash from base_url.
+            expected = str(request.base_url).rstrip("/")
+            if origin.rstrip("/") != expected:
+                return Response("Forbidden", status_code=403)
+        return await call_next(request)
+
+
+# Middleware execution order (last added = outermost = runs first):
+#   SessionMiddleware → OriginCheckMiddleware → AuthMiddleware → app
 app.add_middleware(AuthMiddleware)
+app.add_middleware(OriginCheckMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, https_only=HTTPS_ONLY, same_site="lax")
+
+# Warn early rather than letting the first generation attempt fail inside an SSE stream.
+if not GOOGLE_API_KEY:
+    logger.warning(
+        "GOOGLE_API_KEY is not set — generation endpoints will return errors until "
+        "it is configured in .env"
+    )
 
 # Ensure directories exist before mounting as static
 Path(OUTPUT_DIR).mkdir(exist_ok=True)
@@ -152,13 +186,17 @@ def init_column_state() -> dict:
 
 
 def get_session(session_id: str) -> dict:
-    """Return the session-level dict (columns list + max_columns). Creates if missing."""
+    """Return the session-level dict (columns list + max_columns). Creates if missing.
+
+    Updates _last_accessed on every call so the cleanup loop can evict idle sessions.
+    """
     if session_id not in sessions:
         sessions[session_id] = {
             "columns": [init_column_state()],  # start with one column
             "max_columns": MAX_COLUMNS,
             "min_columns": 1,
         }
+    sessions[session_id]["_last_accessed"] = time.time()
     return sessions[session_id]
 
 
@@ -247,6 +285,61 @@ def _scan_variant_combos(concept_dir: Path, variant_num: int) -> list[dict]:
         })
     results.sort(key=lambda r: size_order.get(r["size"], -1), reverse=True)
     return results
+
+
+# ── Session cleanup ───────────────────────────────────────────────────────────
+
+@app.on_event("startup")
+async def start_session_cleanup():
+    """Launch the background task that evicts idle sessions."""
+    asyncio.create_task(_session_cleanup_loop())
+
+
+async def _session_cleanup_loop():
+    """Sweep `sessions` every SESSION_CLEANUP_INTERVAL and evict entries that have
+    been idle longer than SESSION_TTL_SECONDS."""
+    while True:
+        await asyncio.sleep(SESSION_CLEANUP_INTERVAL)
+        cutoff = time.time() - SESSION_TTL_SECONDS
+        stale = [
+            sid for sid, sess in sessions.items()
+            if sess.get("_last_accessed", 0) < cutoff
+        ]
+        for sid in stale:
+            sessions.pop(sid, None)
+        if stale:
+            logger.info("Session cleanup: evicted %d stale session(s)", len(stale))
+
+
+# ── Shared helpers ────────────────────────────────────────────────────────────
+
+def _validate_bg_params(bg_tolerance: int, edge_erode: int, decontaminate: int) -> str | None:
+    """Return an error message if background-removal parameters are out of range, else None."""
+    if not 0 <= bg_tolerance <= 255:
+        return "bg_tolerance must be between 0 and 255."
+    if not 0 <= edge_erode <= 50:
+        return "edge_erode must be between 0 and 50."
+    if not 0 <= decontaminate <= 100:
+        return "decontaminate must be between 0 and 100."
+    return None
+
+
+async def _run_remove_bg(
+    img: Image.Image,
+    bg_color: str,
+    bg_tolerance: int,
+    edge_erode: int,
+    decontaminate: int,
+) -> Image.Image:
+    """Run background removal in a thread pool and return the result image."""
+    return await asyncio.to_thread(
+        remove_background_color,
+        img,
+        bg_color,
+        tolerance=bg_tolerance,
+        erode_px=edge_erode,
+        decontaminate=decontaminate,
+    )
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
@@ -399,6 +492,22 @@ async def generate(
         if not concept.strip():
             yield sse({"type": "error", "message": "No concept to generate from."})
             return
+        # Validate user-controlled numeric and enum inputs before any API call.
+        if not 1 <= num_variants <= 8:
+            yield sse({"type": "error", "message": "num_variants must be between 1 and 8."})
+            return
+        if not 1 <= max_colors <= 8:
+            yield sse({"type": "error", "message": "max_colors must be between 1 and 8."})
+            return
+        if variant_size not in SIZE_PX:
+            yield sse({"type": "error", "message": f"Invalid size '{variant_size}'."})
+            return
+        if aspect_ratio not in ASPECT_RATIOS:
+            yield sse({"type": "error", "message": f"Invalid aspect ratio '{aspect_ratio}'."})
+            return
+        if reference_mode not in ("style", "copy", "edit"):
+            yield sse({"type": "error", "message": "Invalid reference mode."})
+            return
 
         session = get_column(session_id, column_id)
         # Reference image is only applied in Direct mode — when brainstorming, the
@@ -546,6 +655,18 @@ async def finalize(
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
 ):
     async def stream():
+        # Validate inputs before touching session state.
+        if final_size not in SIZE_PX:
+            yield sse({"type": "error", "message": f"Invalid size '{final_size}'."})
+            return
+        if aspect_ratio not in ASPECT_RATIOS:
+            yield sse({"type": "error", "message": f"Invalid aspect ratio '{aspect_ratio}'."})
+            return
+        bg_err = _validate_bg_params(bg_tolerance, edge_erode, decontaminate)
+        if bg_err:
+            yield sse({"type": "error", "message": bg_err})
+            return
+
         session = get_column(session_id, column_id)
         images = session.get("images", [])
         prompts = session.get("prompts", [])
@@ -667,6 +788,13 @@ async def render_combo(
     """
 
     async def stream():
+        if size not in SIZE_PX:
+            yield sse({"type": "error", "message": f"Invalid size '{size}'."})
+            return
+        if aspect_ratio not in ASPECT_RATIOS:
+            yield sse({"type": "error", "message": f"Invalid aspect ratio '{aspect_ratio}'."})
+            return
+
         session = get_column(session_id, column_id)
         concept_dir_str = session.get("concept_dir")
         if not concept_dir_str:
@@ -838,6 +966,11 @@ async def remove_variant_bg(
     decontaminate: int = Form(...),
 ):
     async def stream():
+        bg_err = _validate_bg_params(bg_tolerance, edge_erode, decontaminate)
+        if bg_err:
+            yield sse({"type": "error", "message": bg_err})
+            return
+
         session = get_column(session_id, column_id)
         images = session.get("images", [])
         paths = session.get("image_paths", [])
@@ -860,14 +993,7 @@ async def remove_variant_bg(
         else:
             yield sse({"type": "status", "message": "Removing background..."})
             try:
-                result = await asyncio.to_thread(
-                    remove_background_color,
-                    images[idx],
-                    bg_color,
-                    tolerance=bg_tolerance,
-                    erode_px=edge_erode,
-                    decontaminate=decontaminate,
-                )
+                result = await _run_remove_bg(images[idx], bg_color, bg_tolerance, edge_erode, decontaminate)
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
                 return
@@ -905,6 +1031,11 @@ async def remove_combo_bg(
     exists we skip reprocessing and return it immediately.
     """
     async def stream():
+        bg_err = _validate_bg_params(bg_tolerance, edge_erode, decontaminate)
+        if bg_err:
+            yield sse({"type": "error", "message": bg_err})
+            return
+
         # Strip leading slash and resolve to an absolute path, rejecting anything
         # outside OUTPUT_DIR to prevent path-traversal.
         clean = combo_url.lstrip("/")
@@ -928,14 +1059,7 @@ async def remove_combo_bg(
         yield sse({"type": "status", "message": "Removing background..."})
         try:
             img = await asyncio.to_thread(lambda: Image.open(abs_path).convert("RGBA"))
-            result = await asyncio.to_thread(
-                remove_background_color,
-                img,
-                bg_color,
-                tolerance=bg_tolerance,
-                erode_px=edge_erode,
-                decontaminate=decontaminate,
-            )
+            result = await _run_remove_bg(img, bg_color, bg_tolerance, edge_erode, decontaminate)
         except Exception as e:
             yield sse({"type": "error", "message": str(e)})
             return
@@ -959,6 +1083,11 @@ async def remove_final_bg(
     decontaminate: int = Form(...),
 ):
     async def stream():
+        bg_err = _validate_bg_params(bg_tolerance, edge_erode, decontaminate)
+        if bg_err:
+            yield sse({"type": "error", "message": bg_err})
+            return
+
         session = get_column(session_id, column_id)
         final_img = session.get("final_image")
         final_path = session.get("final_path")
@@ -974,14 +1103,7 @@ async def remove_final_bg(
         else:
             yield sse({"type": "status", "message": "Removing background..."})
             try:
-                result = await asyncio.to_thread(
-                    remove_background_color,
-                    final_img,
-                    bg_color,
-                    tolerance=bg_tolerance,
-                    erode_px=edge_erode,
-                    decontaminate=decontaminate,
-                )
+                result = await _run_remove_bg(final_img, bg_color, bg_tolerance, edge_erode, decontaminate)
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
                 return
@@ -1330,6 +1452,16 @@ async def printify_publish(
     async def stream():
         if not PRINTIFY_TOKEN:
             yield sse({"type": "error", "message": "PRINTIFY_TOKEN not configured."})
+            return
+        # Validate numeric and range inputs before any API calls.
+        if price_cents < 1:
+            yield sse({"type": "error", "message": "price_cents must be at least 1."})
+            return
+        if not 0.0 <= design_x <= 1.0 or not 0.0 <= design_y <= 1.0:
+            yield sse({"type": "error", "message": "design_x and design_y must be between 0.0 and 1.0."})
+            return
+        if not 0.1 <= design_scale <= 2.0:
+            yield sse({"type": "error", "message": "design_scale must be between 0.1 and 2.0."})
             return
 
         session = get_column(session_id, column_id)
