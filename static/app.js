@@ -439,6 +439,23 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 if (state.variant_aspect_ratio) this.generatedVariantAspectRatio = state.variant_aspect_ratio;
                 // Re-enable edit mode if iterations exist so the iterations panel is visible
                 if (state.image_paths.length > origCount) this.editModeActive = true;
+
+                // Restore rendered combos scanned from disk — combo_lists[i] = [{size, aspectRatio, url}]
+                // Without this, variantCombos stays empty on hard reload and the iterations step
+                // only shows the original 512 thumbnail instead of all previously rendered sizes.
+                if (Array.isArray(state.combo_lists)) {
+                    const combos = {};
+                    state.combo_lists.forEach((list, i) => { combos[i] = list; });
+                    this.variantCombos = combos;
+                    // $watch('selectedVariant') only fires on changes, not on the initial value set
+                    // above, so we must manually seed activeComboUrl/activeComboSize here.
+                    const selIdx = this.selectedVariant ?? 0;
+                    const selCombos = combos[selIdx] || [];
+                    if (selCombos.length > 0) {
+                        this.activeComboUrl = selCombos[0].url;
+                        this.activeComboSize = selCombos[0].size;
+                    }
+                }
             }
 
             // Advance the step indicator to match the most progressed phase (4 is the max)

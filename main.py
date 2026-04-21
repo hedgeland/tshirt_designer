@@ -1579,16 +1579,38 @@ async def add_column(session_id: str = Form(...)):
     return {"column_id": len(columns) - 1, "count": len(columns)}
 
 
+def _serialize_column(col: dict) -> dict:
+    """Build a JSON-serializable column state dict for session restore.
+
+    Includes the base serializable fields plus a combo_lists scan so the client
+    can restore variantCombos without re-generating after a hard reload.
+    """
+    state = {k: col.get(k) for k in _SERIALIZABLE_COLUMN_KEYS}
+    concept_dir_str = col.get("concept_dir")
+    image_paths = col.get("image_paths") or []
+    # Scan for rendered combo files on disk — concept_dir must exist and have images
+    if concept_dir_str and image_paths:
+        concept_dir = Path(concept_dir_str)
+        if concept_dir.exists():
+            # One entry per image_path (originals + iterations), 1-indexed to match filename convention
+            state["combo_lists"] = [
+                _scan_variant_combos(concept_dir, i + 1)
+                for i in range(len(image_paths))
+            ]
+    return state
+
+
 @app.get("/session/columns")
 async def session_columns(session_id: str):
     """Return serializable column states for page-load restore.
 
     PIL Image objects are not JSON-serializable and are excluded — only text and
     path fields are returned. Images will need to be re-generated after a page reload.
+    Rendered combo files are scanned from disk and included as combo_lists so the
+    iterations step restores all previously rendered resolutions/aspect ratios.
     """
     sess = get_session(session_id)
-    serializable_keys = _SERIALIZABLE_COLUMN_KEYS
-    cols = [{k: col.get(k) for k in serializable_keys} for col in sess["columns"]]
+    cols = [_serialize_column(col) for col in sess["columns"]]
     return {
         "columns": cols,
         "max_columns": sess["max_columns"],
@@ -1611,8 +1633,7 @@ async def remove_column(session_id: str = Form(...), column_id: int = Form(...))
         return JSONResponse({"error": "Column not found."}, status_code=404)
     columns.pop(column_id)
     # Return the compacted list so the client can reassign indices in one step
-    serializable_keys = _SERIALIZABLE_COLUMN_KEYS
-    cols = [{k: col.get(k) for k in serializable_keys} for col in columns]
+    cols = [_serialize_column(col) for col in columns]
     return {
         "columns": cols,
         "max_columns": sess["max_columns"],
