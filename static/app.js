@@ -223,6 +223,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         pIsTopPreset: true,         // true when X/Y match the "Align to Top" formula
         pScale: 1.0,                // fraction of print area width the design occupies
         pContentTop: 0,             // fraction of image height above first visible pixel
+        pTightBounds: null,         // { top, bottom, left, right } fractions from canvas alpha scan; null = use full square
 
         pTitle: "",
         pDescription: "",
@@ -325,9 +326,35 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             if (!this.pPrintWidth || !this.pPrintHeight) return false;
             const designPx = this.pDesignPx;
             const rad = this.pRotateDeg * Math.PI / 180;
-            // Axis-aligned bounding box of a rotated square: each side expands by |cos θ| + |sin θ|
-            const aabb = designPx * (Math.abs(Math.cos(rad)) + Math.abs(Math.sin(rad)));
-            // Check bounding box of the rotated image (centered on the design center)
+            const cos = Math.cos(rad), sin = Math.sin(rad);
+
+            if (this.pTightBounds) {
+                // BG removed: rotate the 4 corners of the content sub-rectangle around the
+                // design-square center, then check if any corner escapes the print area.
+                const b = this.pTightBounds;
+                // Corner positions relative to design-square center (before rotation)
+                const left_rel   = (b.left   - 0.5) * designPx;
+                const right_rel  = (b.right  - 0.5) * designPx;
+                const top_rel    = (b.top    - 0.5) * designPx;
+                const bottom_rel = (b.bottom - 0.5) * designPx;
+                // Rotate all 4 corners and collect absolute print-space coordinates
+                const dcx = this.pXPx + designPx / 2;
+                const dcy = this.pYPx + designPx / 2;
+                const corners = [
+                    [left_rel, top_rel], [right_rel, top_rel],
+                    [right_rel, bottom_rel], [left_rel, bottom_rel],
+                ];
+                const xs = corners.map(([x, y]) => dcx + x * cos - y * sin);
+                const ys = corners.map(([x, y]) => dcy + x * sin + y * cos);
+                const minX = Math.min(...xs), maxX = Math.max(...xs);
+                const minY = Math.min(...ys), maxY = Math.max(...ys);
+                return minX < 0 || maxX > this.pPrintWidth
+                    || minY < 0 || maxY > this.pPrintHeight;
+            }
+
+            // No BG removal: axis-aligned bounding box of the full rotated square
+            // Each side of the AABB expands by |cos θ| + |sin θ| relative to the square side
+            const aabb = designPx * (Math.abs(cos) + Math.abs(sin));
             const cx = this.pXPx + designPx / 2;
             const cy = this.pYPx + designPx / 2;
             return cx - aabb / 2 < 0 || cx + aabb / 2 > this.pPrintWidth
@@ -864,6 +891,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pSelectedColors = [];
             this.pSelectedSizes = [];
             this.pContentTop = 0;
+            this.pTightBounds = null;  // reset; will be recomputed below if bg is removed
             this.pXPx = 0;
             this.pYPx = this.pTopAllowance;  // pTopAllowance intentionally not reset — persists
             this.pRotateDeg = 0;
@@ -877,6 +905,15 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     .then(r => r.json())
                     .then(data => { this.pContentTop = data.content_top ?? 0; })
                     .catch(() => { });
+
+                // If the active combo is currently showing its bg-removed version, compute
+                // tight pixel bounds so the OOB check ignores transparent areas.
+                const combo = this.activeComboObj;
+                if (combo?.noBgUrl && combo.url === combo.noBgUrl) {
+                    this._computeTightBounds(this.activeComboUrl)
+                        .then(b => { this.pTightBounds = b; })
+                        .catch(() => { });
+                }
             }
 
             // Load shops (skip if shop ID already configured server-side)
@@ -1110,6 +1147,45 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             if (!this.pPrintWidth) return;
             this.pYPx = Math.round((this.pPrintHeight - this.pDesignPx) / 2);
             this.pIsTopPreset = false;
+        },
+
+        // Scan the alpha channel of an image via canvas and return tight content bounds
+        // as { top, bottom, left, right } fractions (0–1). Returns null if the image
+        // is fully opaque or fully transparent (fall back to full-square bounds check).
+        async _computeTightBounds(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const w = img.naturalWidth, h = img.naturalHeight;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    // Read every pixel's alpha byte (index 3 of each RGBA quad)
+                    const data = ctx.getImageData(0, 0, w, h).data;
+                    let minX = w, maxX = -1, minY = h, maxY = -1;
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < w; x++) {
+                            if (data[(y * w + x) * 4 + 3] > 0) {
+                                if (x < minX) minX = x;
+                                if (x > maxX) maxX = x;
+                                if (y < minY) minY = y;
+                                if (y > maxY) maxY = y;
+                            }
+                        }
+                    }
+                    // Fully opaque or fully transparent — no meaningful tight bounds
+                    if (maxX === -1 || (minX === 0 && maxX === w - 1 && minY === 0 && maxY === h - 1)) {
+                        resolve(null);
+                        return;
+                    }
+                    // +1 to maxX/maxY so the fraction covers the last pixel's far edge
+                    resolve({ top: minY / h, bottom: (maxY + 1) / h, left: minX / w, right: (maxX + 1) / w });
+                };
+                img.onerror = () => resolve(null);
+                img.src = url;
+            });
         },
 
         togglePColor(color) {
