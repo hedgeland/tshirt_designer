@@ -47,9 +47,9 @@ def scan_output() -> list[dict]:
     Each theme dict contains:
       - theme:            display name (underscores → spaces)
       - dir_name:         raw directory name (used to build archive URLs)
-      - theme_size_bytes: total bytes of all files under this theme
+      - session_size_bytes: total bytes of all files under this theme
       - finals:   list of {png_url, png_size, md_url, no_bg_url, no_bg_size, ts, width, height}
-      - concepts: list of {name, display_theme, concept_text, images: [{url, ...}]}
+      - concepts: list of {name, display_session, concept_text, images: [{url, ...}]}
 
     Themes are sorted newest-first by directory mtime.
     """
@@ -70,15 +70,15 @@ def scan_output() -> list[dict]:
         except FileNotFoundError:
             return 0, None
 
-    themes = []
-    for theme_dir in sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
-        if not theme_dir.is_dir():
+    design_sessions = []
+    for session_dir in sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if not session_dir.is_dir():
             continue
 
-        theme_bytes = 0
+        session_bytes = 0
         finals = []
         finals_with_stat = [
-            (f, f.stat()) for f in theme_dir.glob("final_*.png")
+            (f, f.stat()) for f in session_dir.glob("final_*.png")
             if "_no_bg" not in f.name
         ]
         for f, f_stat in sorted(finals_with_stat, key=lambda x: x[1].st_mtime, reverse=True):
@@ -88,7 +88,7 @@ def scan_output() -> list[dict]:
             ts = datetime.fromtimestamp(f_stat.st_mtime).strftime("%Y-%m-%d %H:%M")
             no_bg_size, no_bg_url = _opt_stat(no_bg)
             md_size, md_url = _opt_stat(md)
-            theme_bytes += size + no_bg_size + md_size
+            session_bytes += size + no_bg_size + md_size
             w, h = _dims(f)
             finals.append({
                 "png_url": _url(f),
@@ -104,13 +104,13 @@ def scan_output() -> list[dict]:
         concepts = []
         # Find all concept_N directories
         concept_dirs = sorted(
-            [d for d in theme_dir.iterdir() if d.is_dir() and d.name.startswith("concept_")],
+            [d for d in session_dir.iterdir() if d.is_dir() and d.name.startswith("concept_")],
             key=lambda d: d.stat().st_mtime,
             reverse=True
         )
 
         for concept_dir in concept_dirs:
-            display_theme, concept_text, _ = parse_concept_from_prompts(concept_dir)
+            display_session, concept_text, _ = parse_concept_from_prompts(concept_dir)
             
             # Group variants in this concept
             _RES_ORDER = {"512": 0, "1K": 1, "2K": 2, "4K": 3}
@@ -135,7 +135,7 @@ def scan_output() -> list[dict]:
                     no_bg = v.with_name(v.stem + "_no_bg.png")
                     size = v_stat.st_size
                     no_bg_size, no_bg_url = _opt_stat(no_bg)
-                    theme_bytes += size + no_bg_size
+                    session_bytes += size + no_bg_size
                     vw, vh = _dims(v)
                     render_list.append({
                         "url": _url(v),
@@ -164,13 +164,13 @@ def scan_output() -> list[dict]:
             if concept_images:
                 concepts.append({
                     "name": concept_dir.name,
-                    "display_theme": display_theme,
+                    "display_session": display_session,
                     "concept_text": concept_text,
                     "images": concept_images,
                 })
 
         if finals or concepts:
-            parts = theme_dir.name.rsplit("_", 2)
+            parts = session_dir.name.rsplit("_", 2)
             if len(parts) == 3 and parts[1].isdigit() and len(parts[1]) == 8:
                 d = parts[1]
                 t = parts[2]
@@ -179,23 +179,23 @@ def scan_output() -> list[dict]:
                 prefix = " ".join(words) if words else parts[0]
                 display_name = f"{prefix} - {ts_str}"
             else:
-                display_name = theme_dir.name
+                display_name = session_dir.name
 
             # Compatibility: 'images' is all variants across all concepts
             all_images = []
             for c in concepts:
                 all_images.extend(c["images"])
 
-            themes.append({
-                "theme": display_name,
-                "dir_name": theme_dir.name,
-                "theme_size_bytes": theme_bytes,
+            design_sessions.append({
+                "design_session": display_name,
+                "dir_name": session_dir.name,
+                "session_size_bytes": session_bytes,
                 "finals": finals,
                 "concepts": concepts,
                 "images": all_images,
             })
 
-    return themes
+    return design_sessions
 
 
 def delete_files(paths: list[str]) -> dict:
@@ -220,10 +220,10 @@ def delete_files(paths: list[str]) -> dict:
     # Collect first, then remove — modifying a directory while iterating it is
     # undefined behaviour on some filesystems and can raise StopIteration early.
     empty_concept_dirs = []
-    for theme_dir in Path(OUTPUT_DIR).iterdir():
-        if not theme_dir.is_dir():
+    for session_dir in Path(OUTPUT_DIR).iterdir():
+        if not session_dir.is_dir():
             continue
-        for concept_dir in theme_dir.iterdir():
+        for concept_dir in session_dir.iterdir():
             if concept_dir.is_dir() and not any(concept_dir.iterdir()):
                 empty_concept_dirs.append(concept_dir)
     for concept_dir in empty_concept_dirs:
@@ -233,22 +233,22 @@ def delete_files(paths: list[str]) -> dict:
             pass  # already gone or not empty; safe to skip
 
     # Re-scan theme dirs after child removal
-    for theme_dir in Path(OUTPUT_DIR).iterdir():
-        if theme_dir.is_dir() and not any(theme_dir.iterdir()):
+    for session_dir in Path(OUTPUT_DIR).iterdir():
+        if session_dir.is_dir() and not any(session_dir.iterdir()):
             try:
-                theme_dir.rmdir()
+                session_dir.rmdir()
             except OSError:
                 pass
 
     return {"deleted": deleted, "freed_bytes": freed, "errors": errors}
 
 
-def archive_theme(dir_name: str) -> bytes:
+def archive_design_session(dir_name: str) -> bytes:
     """Zip all files under a theme directory and return the bytes."""
-    theme_dir = Path(OUTPUT_DIR) / dir_name
+    session_dir = Path(OUTPUT_DIR) / dir_name
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for f in sorted(theme_dir.rglob("*")):
+        for f in sorted(session_dir.rglob("*")):
             if f.is_file():
                 zf.write(f, f.relative_to(Path(OUTPUT_DIR)))
     return buf.getvalue()
@@ -269,11 +269,11 @@ def archive_files(paths: list[str]) -> bytes:
     return buf.getvalue()
 
 
-def rename_theme(old_dir_name: str, new_display_name: str) -> dict:
+def rename_design_session(old_dir_name: str, new_display_name: str) -> dict:
     """Rename a theme directory. Converts new_display_name to a safe dir name."""
     root = Path(OUTPUT_DIR)
     old_path = root / old_dir_name
-    new_dir_name = safe_theme_name(new_display_name)
+    new_dir_name = safe_design_session_name(new_display_name)
     new_path = root / new_dir_name
 
     if not old_path.is_dir():
@@ -282,10 +282,10 @@ def rename_theme(old_dir_name: str, new_display_name: str) -> dict:
         raise ValueError("A theme with that name already exists.")
 
     old_path.rename(new_path)
-    return {"dir_name": new_dir_name, "theme": new_display_name}
+    return {"dir_name": new_dir_name, "design_session": new_display_name}
 
 
-def load_image_to_session(session: dict, image_url: str, display_theme: str) -> dict:
+def load_image_to_session(session: dict, image_url: str, display_session: str) -> dict:
     """Load an on-disk image into a session as a single variant.
 
     Validates that the URL resolves to a file inside OUTPUT_DIR, then resets the
@@ -301,7 +301,7 @@ def load_image_to_session(session: dict, image_url: str, display_theme: str) -> 
     w, h = img.size
 
     # Reset session to a clean variant-only state.
-    session["theme"] = display_theme
+    session["theme"] = display_session
     session["concepts"] = []
     session["prompts"] = []
     # Use the URL-relative path (strip leading /) so it matches the format
@@ -323,19 +323,19 @@ def load_image_to_session(session: dict, image_url: str, display_theme: str) -> 
     return {"url": image_url, "width": w, "height": h}
 
 
-def load_concept_to_session(session: dict, theme_dir_name: str, concept_dir_name: str) -> dict:
+def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_name: str) -> dict:
     """Load an entire concept directory into a session.
 
     Restores theme, concept text, variants, and their rendered combos.
     """
     root = Path(OUTPUT_DIR).resolve()
-    theme_dir = root / theme_dir_name
-    concept_dir = theme_dir / concept_dir_name
+    session_dir = root / session_dir_name
+    concept_dir = session_dir / concept_dir_name
 
     if not concept_dir.is_dir():
         raise ValueError(f"Concept directory not found: {concept_dir_name}")
 
-    display_theme, concept_text, variant_count = parse_concept_from_prompts(concept_dir)
+    display_session, concept_text, variant_count = parse_concept_from_prompts(concept_dir)
 
     # Group variants
     groups: dict[int, list[Path]] = {}
@@ -399,7 +399,7 @@ def load_concept_to_session(session: dict, theme_dir_name: str, concept_dir_name
     iteration_roots = [0] * (len(image_paths) - orig_count)
 
     # Reset and populate session
-    session["theme"] = display_theme or theme_dir_name
+    session["theme"] = display_session or session_dir_name
     session["concepts"] = [concept_text] if concept_text else []
     session["prompts"] = [] # We don't store prompts in session usually, they are built on the fly
     session["images"] = images
@@ -421,7 +421,7 @@ def load_concept_to_session(session: dict, theme_dir_name: str, concept_dir_name
     return {"theme": session["theme"], "concept": concept_text}
 
 
-def safe_theme_name(theme: str) -> str:
+def safe_design_session_name(theme: str) -> str:
     """Return a filesystem-safe directory name: sanitized theme text + YYYYMMDD_HHMMSS.
 
     Full theme text is preserved (not truncated) so the browser can extract the
@@ -448,7 +448,7 @@ def save_variants(
     subsequent /render calls on the same variant set.
     """
     ar_safe = aspect_ratio.replace(":", "x")  # "1:1" → "1x1", filesystem-safe
-    dir_path = Path(OUTPUT_DIR) / safe_theme_name(theme) / f"concept_{concept_idx + 1}"
+    dir_path = Path(OUTPUT_DIR) / safe_design_session_name(theme) / f"concept_{concept_idx + 1}"
     dir_path.mkdir(parents=True, exist_ok=True)
 
     paths = []

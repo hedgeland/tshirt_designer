@@ -518,7 +518,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         },
 
         // Apply an image loaded from the output browser — resets workflow to variant-only step
-        async _applyLoadedImage({ url, width, height, displayTheme }) {
+        async _applyLoadedImage({ url, width, height, displaySession }) {
             const hasWork = this.concepts.length || this.variants.length;
             if (hasWork && !confirm("Load this image as a variant? Your current column session will be cleared.")) return;
 
@@ -529,7 +529,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     session_id: this.sessionId,
                     column_id: this.colIdx,
                     image_url: url,
-                    display_theme: displayTheme,
+                    display_session: displaySession,
                 }),
             });
             if (!res.ok) { alert(`Failed to load image (${res.status})`); return; }
@@ -547,7 +547,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.activeComboSize = "";
             this.error = "";
             this.editModeActive = false;
-            this.theme = displayTheme;
+            this.theme = displaySession;
             this.variants = [{ url, origUrl: url, noBgUrl: null, ts: Date.now() }];
             this.selectedVariant = 0;
             this.loadedImageRes = { width, height };
@@ -1352,7 +1352,7 @@ function designer() {
         browserPinned: false,   // when true, no close trigger works until unpinned first
         browserMode: null,      // null = normal, "reference" = picking a reference image
         browserTargetColIdx: 0, // which column's button triggered this browser open
-        browserThemes: [],
+        browserDesignSessions: [],
         browserFilter: "",
         browserLoading: false,
         manageMode: false,
@@ -1479,10 +1479,10 @@ function designer() {
         },
 
         // ── Computed ───────────────────────────────────────────────────────
-        get filteredBrowserThemes() {
+        get filteredBrowserDesignSessions() {
             const q = this.browserFilter.trim().toLowerCase();
-            if (!q) return this.browserThemes;
-            return this.browserThemes.filter(t => t.theme.toLowerCase().includes(q));
+            if (!q) return this.browserDesignSessions;
+            return this.browserDesignSessions.filter(t => t.design_session.toLowerCase().includes(q));
         },
 
         get selectedCount() {
@@ -1610,7 +1610,7 @@ function designer() {
             this.browserMode = null;
             this.browserTargetColIdx = colIdx ?? 0;
             this.showBrowser = true;
-            if (this.browserThemes.length > 0) return; // already loaded
+            if (this.browserDesignSessions.length > 0) return; // already loaded
             this.reloadBrowser();
         },
 
@@ -1618,7 +1618,7 @@ function designer() {
             this.browserMode = "reference";
             this.browserTargetColIdx = colIdx ?? 0;
             this.showBrowser = true;
-            if (this.browserThemes.length > 0) return;
+            if (this.browserDesignSessions.length > 0) return;
             this.reloadBrowser();
         },
 
@@ -1628,12 +1628,12 @@ function designer() {
             try {
                 const res = await fetch("/browse");
                 const data = await res.json();
-                this.browserThemes = data.map((t, ti) => ({
+                this.browserDesignSessions = data.map((t, ti) => ({
                     ...t,
                     expanded: ti === 0,
                 }));
                 this.storageStats = {
-                    totalBytes: data.reduce((s, t) => s + t.theme_size_bytes, 0),
+                    totalBytes: data.reduce((s, t) => s + t.design_session_size_bytes, 0),
                     themeCount: data.length,
                 };
             } finally {
@@ -1641,13 +1641,13 @@ function designer() {
             }
         },
 
-        async reloadSession(themeDir, conceptDir) {
+        async reloadSession(sessionDir, conceptDir) {
             this.browserLoading = true;
             try {
                 const fd = new FormData();
                 fd.append("session_id", this.sessionId);
                 fd.append("column_id", this.$store.activeColIdx);
-                fd.append("theme_dir", themeDir);
+                fd.append("session_dir", sessionDir);
                 fd.append("concept_dir", conceptDir);
 
                 const res = await fetch("/session/reload", {
@@ -1707,13 +1707,13 @@ function designer() {
             return this.selectedFiles[url] !== undefined;
         },
 
-        _themeFileList(theme) {
+        _sessionFileList(session) {
             const files = [];
-            theme.finals.forEach(f => {
+            session.finals.forEach(f => {
                 files.push([f.png_url, f.png_size]);
                 if (f.no_bg_url) files.push([f.no_bg_url, f.no_bg_size]);
             });
-            (theme.images || []).forEach(v => {
+            (session.images || []).forEach(v => {
                 // Walk all renders so manage-mode select-all captures every AR/size file.
                 (v.renders || [{ url: v.url, size: v.size, no_bg_url: v.no_bg_url, no_bg_size: v.no_bg_size }]).forEach(r => {
                     files.push([r.url, r.size]);
@@ -1723,8 +1723,8 @@ function designer() {
             return files;
         },
 
-        toggleThemeFiles(theme) {
-            const files = this._themeFileList(theme);
+        toggleSessionFiles(session) {
+            const files = this._sessionFileList(session);
             const allSelected = files.every(([url]) => this.selectedFiles[url] !== undefined);
             const updated = { ...this.selectedFiles };
             if (allSelected) files.forEach(([url]) => delete updated[url]);
@@ -1732,8 +1732,8 @@ function designer() {
             this.selectedFiles = updated;
         },
 
-        themeAllSelected(theme) {
-            const files = this._themeFileList(theme);
+        sessionAllSelected(session) {
+            const files = this._sessionFileList(session);
             return files.length > 0 && files.every(([url]) => this.selectedFiles[url] !== undefined);
         },
 
@@ -1801,9 +1801,9 @@ function designer() {
         },
 
         // Dispatch a load-image event to the currently active column
-        loadToVariants(url, width, height, displayTheme) {
+        loadToVariants(url, width, height, displaySession) {
             window.dispatchEvent(new CustomEvent('col-load-image', {
-                detail: { colIdx: Alpine.store('activeColIdx'), url, width, height, displayTheme },
+                detail: { colIdx: Alpine.store('activeColIdx'), url, width, height, displaySession },
             }));
             this.closeBrowser();
         },

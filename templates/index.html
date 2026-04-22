@@ -203,7 +203,7 @@
             <!-- ── Output Browser — right-side panel ──────────────────────────── -->
             <div class="absolute top-0 right-0 h-full z-20 overflow-hidden opacity-95 transition-[width] duration-200"
                 :style="`width: ${showBrowser ? 500 : 30}px`"
-                @mouseenter="showBrowser = true; if (browserThemes.length === 0) reloadBrowser()"
+                @mouseenter="showBrowser = true; if (browserDesignSessions.length === 0) reloadBrowser()"
                 @click.outside="closeBrowser()" @keydown.escape.window="closeBrowser()">
 
                 <!-- Tab handle -->
@@ -260,8 +260,8 @@
 
                     <!-- Search -->
                     <div class="px-4 py-2 border-b border-slate-600 flex-shrink-0">
-                        <input type="text" x-model="browserFilter" placeholder="Filter by theme…"
-                            aria-label="Filter by theme"
+                        <input type="text" x-model="browserFilter" placeholder="Filter by Design Session…"
+                            aria-label="Filter by Design Session"
                             class="w-full text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                     </div>
 
@@ -281,21 +281,21 @@
                         </div>
 
                         <!-- Empty state -->
-                        <div x-show="!browserLoading && filteredBrowserThemes.length === 0"
+                        <div x-show="!browserLoading && filteredBrowserDesignSessions.length === 0"
                             class="flex flex-col items-center justify-center py-12 text-slate-500 text-sm gap-1">
                             <span class="text-2xl">🗂</span>
                             <span x-text="browserFilter ? 'No matching themes' : 'No output yet'"></span>
                         </div>
 
                         <!-- Theme list -->
-                        <template x-for="(theme, ti) in filteredBrowserThemes" :key="theme.theme">
+                        <template x-for="(theme, ti) in filteredBrowserDesignSessions" :key="session.design_session">
                             <div class="border-b border-slate-700">
 
                                 <!-- Theme header -->
                                 <div class="flex items-center gap-1 px-3 py-2 hover:bg-slate-700 transition-colors">
-                                    <input x-show="manageMode" type="checkbox" :checked="themeAllSelected(theme)"
-                                        @change="toggleThemeFiles(theme)" class="flex-shrink-0 accent-indigo-500">
-                                    <template x-if="manageMode && renamingDir === theme.dir_name">
+                                    <input x-show="manageMode" type="checkbox" :checked="sessionAllSelected(theme)"
+                                        @change="toggleSessionFiles(theme)" class="flex-shrink-0 accent-indigo-500">
+                                    <template x-if="manageMode && renamingDir === session.dir_name">
                                         <div class="flex items-center gap-1 flex-1 min-w-0">
                                             <input type="text" x-model="renameValue" @keydown.enter="commitRename()"
                                                 @keydown.escape="cancelRename()" x-init="$el.focus()"
@@ -306,30 +306,30 @@
                                                 class="flex-shrink-0 text-xs text-slate-400 hover:text-slate-200 px-1">✕</button>
                                         </div>
                                     </template>
-                                    <template x-if="!(manageMode && renamingDir === theme.dir_name)">
-                                        <button @click="theme.expanded = !theme.expanded"
-                                            :aria-expanded="theme.expanded"
+                                    <template x-if="!(manageMode && renamingDir === session.dir_name)">
+                                        <button @click="session.expanded = !session.expanded"
+                                            :aria-expanded="session.expanded"
                                             class="flex items-center gap-2 flex-1 text-left min-w-0">
                                             <span class="text-slate-400 text-xs w-3 flex-shrink-0" aria-hidden="true"
-                                                x-text="theme.expanded ? '▼' : '▶'"></span>
+                                                x-text="session.expanded ? '▼' : '▶'"></span>
                                             <span class="text-sm font-medium flex-1 truncate"
-                                                x-text="theme.theme"></span>
+                                                x-text="session.design_session"></span>
                                             <span class="text-xs text-slate-500 flex-shrink-0"
-                                                x-text="_fmtBytes(theme.theme_size_bytes)"></span>
+                                                x-text="_fmtBytes(session.design_session_size_bytes)"></span>
                                         </button>
                                     </template>
-                                    <button x-show="manageMode && renamingDir !== theme.dir_name"
-                                        @click.stop="startRename(theme.dir_name, theme.theme)" title="Rename theme"
+                                    <button x-show="manageMode && renamingDir !== session.dir_name"
+                                        @click.stop="startRename(session.dir_name, session.design_session)" title="Rename theme"
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">✏</button>
-                                    <button @click.stop="downloadThemeZip(theme.dir_name)" title="Download ZIP"
+                                    <button @click.stop="downloadThemeZip(session.dir_name)" title="Download ZIP"
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">⬇
                                         ZIP</button>
                                 </div>
 
-                                <div x-show="theme.expanded" class="px-4 pb-3 space-y-4">
+                                <div x-show="session.expanded" class="px-4 pb-3 space-y-4">
 
                                     <!-- Finals -->
-                                    <template x-if="theme.finals.length > 0">
+                                    <template x-if="session.finals.length > 0">
                                         <div>
                                             <p
                                                 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -337,7 +337,7 @@
                                                 Finals
                                             </p>
                                             <div class="grid grid-cols-3 gap-2">
-                                                <template x-for="(f, fi) in theme.finals" :key="fi">
+                                                <template x-for="(f, fi) in session.finals" :key="fi">
                                                     <div class="bg-slate-800 rounded-lg overflow-hidden relative group border border-slate-700/50"
                                                         :class="isSelected(f.png_url) ? 'ring-2 ring-indigo-400' : ''"
                                                         @click="if (manageMode) toggleFile(f.png_url, f.png_size); else if (browserMode === 'reference') setReferenceFromBrowser(f.png_url)"
@@ -369,7 +369,7 @@
                                                                     class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 hover:bg-slate-600 transition-colors">⬇
                                                                     No BG</a>
                                                                 <button
-                                                                    @click.stop="loadToVariants(f.png_url, f.width, f.height, theme.theme)"
+                                                                    @click.stop="loadToVariants(f.png_url, f.width, f.height, session.design_session)"
                                                                     title="Load to active column"
                                                                     class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-800/80 text-emerald-300 hover:bg-emerald-700 transition-colors">↑
                                                                     Load</button>
@@ -386,14 +386,14 @@
                                     </template>
 
                                     <!-- Concepts -->
-                                    <template x-for="(concept, ci) in theme.concepts" :key="concept.name">
+                                    <template x-for="(concept, ci) in session.concepts" :key="concept.name">
                                         <div class="space-y-2 border-t border-slate-700/30 pt-3 first:border-t-0 first:pt-0">
                                             <div class="flex items-center justify-between gap-2">
                                                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                                     <span x-text="concept.concept_text ? (concept.concept_text.length > 40 ? concept.concept_text.slice(0, 40) + '...' : concept.concept_text) : 'Concept ' + (ci + 1)"></span>
                                                 </p>
-                                                <button @click.stop="reloadSession(theme.dir_name, concept.name)"
+                                                <button @click.stop="reloadSession(session.dir_name, concept.name)"
                                                     title="Reload this entire concept session into the active column"
                                                     class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-600/30 text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all">
                                                     Reload Session ↺
@@ -427,7 +427,7 @@
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-emerald-400 hover:bg-emerald-600 transition-colors"
                                                                         :class="showDl && (v.renders||[]).length !== 1 ? 'bg-emerald-600 text-white' : (v.renders||[]).every(r => $store.downloadedUrls[r.url]) ? '!text-slate-600' : ''">↓</a>
                                                                     <button
-                                                                        @click.stop="loadToVariants(v.url, v.width, v.height, theme.theme)"
+                                                                        @click.stop="loadToVariants(v.url, v.width, v.height, session.design_session)"
                                                                         title="Load single image as variant"
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-emerald-400 hover:bg-emerald-600 transition-colors">↑</button>
                                                                     <button @click.stop="setReferenceFromBrowser(v.url)"

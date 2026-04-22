@@ -57,11 +57,11 @@ from src.image import finalize_image as finalize_design
 from src.image import generate_image
 from src.output import (
     archive_files,
-    archive_theme,
+    archive_design_session,
     delete_files,
     load_concept_to_session,
     load_image_to_session,
-    rename_theme,
+    rename_design_session,
     safe_theme_name,
     save_variants,
     scan_output,
@@ -241,15 +241,15 @@ def _has_transparency(img: Image.Image) -> bool:
     return img.split()[3].getextrema()[0] == 0
 
 
-def _scan_existing_finals(theme_dir: Path, idx: int) -> list[dict]:
-    """Return all finalized images for a given variant index in theme_dir.
+def _scan_existing_finals(session_dir: Path, idx: int) -> list[dict]:
+    """Return all finalized images for a given variant index in session_dir.
 
     Parses deterministic filenames of the form final_v{idx}_{ar_safe}_{size}.png
     and returns [{size, aspectRatio, url}] sorted by size descending.
     NOTE: deprecated — used only by the legacy /finalize endpoint during transition.
     """
     results = []
-    for p in theme_dir.glob(f"final_v{idx}_*.png"):
+    for p in session_dir.glob(f"final_v{idx}_*.png"):
         if "_no_bg" in p.name:
             continue
         parts = p.stem.split("_")  # ["final", "v{idx}", ar_safe, size]
@@ -697,11 +697,11 @@ async def finalize(
         # a fresh timestamp and would scatter finals into new directories).
         image_paths = session.get("image_paths", [])
         if image_paths:
-            theme_dir = Path(image_paths[0]).parent.parent
+            session_dir = Path(image_paths[0]).parent.parent
         else:
-            theme_dir = Path(OUTPUT_DIR) / safe_theme_name(theme)
+            session_dir = Path(OUTPUT_DIR) / safe_theme_name(theme)
 
-        final_path = theme_dir / final_name
+        final_path = session_dir / final_name
 
         # Return the existing file immediately if this combo was already generated
         if final_path.exists():
@@ -711,7 +711,7 @@ async def finalize(
             session["original_final"] = final_img
             session["original_final_path"] = str(final_path)
             session["no_bg_final_cache"] = None
-            yield sse({"type": "final", "url": f"/{final_path}", "existing_finals": _scan_existing_finals(theme_dir, idx)})
+            yield sse({"type": "final", "url": f"/{final_path}", "existing_finals": _scan_existing_finals(session_dir, idx)})
             return
 
         variant = images[idx]
@@ -768,7 +768,7 @@ async def finalize(
         session["original_final_path"] = str(final_path)
         session["no_bg_final_cache"] = None  # stale on each new finalize
 
-        yield sse({"type": "final", "url": final_url, "existing_finals": _scan_existing_finals(theme_dir, idx)})
+        yield sse({"type": "final", "url": final_url, "existing_finals": _scan_existing_finals(session_dir, idx)})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -1244,7 +1244,7 @@ async def delete_output_files(request: Request):
 
 @app.get("/browse/archive/{dir_name}")
 async def archive_output_theme(dir_name: str):
-    data = await asyncio.to_thread(archive_theme, dir_name)
+    data = await asyncio.to_thread(archive_design_session, dir_name)
     return _zip_response(data, f"{dir_name}.zip")
 
 
@@ -1263,10 +1263,10 @@ async def session_load_image(request: Request):
     session_id = body.get("session_id", "")
     column_id = int(body.get("column_id", 0))
     image_url = body.get("image_url", "")
-    display_theme = body.get("display_theme", "")
+    display_session = body.get("display_session", "")
     try:
         result = await asyncio.to_thread(
-            load_image_to_session, get_column(session_id, column_id), image_url, display_theme
+            load_image_to_session, get_column(session_id, column_id), image_url, display_session
         )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
@@ -1277,14 +1277,14 @@ async def session_load_image(request: Request):
 async def session_reload(
     session_id: str = Form(...),
     column_id: int = Form(...),
-    theme_dir: str = Form(...),
+    session_dir: str = Form(...),
     concept_dir: str = Form(...),
 ):
     """Reload an entire concept directory into a session/column."""
     try:
         session = get_column(session_id, column_id)
         result = await asyncio.to_thread(
-            load_concept_to_session, session, theme_dir, concept_dir
+            load_concept_to_session, session, session_dir, concept_dir
         )
         
         # Return serializable state for the frontend to rehydrate
@@ -1361,7 +1361,7 @@ async def rename_output_theme(request: Request):
     old_dir = body.get("dir_name", "")
     new_name = body.get("new_name", "")
     try:
-        result = await asyncio.to_thread(rename_theme, old_dir, new_name)
+        result = await asyncio.to_thread(rename_design_session, old_dir, new_name)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     return result
