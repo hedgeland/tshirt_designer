@@ -1272,6 +1272,36 @@ async def session_load_image(request: Request):
     return result
 
 
+@app.post("/session/reload")
+async def session_reload(
+    session_id: str = Form(...),
+    column_id: int = Form(...),
+    theme_dir: str = Form(...),
+    concept_dir: str = Form(...),
+):
+    """Reload an entire concept directory into a session/column."""
+    try:
+        session = get_column(session_id, column_id)
+        result = await asyncio.to_thread(
+            load_concept_to_session, session, theme_dir, concept_dir
+        )
+        
+        # Return serializable state for the frontend to rehydrate
+        return {
+            "theme": session["theme"],
+            "concepts": session["concepts"],
+            "image_paths": session["image_paths"],
+            "original_image_paths": session["original_image_paths"],
+            "selected_idx": session["selected_idx"],
+            "variant_size": session.get("variant_size"),
+            "variant_aspect_ratio": session.get("variant_aspect_ratio"),
+            "combo_lists": session.get("combo_lists", []),
+            "concept_dir": session.get("concept_dir"),
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
 @app.post("/session/set-reference-image")
 async def session_set_reference_image(
     session_id: str = Form(...),

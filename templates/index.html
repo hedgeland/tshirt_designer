@@ -326,9 +326,141 @@
                                         ZIP</button>
                                 </div>
 
-                                <div x-show="theme.expanded" class="px-4 pb-3 space-y-3">
+                                <div x-show="theme.expanded" class="px-4 pb-3 space-y-4">
 
                                     <!-- Finals -->
+                                    <template x-if="theme.finals.length > 0">
+                                        <div>
+                                            <p
+                                                class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                                Finals
+                                            </p>
+                                            <div class="grid grid-cols-3 gap-2">
+                                                <template x-for="(f, fi) in theme.finals" :key="fi">
+                                                    <div class="bg-slate-800 rounded-lg overflow-hidden relative group border border-slate-700/50"
+                                                        :class="isSelected(f.png_url) ? 'ring-2 ring-indigo-400' : ''"
+                                                        @click="if (manageMode) toggleFile(f.png_url, f.png_size); else if (browserMode === 'reference') setReferenceFromBrowser(f.png_url)"
+                                                        :style="(manageMode || browserMode === 'reference') ? 'cursor:pointer' : ''">
+                                                        <!-- Manage-mode selection overlay -->
+                                                        <div x-show="manageMode && isSelected(f.png_url)"
+                                                            class="absolute inset-0 z-10 bg-indigo-500/30 flex items-center justify-center pointer-events-none">
+                                                            <span
+                                                                class="text-white text-3xl drop-shadow-lg font-bold">✓</span>
+                                                        </div>
+                                                        <img :src="f.png_url" alt=""
+                                                            class="w-full aspect-square object-contain bg-slate-900 block">
+                                                        <!-- Hover action overlay — hidden in manage/reference modes -->
+                                                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto bg-gradient-to-t from-slate-900/95 via-slate-900/50 to-transparent flex flex-col justify-end"
+                                                            :class="(manageMode || browserMode === 'reference') ? '!opacity-0 !pointer-events-none' : ''">
+                                                            <p class="text-[10px] text-slate-400 px-2 pt-1 leading-tight"
+                                                                x-text="f.ts + ' · ' + f.width + '×' + f.height"></p>
+                                                            <div class="flex gap-1 flex-wrap p-2 pt-1">
+                                                                <a :href="f.png_url" download title="Download PNG"
+                                                                    @click.stop
+                                                                    class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-indigo-300 hover:bg-indigo-600 transition-colors">⬇
+                                                                    PNG</a>
+                                                                <a x-show="f.md_url" :href="f.md_url" download
+                                                                    title="Download metadata" @click.stop
+                                                                    class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 hover:bg-slate-600 transition-colors">📄
+                                                                    MD</a>
+                                                                <a x-show="f.no_bg_url" :href="f.no_bg_url" download
+                                                                    title="Download no-background version" @click.stop
+                                                                    class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 hover:bg-slate-600 transition-colors">⬇
+                                                                    No BG</a>
+                                                                <button
+                                                                    @click.stop="loadToVariants(f.png_url, f.width, f.height, theme.theme)"
+                                                                    title="Load to active column"
+                                                                    class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-800/80 text-emerald-300 hover:bg-emerald-700 transition-colors">↑
+                                                                    Load</button>
+                                                                <button @click.stop="setReferenceFromBrowser(f.png_url)"
+                                                                    title="Set as reference image"
+                                                                    class="text-[10px] px-1.5 py-0.5 rounded bg-orange-800/80 text-orange-300 hover:bg-orange-700 transition-colors">🎯
+                                                                    Ref</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Concepts -->
+                                    <template x-for="(concept, ci) in theme.concepts" :key="concept.name">
+                                        <div class="space-y-2 border-t border-slate-700/30 pt-3 first:border-t-0 first:pt-0">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                    <span x-text="concept.concept_text ? (concept.concept_text.length > 40 ? concept.concept_text.slice(0, 40) + '...' : concept.concept_text) : 'Concept ' + (ci + 1)"></span>
+                                                </p>
+                                                <button @click.stop="reloadSession(theme.dir_name, concept.name)"
+                                                    title="Reload this entire concept session into the active column"
+                                                    class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-600/30 text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all">
+                                                    Reload Session ↺
+                                                </button>
+                                            </div>
+
+                                            <div class="grid grid-cols-4 gap-1.5">
+                                                <template x-for="(v, vi) in concept.images" :key="vi">
+                                                    <div x-data="{ showDl: false }" class="relative"
+                                                        @click.outside="showDl = false"
+                                                        @keydown.escape.window="showDl = false">
+                                                        <div class="bg-slate-800 rounded overflow-hidden relative group border border-slate-700/30"
+                                                            :class="isSelected(v.url) ? 'ring-2 ring-indigo-400' : ''"
+                                                            @click="if (manageMode) toggleFile(v.url, v.size); else if (browserMode === 'reference') setReferenceFromBrowser(v.url)"
+                                                            :style="(manageMode || browserMode === 'reference') ? 'cursor:pointer' : ''">
+                                                            <div x-show="manageMode && isSelected(v.url)"
+                                                                class="absolute inset-0 z-10 bg-indigo-500/30 flex items-center justify-center pointer-events-none">
+                                                                <span class="text-white text-2xl drop-shadow-lg font-bold">✓</span>
+                                                            </div>
+                                                            <img :src="v.url" alt=""
+                                                                class="w-full aspect-square object-contain bg-slate-900 block">
+                                                            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto bg-gradient-to-t from-slate-900/95 via-slate-900/50 to-transparent flex flex-col justify-end"
+                                                                :class="(manageMode || browserMode === 'reference') ? '!opacity-0 !pointer-events-none' : ''">
+                                                                <p class="text-[10px] text-slate-400 px-1.5 pt-1 leading-tight"
+                                                                    x-text="v.width + '×' + v.height"></p>
+                                                                <div class="flex gap-1 p-1.5 pt-0.5">
+                                                                    <a :href="(v.renders||[]).length === 1 ? v.renders[0].url : '#'"
+                                                                        :download="(v.renders||[]).length === 1"
+                                                                        @click.stop="(v.renders||[]).length === 1 ? ($store.downloadedUrls[v.renders[0].url] = true) : ($event.preventDefault(), showDl = !showDl)"
+                                                                        title="Download"
+                                                                        class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-emerald-400 hover:bg-emerald-600 transition-colors"
+                                                                        :class="showDl && (v.renders||[]).length !== 1 ? 'bg-emerald-600 text-white' : (v.renders||[]).every(r => $store.downloadedUrls[r.url]) ? '!text-slate-600' : ''">↓</a>
+                                                                    <button
+                                                                        @click.stop="loadToVariants(v.url, v.width, v.height, theme.theme)"
+                                                                        title="Load single image as variant"
+                                                                        class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-emerald-400 hover:bg-emerald-600 transition-colors">↑</button>
+                                                                    <button @click.stop="setReferenceFromBrowser(v.url)"
+                                                                        title="Set as reference image"
+                                                                        class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-orange-400 hover:bg-orange-600 transition-colors">🎯</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div x-show="showDl" x-cloak
+                                                            class="absolute top-full left-0 mt-1 z-30 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-2 min-w-max">
+                                                            <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Download</p>
+                                                            <template x-for="(r, ri) in (v.renders || [])" :key="ri">
+                                                                <div class="flex items-center gap-1 mb-1 last:mb-0">
+                                                                    <a :href="r.url" download
+                                                                        @click.stop="$store.downloadedUrls[r.url] = true"
+                                                                        class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600 transition-colors"
+                                                                        :class="$store.downloadedUrls[r.url] ? 'text-slate-500 line-through' : 'text-indigo-300'"
+                                                                        x-text="r.ar + ' · ' + r.res"></a>
+                                                                    <a x-show="r.no_bg_url" :href="r.no_bg_url" download
+                                                                        @click.stop="$store.downloadedUrls[r.no_bg_url] = true"
+                                                                        class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600 transition-colors"
+                                                                        :class="$store.downloadedUrls[r.no_bg_url] ? 'text-slate-500 line-through' : 'text-slate-400'">no-bg</a>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                </div>
+
                                     <template x-if="theme.finals.length > 0">
                                         <div>
                                             <p

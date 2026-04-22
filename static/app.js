@@ -277,6 +277,15 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 if (e.detail.colIdx === this.colIdx) this._applyPreset(e.detail);
             });
 
+            // Receive "rehydrate column" events from designer.reloadSession()
+            window.addEventListener('rehydrate-column', (e) => {
+                if (e.detail.columnIdx === this.colIdx) {
+                    this._restoreInitialState(e.detail.state);
+                    // Also scroll to gallery
+                    this.$nextTick(() => this.$refs.step4?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                }
+            });
+
             // When switching variants, restore or clear the active combo from variantCombos.
             // Combos are sorted largest-first so index 0 is the highest-quality render.
             this.$watch('selectedVariant', (val) => {
@@ -1612,6 +1621,46 @@ function designer() {
                     totalBytes: data.reduce((s, t) => s + t.theme_size_bytes, 0),
                     themeCount: data.length,
                 };
+            } finally {
+                this.browserLoading = false;
+            }
+        },
+
+        async reloadSession(themeDir, conceptDir) {
+            this.browserLoading = true;
+            try {
+                const fd = new FormData();
+                fd.append("session_id", this.sessionId);
+                fd.append("column_id", this.$store.activeColIdx);
+                fd.append("theme_dir", themeDir);
+                fd.append("concept_dir", conceptDir);
+
+                const res = await fetch("/session/reload", {
+                    method: "POST",
+                    body: fd,
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    alert("Error reloading session: " + data.error);
+                    return;
+                }
+
+                // Dispatch event to the targeted column designer component to rehydrate its state
+                window.dispatchEvent(
+                    new CustomEvent("rehydrate-column", {
+                        detail: {
+                            columnIdx: this.$store.activeColIdx,
+                            state: data,
+                        },
+                    })
+                );
+
+                this.showBrowser = false;
+                this.browserMode = null;
+            } catch (err) {
+                console.error("Reload failed:", err);
+                alert("Reload failed: " + err.message);
             } finally {
                 this.browserLoading = false;
             }
