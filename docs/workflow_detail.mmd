@@ -92,6 +92,18 @@ graph TD
         SaveDraft --> Done2([Product saved as draft])
     end
 
+    %% 7. Output Browser
+    subgraph OutputBrowser [7. Output Browser]
+        OpenBrowser([Open drawer]) --> ScanOutput[GET /browse Scan output directory group by theme/concept]
+        ScanOutput --> ViewBrowser(View themes and concepts)
+        ViewBrowser --> BrowserAction{Action?}
+        BrowserAction -- "Reload Session" --> ReloadSession[POST /session/reload Load concept variants and metadata into active column]
+        BrowserAction -- "Pick Ref" --> SetRefImage
+        BrowserAction -- "Load Single" --> LoadSingle[POST /session/load-image Load one image as variant bypassing brainstorm]
+        LoadSingle --> ViewVariants
+        ReloadSession --> ViewVariants
+    end
+
     %% Phase transitions
     AppHome --> SessionInit
     ConceptSelected --> ConceptIn
@@ -100,6 +112,7 @@ graph TD
     RerenderVariants -.-> ConceptIn
     ReadyToPublish --> OpenPrintify
     ColView -.-> EnterTheme
+    ColView --> OpenBrowser
 
     %% Subgraph styling
     style Auth fill:#fff3cd,stroke:#ffc107,stroke-dasharray: 5 5
@@ -108,6 +121,7 @@ graph TD
     style PromptBuild fill:#d1ecf1,stroke:#0dcaf0
     style VariantGen fill:#cfe2ff,stroke:#0d6efd
     style Publish fill:#ffe5d0,stroke:#fd7e14
+    style OutputBrowser fill:#f8f9fa,stroke:#6c757d
 
     %% Decision nodes - amber
     style AuthEnabled fill:#fff3cd,stroke:#ffc107
@@ -122,6 +136,7 @@ graph TD
     style VariantChoice fill:#fff3cd,stroke:#ffc107
     style RenderCheck fill:#fff3cd,stroke:#ffc107
     style PublishChoice fill:#fff3cd,stroke:#ffc107
+    style BrowserAction fill:#fff3cd,stroke:#ffc107
 
     %% API call nodes - blue
     style OAuthRedirect fill:#cfe2ff,stroke:#0d6efd
@@ -146,12 +161,16 @@ graph TD
     style SetDetails fill:#cfe2ff,stroke:#0d6efd
     style PublishNow fill:#cfe2ff,stroke:#0d6efd
     style SaveDraft fill:#cfe2ff,stroke:#0d6efd
+    style ScanOutput fill:#cfe2ff,stroke:#0d6efd
+    style ReloadSession fill:#cfe2ff,stroke:#0d6efd
+    style LoadSingle fill:#cfe2ff,stroke:#0d6efd
 
     %% View/state nodes - gray
     style ColView fill:#f8f9fa,stroke:#6c757d
     style ViewConcepts fill:#f8f9fa,stroke:#6c757d
     style ViewVariants fill:#f8f9fa,stroke:#6c757d
     style ComboGallery fill:#f8f9fa,stroke:#6c757d
+    style ViewBrowser fill:#f8f9fa,stroke:#6c757d
 
     %% Terminal nodes - green
     style PageLoad fill:#d1e7dd,stroke:#198754
@@ -170,6 +189,7 @@ graph TD
     style Done fill:#d1e7dd,stroke:#198754
     style Done2 fill:#d1e7dd,stroke:#198754
     style ColLimitMsg fill:#d1e7dd,stroke:#198754
+    style OpenBrowser fill:#d1e7dd,stroke:#198754
 
     %% Error nodes - red
     style LoginError fill:#f8d7da,stroke:#dc3545

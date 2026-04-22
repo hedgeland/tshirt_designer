@@ -5,12 +5,15 @@ graph TD
     PromptBuild[4. Prompt Building - per column Load or build prompts generate N renders at chosen aspect and size]
     Variants[5. Variant Gallery - per column All renders unified by variant aspect ratio and resolution Render new combos using smallest existing render as reference Iterative editing applies edits to any variant to produce new variants]
     Publish[6. Publish - per column Configure Printify product upload optional publish to store]
+    Browser[7. Output Browser - Browse previous sessions and reload them directly into any column]
 
     Auth --> ColMgmt
     ColMgmt --> Ideation
     Ideation --> PromptBuild
     PromptBuild --> Variants
     Variants --> Publish
+    
+    Browser -- "Reload Session" --> Variants
 
     style Auth fill:#fff3cd,stroke:#ffc107,stroke-dasharray: 5 5
     style ColMgmt fill:#f8d7da,stroke:#dc3545
@@ -18,3 +21,4 @@ graph TD
     style PromptBuild fill:#d1ecf1,stroke:#0dcaf0
     style Variants fill:#cfe2ff,stroke:#0d6efd
     style Publish fill:#ffe5d0,stroke:#fd7e14
+    style Browser fill:#f8f9fa,stroke:#6c757d
