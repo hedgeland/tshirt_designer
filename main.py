@@ -59,6 +59,7 @@ from src.output import (
     archive_files,
     archive_theme,
     delete_files,
+    load_concept_to_session,
     load_image_to_session,
     rename_theme,
     safe_theme_name,
