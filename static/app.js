@@ -1532,8 +1532,22 @@ function designer() {
 
         // Persist the user's max-columns preference to the server; trims excess columns.
         async updateMaxColumns() {
+            // Ensure we have a valid number
+            const newVal = parseInt(this.maxColumns, 10);
+            if (isNaN(newVal) || newVal < 1) {
+                this.maxColumns = this.columns.length;
+                return;
+            }
+            this.maxColumns = Math.min(newVal, cfg.maxColumns);
+
             // Clamp minColumns down if it would exceed the new max
-            if (this.minColumns > this.maxColumns) this.minColumns = this.maxColumns;
+            if (this.minColumns > this.maxColumns) {
+                this.minColumns = this.maxColumns;
+                const fdMin = new FormData();
+                fdMin.append("session_id", this.sessionId);
+                fdMin.append("min_columns", this.minColumns);
+                fetch("/session/min-columns", { method: "POST", body: fdMin });
+            }
 
             // Identify columns that need to be removed (rightmost first)
             const excess = this.columns.length - this.maxColumns;
@@ -1545,20 +1559,24 @@ function designer() {
                     const d = el?._x_dataStack?.[0];
                     return d?.hasUnsubmittedText;
                 }).some(Boolean);
+                
                 if (hasWip && !confirm(`Lowering the max will close ${excess} column${excess > 1 ? 's' : ''} with unsubmitted text. Continue?`)) {
                     // Revert the input to the current actual column count
                     this.maxColumns = this.columns.length;
                     return;
                 }
+                
                 // Close excess columns from the right, one at a time
                 while (this.columns.length > this.maxColumns) {
                     const fd = new FormData();
+                    const targetIdx = this.columns.length - 1;
                     fd.append("session_id", this.sessionId);
-                    fd.append("column_id", this.columns.length - 1);
+                    fd.append("column_id", targetIdx);
                     const res = await fetch("/session/remove-column", { method: "POST", body: fd });
-                    if (!res.ok) break;
-                    const data = await res.json();
-                    if (data.error) break;
+                    if (!res.ok) {
+                        console.error(`Failed to remove column ${targetIdx}: ${res.status}`);
+                        break;
+                    }
                     this.columns.pop();
                     Alpine.store('columnCount', this.columns.length);
                 }
@@ -1567,15 +1585,37 @@ function designer() {
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
             fd.append("max_columns", this.maxColumns);
-            await fetch("/session/max-columns", { method: "POST", body: fd });
+            const res = await fetch("/session/max-columns", { method: "POST", body: fd });
+            if (!res.ok) {
+                console.error(`Failed to set max columns: ${res.status}`);
+                if (res.status === 400) {
+                    const text = await res.text();
+                    console.error(`400 Detail: ${text}`);
+                }
+            }
         },
 
         // Persist the user's min-columns floor to the server
         async updateMinColumns() {
+            // Ensure we have a valid number
+            const newVal = parseInt(this.minColumns, 10);
+            if (isNaN(newVal) || newVal < 1) {
+                this.minColumns = 1;
+            } else {
+                this.minColumns = Math.min(newVal, this.maxColumns);
+            }
+
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
             fd.append("min_columns", this.minColumns);
-            await fetch("/session/min-columns", { method: "POST", body: fd });
+            const res = await fetch("/session/min-columns", { method: "POST", body: fd });
+            if (!res.ok) {
+                console.error(`Failed to set min columns: ${res.status}`);
+                if (res.status === 400) {
+                    const text = await res.text();
+                    console.error(`400 Detail: ${text}`);
+                }
+            }
             // Bring column count up to the new floor if needed
             while (this.columns.length < this.minColumns) {
                 await this.addColumn();
