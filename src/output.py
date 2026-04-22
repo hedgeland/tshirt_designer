@@ -20,21 +20,25 @@ def _resolve_output_path(url: str) -> Path:
     return p
 
 
-def parse_concept_from_prompts(concept_dir: Path) -> tuple[str, str]:
-    """Parse theme and concept text from prompts.md sidecar if it exists."""
+def parse_concept_from_prompts(concept_dir: Path) -> tuple[str, str, int]:
+    """Parse theme, concept text, and original variant count from prompts.md sidecar."""
     prompts_path = concept_dir / "prompts.md"
     theme = ""
     concept = ""
+    variant_count = 0
     if prompts_path.exists():
         content = prompts_path.read_text()
         # Look for | Theme | value | and | Concept | value |
         theme_match = re.search(r"\|\s*Theme\s*\|\s*([^|]+)\|", content)
         concept_match = re.search(r"\|\s*Concept\s*\|\s*([^|]+)\|", content)
+        count_match = re.search(r"\|\s*Variants\s*\|\s*(\d+)\s*\|", content)
         if theme_match:
             theme = theme_match.group(1).strip()
         if concept_match:
             concept = concept_match.group(1).strip()
-    return theme, concept
+        if count_match:
+            variant_count = int(count_match.group(1))
+    return theme, concept, variant_count
 
 
 def scan_output() -> list[dict]:
@@ -106,7 +110,7 @@ def scan_output() -> list[dict]:
         )
 
         for concept_dir in concept_dirs:
-            display_theme, concept_text = parse_concept_from_prompts(concept_dir)
+            display_theme, concept_text, _ = parse_concept_from_prompts(concept_dir)
             
             # Group variants in this concept
             _RES_ORDER = {"512": 0, "1K": 1, "2K": 2, "4K": 3}
@@ -324,14 +328,14 @@ def load_concept_to_session(session: dict, theme_dir_name: str, concept_dir_name
 
     Restores theme, concept text, variants, and their rendered combos.
     """
-    root = Path(OUTPUT_DIR)
+    root = Path(OUTPUT_DIR).resolve()
     theme_dir = root / theme_dir_name
     concept_dir = theme_dir / concept_dir_name
 
     if not concept_dir.is_dir():
         raise ValueError(f"Concept directory not found: {concept_dir_name}")
 
-    display_theme, concept_text = parse_concept_from_prompts(concept_dir)
+    display_theme, concept_text, variant_count = parse_concept_from_prompts(concept_dir)
 
     # Group variants
     groups: dict[int, list[Path]] = {}
@@ -346,12 +350,11 @@ def load_concept_to_session(session: dict, theme_dir_name: str, concept_dir_name
     if not groups:
         raise ValueError("No variants found in concept directory.")
 
-    # Sort groups and identify "original" 512 variants (or smallest if 512 missing)
+    # Sort groups and identify "original" variants vs iterations
     _RES_ORDER = {"512": 0, "1K": 1, "2K": 2, "4K": 3}
     
     variant_indices = sorted(groups.keys())
     image_paths = []
-    original_image_paths = []
     combo_lists = []
     
     for idx in variant_indices:
@@ -361,8 +364,8 @@ def load_concept_to_session(session: dict, theme_dir_name: str, concept_dir_name
         
         # The first render is our "primary" one for this variant slot
         primary = renders_sorted[0]
-        image_paths.append(str(primary.relative_to(root)))
-        original_image_paths.append(str(primary.relative_to(root)))
+        # Store paths relative to project root (e.g. "output/theme/concept/...")
+        image_paths.append(primary.relative_to(root.parent).as_posix())
         
         # Build the combo list for this variant
         combos = []
@@ -372,19 +375,28 @@ def load_concept_to_session(session: dict, theme_dir_name: str, concept_dir_name
             res = m.group(3)
             no_bg = r.with_name(r.stem + "_no_bg.png")
             combos.append({
-                "url": "/" + r.relative_to(root).as_posix(),
+                "url": "/" + r.relative_to(root.parent).as_posix(),
                 "size": res,
                 "aspectRatio": ar,
-                "noBgUrl": "/" + no_bg.relative_to(root).as_posix() if no_bg.exists() else None
+                "noBgUrl": "/" + no_bg.relative_to(root.parent).as_posix() if no_bg.exists() else None
             })
         combo_lists.append(combos)
 
     # Load PIL images for the primary variants
     images = []
     for p_str in image_paths:
-        img = Image.open(root / p_str)
+        img = Image.open(p_str)
         img.load()
         images.append(img)
+
+    # Differentiate originals vs iterations
+    # If variant_count is 0 (missing metadata), assume all are originals (old session)
+    orig_count = variant_count if variant_count > 0 else len(image_paths)
+    original_image_paths = image_paths[:orig_count]
+    
+    # Best-effort iteration_roots: assume iterations come from the first original variant
+    # since we don't have true per-iteration rootIdx metadata on disk yet.
+    iteration_roots = [0] * (len(image_paths) - orig_count)
 
     # Reset and populate session
     session["theme"] = display_theme or theme_dir_name
@@ -392,11 +404,12 @@ def load_concept_to_session(session: dict, theme_dir_name: str, concept_dir_name
     session["prompts"] = [] # We don't store prompts in session usually, they are built on the fly
     session["images"] = images
     session["image_paths"] = image_paths
-    session["original_images"] = list(images)
+    session["original_images"] = list(images[:orig_count])
     session["original_image_paths"] = list(original_image_paths)
+    session["iteration_roots"] = iteration_roots
     session["no_bg_variant_cache"] = {}
     session["selected_idx"] = 0
-    session["concept_dir"] = str(concept_dir.relative_to(root))
+    session["concept_dir"] = concept_dir.relative_to(root.parent).as_posix()
     session["combo_lists"] = combo_lists
     
     # Extract variant size and aspect ratio from the first primary variant
