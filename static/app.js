@@ -131,6 +131,17 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         selectedVariant: null,
         directMode: false,     // true when user skips brainstorm and generates directly
 
+        get visibleSteps() {
+            const steps = [1];
+            if (this.step >= 2) steps.push(2);
+            if (this.step >= 3) steps.push(3);
+            if (this.step >= 4 || this.loadedImageRes) steps.push(4);
+            if ((this.step >= 4 || this.loadedImageRes) && this.selectedVariant !== null) {
+                steps.push(5, 6);
+            }
+            return steps;
+        },
+
         // ── UI state ───────────────────────────────────────────────────────
         isLoading: false,
         loadingMsg: "",
