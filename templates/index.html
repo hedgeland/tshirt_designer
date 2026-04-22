@@ -490,6 +490,9 @@
             <!-- ── Columns area ─────────────────────────────────────────────────── -->
             <div class="h-full flex flex-row overflow-x-auto overflow-y-hidden">
 
+                <!-- Spacer to keep the first column clear of the collapsed left Presets panel -->
+                <div class="flex-shrink-0 w-[30px] pointer-events-none" aria-hidden="true"></div>
+
                 <template x-for="(col, index) in columns" :key="col.uid">
                     <!-- Each column is a fully independent Alpine component with its own workflow state -->
                     <div x-data="columnDesigner(index, sessionId, cfg, col.initialState || {})"
@@ -1627,6 +1630,8 @@
                     </div><!-- /column -->
                 </template><!-- /x-for columns -->
 
+                <!-- Spacer to prevent the last column from getting trapped under the right Output Browser hover zone -->
+                <div class="flex-shrink-0 w-[30px] pointer-events-none" aria-hidden="true"></div>
 
             </div><!-- /columns area -->
 
