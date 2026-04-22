@@ -284,17 +284,17 @@
                         <div x-show="!browserLoading && filteredBrowserDesignSessions.length === 0"
                             class="flex flex-col items-center justify-center py-12 text-slate-500 text-sm gap-1">
                             <span class="text-2xl">🗂</span>
-                            <span x-text="browserFilter ? 'No matching themes' : 'No output yet'"></span>
+                            <span x-text="browserFilter ? 'No matching sessions' : 'No output yet'"></span>
                         </div>
 
                         <!-- Theme list -->
-                        <template x-for="(theme, ti) in filteredBrowserDesignSessions" :key="session.design_session">
+                        <template x-for="(session, ti) in filteredBrowserDesignSessions" :key="session.design_session">
                             <div class="border-b border-slate-700">
 
                                 <!-- Theme header -->
                                 <div class="flex items-center gap-1 px-3 py-2 hover:bg-slate-700 transition-colors">
-                                    <input x-show="manageMode" type="checkbox" :checked="sessionAllSelected(theme)"
-                                        @change="toggleSessionFiles(theme)" class="flex-shrink-0 accent-indigo-500">
+                                    <input x-show="manageMode" type="checkbox" :checked="sessionAllSelected(session)"
+                                        @change="toggleSessionFiles(session)" class="flex-shrink-0 accent-indigo-500">
                                     <template x-if="manageMode && renamingDir === session.dir_name">
                                         <div class="flex items-center gap-1 flex-1 min-w-0">
                                             <input type="text" x-model="renameValue" @keydown.enter="commitRename()"
@@ -319,7 +319,7 @@
                                         </button>
                                     </template>
                                     <button x-show="manageMode && renamingDir !== session.dir_name"
-                                        @click.stop="startRename(session.dir_name, session.design_session)" title="Rename theme"
+                                        @click.stop="startRename(session.dir_name, session.design_session)" title="Rename session"
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">✏</button>
                                     <button @click.stop="downloadThemeZip(session.dir_name)" title="Download ZIP"
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">⬇
