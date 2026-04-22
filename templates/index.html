@@ -490,9 +490,10 @@
             <!-- ── Columns area ─────────────────────────────────────────────────── -->
             <div class="h-full flex flex-row overflow-x-auto overflow-y-hidden">
 
-                <template x-for="col in columns" :key="col.id">
+                <template x-for="(col, index) in columns" :key="col.uid">
                     <!-- Each column is a fully independent Alpine component with its own workflow state -->
-                    <div x-data="columnDesigner(col.id, sessionId, cfg, col.initialState || {})" :data-col-idx="col.id"
+                    <div x-data="columnDesigner(index, sessionId, cfg, col.initialState || {})"
+                        x-effect="colIdx = index" :data-col-idx="index"
                         @click.capture="Alpine.store('activeColIdx', colIdx)"
                         class="min-w-[480px] flex-1 flex flex-col border-r border-slate-600 last:border-r-0 overflow-hidden bg-slate-800 relative">
 
@@ -501,7 +502,7 @@
                             :class="$store.browserOpen && $store.activeColIdx === colIdx
                                  ? 'bg-indigo-900/60 border-l-2 border-l-indigo-400'
                                  : 'bg-slate-700'">
-                            <span class="text-sm font-semibold text-slate-200" x-text="`Design ${col.id + 1}`"></span>
+                            <span class="text-sm font-semibold text-slate-200" x-text="`Design ${index + 1}`"></span>
                             <!-- Settings toggle -->
                             <button @click="settingsOpen = !settingsOpen" :aria-expanded="settingsOpen"
                                 title="Toggle column settings"
@@ -538,13 +539,13 @@
 
                                 <!-- Background Color -->
                                 <div>
-                                    <label :for="'bg-color-' + col.id"
+                                    <label :for="'bg-color-' + index"
                                         class="text-xs font-medium block mb-1.5">Background color</label>
                                     <p class="text-xs text-slate-300 mb-1">Default = <span
                                             @click="bgColor = '{{ bg_color }}'" title="Click to reset"
                                             class="underline cursor-pointer hover:text-white transition-colors">{{
                                             bg_color }} ({{ bg_color_name }})</span></p>
-                                    <input :id="'bg-color-' + col.id" type="color" x-model="bgColor"
+                                    <input :id="'bg-color-' + index" type="color" x-model="bgColor"
                                         aria-label="Background color"
                                         class="block w-full h-9 rounded-md border border-slate-500">
                                     <p class="text-xs text-slate-300 mt-1">Pick a solid color easy to remove in Canva.
@@ -562,13 +563,13 @@
                                     ]">
                                         <div>
                                             <div class="flex justify-between items-baseline mb-1">
-                                                <label :for="'slider-' + col.id + '-' + slider.key"
+                                                <label :for="'slider-' + index + '-' + slider.key"
                                                     class="text-xs font-medium" x-text="slider.label"></label>
                                                 <span class="text-xs font-semibold text-indigo-300"
                                                     x-text="$data[slider.key]"
                                                     :aria-label="slider.label + ': ' + $data[slider.key]"></span>
                                             </div>
-                                            <input type="range" :id="'slider-' + col.id + '-' + slider.key"
+                                            <input type="range" :id="'slider-' + index + '-' + slider.key"
                                                 :aria-label="slider.label" :min="slider.min" :max="slider.max"
                                                 :step="slider.step" x-model.number="$data[slider.key]">
                                             <p x-show="slider.hint" x-text="slider.hint"
@@ -580,9 +581,9 @@
                                 <!-- Generation options -->
                                 <div class="space-y-2">
                                     <div>
-                                        <label :for="'aspect-ratio-' + col.id"
+                                        <label :for="'aspect-ratio-' + index"
                                             class="text-xs font-medium block mb-1">Aspect ratio</label>
-                                        <select :id="'aspect-ratio-' + col.id" x-model="aspectRatio"
+                                        <select :id="'aspect-ratio-' + index" x-model="aspectRatio"
                                             class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                             <template x-for="r in cfg.aspectRatios" :key="r">
                                                 <option :value="r" x-text="r"></option>
@@ -590,9 +591,9 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label :for="'variant-size-' + col.id"
+                                        <label :for="'variant-size-' + index"
                                             class="text-xs font-medium block mb-1">Variant resolution</label>
-                                        <select :id="'variant-size-' + col.id" x-model="variantSize"
+                                        <select :id="'variant-size-' + index" x-model="variantSize"
                                             class="w-full text-xs border border-slate-500 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                             {% for s in brainstorm_sizes %}
                                             <option value="{{ s }}">{{ s }}</option>
@@ -665,8 +666,8 @@
                                     </div>
                                     <div x-show="!sCollapsed[1]">
                                         <!-- Theme textarea — full width -->
-                                        <label :for="'theme-input-' + col.id" class="sr-only">Design theme</label>
-                                        <textarea :id="'theme-input-' + col.id" x-model="theme" x-ref="themeInput"
+                                        <label :for="'theme-input-' + index" class="sr-only">Design theme</label>
+                                        <textarea :id="'theme-input-' + index" x-model="theme" x-ref="themeInput"
                                             @keydown.enter.prevent="doGenerateDirect()" @focus="$el.select()" rows="2"
                                             placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
                                             class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"></textarea>
@@ -697,7 +698,7 @@
 
                                             <!-- Reference image: Upload/Pick when unset, thumbnail + controls when set -->
                                             <div x-show="!refImageUrl" class="flex gap-2">
-                                                <label :aria-label="'Upload reference image for Design ' + (col.id + 1)"
+                                                <label :aria-label="'Upload reference image for Design ' + (index + 1)"
                                                     class="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
                                                     <span aria-hidden="true">⬆️</span> Upload
                                                     <input type="file" accept="image/*" class="hidden"
@@ -777,7 +778,7 @@
                                                     :class="selectedConcept === concept
                                                ? 'border-indigo-400 bg-indigo-50'
                                                : 'bg-slate-100 border-slate-300 hover:bg-white hover:border-slate-400'">
-                                                    <input type="radio" :name="'concept-' + col.id" :value="concept"
+                                                    <input type="radio" :name="'concept-' + index" :value="concept"
                                                         @change="selectConcept(concept)"
                                                         :checked="selectedConcept === concept"
                                                         class="mt-0.5 accent-indigo-600 flex-shrink-0">
@@ -1206,7 +1207,7 @@
                                         <h2 class="text-base font-semibold"><span aria-hidden="true">👕</span> Publish
                                             to Printify
                                             <span class="text-xs font-normal text-slate-400 ml-1"
-                                                x-text="`— Design ${col.id + 1}`"></span>
+                                                x-text="`— Design ${index + 1}`"></span>
                                         </h2>
                                         <button @click="showPrintify = false" aria-label="Close" title="Close (Esc)"
                                             class="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>

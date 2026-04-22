@@ -1,6 +1,8 @@
 // ── Alpine global stores ──────────────────────────────────────────────────────
 // Declare stores before Alpine processes the DOM so $store.* refs in templates
 // never see undefined on first render. Values are updated by designer.init().
+let colUidSeq = 1;
+
 document.addEventListener('alpine:init', () => {
     Alpine.store('columnCount', 1); // updated to actual count after session restore
     Alpine.store('minColumns', 1);  // updated after session restore; drives close-button disable
@@ -1384,8 +1386,8 @@ function designer() {
             // server-side PIL images, but text state and paths survive via session restore.
             window.addEventListener('beforeunload', (e) => {
                 // Check live Alpine state for active columns; fall back to columns array length
-                const anyWork = this.columns.some((col) => {
-                    const el = document.querySelector(`[data-col-idx="${col.id}"]`);
+                const anyWork = this.columns.some((col, i) => {
+                    const el = document.querySelector(`[data-col-idx="${i}"]`);
                     const data = el?._x_dataStack?.[0];
                     // Consider a column "in progress" if it has a theme, concepts, variants, or final image
                     return data?.theme?.trim() || data?.concepts?.length || data?.variants?.length;
@@ -1428,23 +1430,23 @@ function designer() {
                     // Re-create the column list from persisted server state; each entry
                     // carries its initialState so columnDesigner can restore the workflow step.
                     if (Array.isArray(data.columns) && data.columns.length > 0) {
-                        this.columns = data.columns.map((state, i) => ({
-                            id: i,
+                        this.columns = data.columns.map((state) => ({
+                            uid: colUidSeq++,
                             initialState: state,
                         }));
                     } else {
-                        this.columns = [{ id: 0, initialState: {} }];
+                        this.columns = [{ uid: colUidSeq++, initialState: {} }];
                     }
                 }
             } catch {
                 // Network or parse error — start fresh with a single empty column
-                this.columns = [{ id: 0, initialState: {} }];
+                this.columns = [{ uid: colUidSeq++, initialState: {} }];
             }
 
             // After a hard reload the server session is empty, so we may have fewer
             // columns than minColumns. Pad up to the floor before rendering.
             while (this.columns.length < this.minColumns) {
-                this.columns.push({ id: this.columns.length, initialState: {} });
+                this.columns.push({ uid: colUidSeq++, initialState: {} });
             }
 
             // Publish column count to a global Alpine store so column components can
@@ -1496,13 +1498,14 @@ function designer() {
             const res = await fetch("/columns", { method: "POST", body: fd });
             const data = await res.json();
             if (data.error) return;
-            this.columns.push({ id: data.column_id });
+            this.columns.push({ uid: colUidSeq++ });
             Alpine.store('columnCount', this.columns.length);
         },
 
         // Remove a column — blocked while the column is loading or it's the last one.
-        // Rebuilds the columns array from the server's compacted response so indices
-        // stay in sync after the gap is closed.
+        // Mutates the local columns array by splicing out the removed index. The DOM
+        // elements bound via x-for will stay in place, and their x-effect="colIdx = index"
+        // will automatically update the inner columnDesigner's colIdx to match its new position.
         async closeColumn(colIdx) {
             if (this.columns.length <= 1) return; // guard — can't close the last column
             // Read live Alpine state from the column DOM to decide whether to confirm
@@ -1519,9 +1522,8 @@ function designer() {
             if (!res.ok) return;
             const data = await res.json();
             if (data.error) return;
-            // Rebuild from the server's compacted array — surviving columns get new indices
-            // starting at 0; _restoreInitialState in each columnDesigner handles the re-mount.
-            this.columns = data.columns.map((state, i) => ({ id: i, initialState: state }));
+            
+            this.columns.splice(colIdx, 1);
             Alpine.store('columnCount', this.columns.length);
             // If closing dropped below the minColumns floor, lower it to match so the
             // preference doesn't re-add the column on next load.
@@ -1564,7 +1566,7 @@ function designer() {
                     if (!res.ok) break;
                     const data = await res.json();
                     if (data.error) break;
-                    this.columns = data.columns.map((state, i) => ({ id: i, initialState: state }));
+                    this.columns.pop();
                     Alpine.store('columnCount', this.columns.length);
                 }
             }
