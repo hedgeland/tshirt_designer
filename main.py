@@ -1243,7 +1243,7 @@ async def delete_output_files(request: Request):
 
 
 @app.get("/browse/archive/{dir_name}")
-async def archive_output_theme(dir_name: str):
+async def archive_output_session(dir_name: str):
     data = await asyncio.to_thread(archive_design_session, dir_name)
     return _zip_response(data, f"{dir_name}.zip")
 
@@ -1356,7 +1356,7 @@ async def session_clear_reference_image(request: Request):
 
 
 @app.patch("/browse/rename")
-async def rename_output_theme(request: Request):
+async def rename_output_session(request: Request):
     body = await request.json()
     old_dir = body.get("dir_name", "")
     new_name = body.get("new_name", "")

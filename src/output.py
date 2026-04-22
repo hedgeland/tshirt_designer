@@ -244,7 +244,7 @@ def delete_files(paths: list[str]) -> dict:
 
 
 def archive_design_session(dir_name: str) -> bytes:
-    """Zip all files under a theme directory and return the bytes."""
+    """Zip all files under a session directory and return the bytes."""
     session_dir = Path(OUTPUT_DIR) / dir_name
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -270,16 +270,16 @@ def archive_files(paths: list[str]) -> bytes:
 
 
 def rename_design_session(old_dir_name: str, new_display_name: str) -> dict:
-    """Rename a theme directory. Converts new_display_name to a safe dir name."""
+    """Rename a session directory. Converts new_display_name to a safe dir name."""
     root = Path(OUTPUT_DIR)
     old_path = root / old_dir_name
     new_dir_name = safe_design_session_name(new_display_name)
     new_path = root / new_dir_name
 
     if not old_path.is_dir():
-        raise ValueError(f"Theme not found: {old_dir_name}")
+        raise ValueError(f"Session not found: {old_dir_name}")
     if new_path.exists() and new_path != old_path:
-        raise ValueError("A theme with that name already exists.")
+        raise ValueError("A session with that name already exists.")
 
     old_path.rename(new_path)
     return {"dir_name": new_dir_name, "design_session": new_display_name}

@@ -254,7 +254,7 @@
                     <div x-show="storageStats"
                         class="px-4 py-1.5 bg-slate-900/50 border-b border-slate-700 flex-shrink-0">
                         <p class="text-xs text-slate-500"
-                            x-text="storageStats ? `${_fmtBytes(storageStats.totalBytes)} · ${storageStats.themeCount} theme${storageStats.themeCount !== 1 ? 's' : ''}` : ''">
+                            x-text="storageStats ? `${_fmtBytes(storageStats.totalBytes)} · ${storageStats.sessionCount} session${storageStats.sessionCount !== 1 ? 's' : ''}` : ''">
                         </p>
                     </div>
 
@@ -321,7 +321,7 @@
                                     <button x-show="manageMode && renamingDir !== session.dir_name"
                                         @click.stop="startRename(session.dir_name, session.design_session)" title="Rename session"
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">✏</button>
-                                    <button @click.stop="downloadThemeZip(session.dir_name)" title="Download ZIP"
+                                    <button @click.stop="downloadSessionZip(session.dir_name)" title="Download ZIP"
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">⬇
                                         ZIP</button>
                                 </div>

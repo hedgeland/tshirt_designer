@@ -1357,7 +1357,7 @@ function designer() {
         browserLoading: false,
         manageMode: false,
         selectedFiles: {},      // url → size_bytes; object for Alpine reactivity
-        storageStats: null,     // {totalBytes, themeCount}
+        storageStats: null,     // {totalBytes, sessionCount}
         renamingDir: "",        // dir_name of the theme currently being renamed
         renameValue: "",        // current value of the rename input
 
@@ -1644,7 +1644,7 @@ function designer() {
                 }));
                 this.storageStats = {
                     totalBytes: data.reduce((s, t) => s + t.design_session_size_bytes, 0),
-                    themeCount: data.length,
+                    sessionCount: data.length,
                 };
             } finally {
                 this.browserLoading = false;
@@ -1761,7 +1761,7 @@ function designer() {
             await this.reloadBrowser();
         },
 
-        downloadThemeZip(dirName) {
+        downloadSessionZip(dirName) {
             const a = document.createElement("a");
             a.href = `/browse/archive/${encodeURIComponent(dirName)}`;
             a.download = `${dirName}.zip`;
