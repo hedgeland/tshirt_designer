@@ -27,3 +27,4 @@ prompt_presets.json
 .gemini/
 gemini.md
 .vscode/sessions.json
+.vscode/tasks.json
