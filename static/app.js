@@ -352,6 +352,52 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             return Alpine.store('printifyFavorites').includes(blueprintId);
         },
 
+        async togglePrintifyFavorite(blueprintId) {
+            const id = parseInt(blueprintId, 10);
+            if (isNaN(id)) return;
+            
+            const favs = [...Alpine.store('printifyFavorites')];
+            const isFav = favs.includes(id);
+            const action = isFav ? "remove" : "add";
+
+            console.log(`Toggling favorite: ID=${id}, current_is_fav=${isFav}, action=${action}`);
+
+            if (isFav) {
+                const idx = favs.indexOf(id);
+                favs.splice(idx, 1);
+            } else {
+                favs.push(id);
+            }
+
+            // Optimistic update
+            Alpine.store('printifyFavorites', favs);
+
+            try {
+                const res = await fetch("/settings/printify-favorites", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ blueprint_id: id, action }),
+                });
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`HTTP ${res.status}: ${errText}`);
+                }
+                const data = await res.json();
+                if (data.printify_favorites) {
+                    Alpine.store('printifyFavorites', data.printify_favorites);
+                }
+            } catch (err) {
+                console.error("Failed to toggle Printify favorite:", err);
+                // Rollback on error
+                if (isFav) favs.push(id);
+                else {
+                    const idx = favs.indexOf(id);
+                    if (idx !== -1) favs.splice(idx, 1);
+                }
+                Alpine.store('printifyFavorites', favs);
+            }
+        },
+
         get pDesignPx() {
             return this.pScale * this.pPrintWidth;
         },
@@ -1998,42 +2044,6 @@ function designer() {
                 }));
             }
             this.presetsStatus = `Applied to all columns.`;
-        },
-
-        async togglePrintifyFavorite(blueprintId) {
-            const favs = [...Alpine.store('printifyFavorites')];
-            const isFav = favs.includes(blueprintId);
-            const action = isFav ? "remove" : "add";
-
-            if (isFav) {
-                const idx = favs.indexOf(blueprintId);
-                favs.splice(idx, 1);
-            } else {
-                favs.push(blueprintId);
-            }
-
-            // Optimistic update
-            Alpine.store('printifyFavorites', favs);
-
-            try {
-                const res = await fetch("/settings/printify-favorites", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ blueprint_id: blueprintId, action }),
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                // Ensure sync with server's final state
-                if (data.printify_favorites) {
-                    Alpine.store('printifyFavorites', data.printify_favorites);
-                }
-            } catch (err) {
-                console.error("Failed to toggle Printify favorite:", err);
-                // Rollback on error
-                if (isFav) favs.push(blueprintId);
-                else favs.pop();
-                Alpine.store('printifyFavorites', favs);
-            }
         },
     };
 }

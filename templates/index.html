@@ -1269,7 +1269,7 @@
                                                             <span class="text-xs ml-1 opacity-60"
                                                                 x-text="bp.brand ? '· ' + bp.brand : ''"></span>
                                                         </div>
-                                                        <button @click.stop="$root._x_dataStack[0].togglePrintifyFavorite(bp.id)"
+                                                        <button @click.stop="togglePrintifyFavorite(bp.id)"
                                                             title="Remove from favorites"
                                                             class="px-3 py-2 text-amber-400 hover:text-amber-500 transition-colors">
                                                             ★
@@ -1302,7 +1302,7 @@
                                                             <span class="text-xs ml-1 opacity-60"
                                                                 x-text="bp.brand ? '· ' + bp.brand : ''"></span>
                                                         </div>
-                                                        <button @click.stop="$root._x_dataStack[0].togglePrintifyFavorite(bp.id)"
+                                                        <button @click.stop="togglePrintifyFavorite(bp.id)"
                                                             :title="isFavorite(bp.id) ? 'Remove from favorites' : 'Add to favorites'"
                                                             class="px-3 py-2 transition-colors"
                                                             :class="isFavorite(bp.id) ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400'">
