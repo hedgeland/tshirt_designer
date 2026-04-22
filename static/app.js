@@ -1643,7 +1643,7 @@ function designer() {
                     expanded: ti === 0,
                 }));
                 this.storageStats = {
-                    totalBytes: data.reduce((s, t) => s + t.design_session_size_bytes, 0),
+                    totalBytes: data.reduce((s, t) => s + t.session_size_bytes, 0),
                     sessionCount: data.length,
                 };
             } finally {
