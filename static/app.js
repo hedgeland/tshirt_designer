@@ -1448,8 +1448,11 @@ function designer() {
 
             // After a hard reload the server session is empty, so we may have fewer
             // columns than minColumns. Pad up to the floor before rendering.
-            while (this.columns.length < this.minColumns) {
-                this.columns.push({ uid: colUidSeq++, initialState: {} });
+            const targetCols = this.minColumns;
+            while (this.columns.length < targetCols) {
+                const prevCount = this.columns.length;
+                await this.addColumn();
+                if (this.columns.length === prevCount) break; // prevent infinite loop if addColumn fails
             }
 
             // Publish column count to a global Alpine store so column components can
@@ -1521,9 +1524,16 @@ function designer() {
             fd.append("session_id", this.sessionId);
             fd.append("column_id", colIdx);
             const res = await fetch("/session/remove-column", { method: "POST", body: fd });
-            if (!res.ok) return;
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                alert(`Failed to close column: ${errData.error || res.statusText}\nTry refreshing the page to resync your session.`);
+                return;
+            }
             const data = await res.json();
-            if (data.error) return;
+            if (data.error) {
+                alert(`Failed to close column: ${data.error}`);
+                return;
+            }
             
             this.columns.splice(colIdx, 1);
             Alpine.store('columnCount', this.columns.length);
