@@ -3,15 +3,12 @@
 All httpx calls are mocked; no real Printify API requests are made.
 """
 
-import json
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 
-import src.printify as printify_module
 from src.printify import create_product, list_shops, upload_image
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -97,7 +94,6 @@ def test_create_product_with_single_variant():
 
 def test_list_shops_retries_on_503(caplog):
     """list_shops must retry when the first call gets a 503 ServiceUnavailable."""
-    import logging
     call_count = 0
 
     def fake_get(url, headers, timeout):

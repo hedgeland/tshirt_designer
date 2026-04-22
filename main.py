@@ -50,7 +50,7 @@ from config import (
     SESSION_TTL_SECONDS,
     SIZE_PX,
 )
-from src import presets, printify
+from src import presets, printify, settings
 from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
 from src.image import finalize_image as finalize_design
@@ -192,10 +192,11 @@ def get_session(session_id: str) -> dict:
     Updates _last_accessed on every call so the cleanup loop can evict idle sessions.
     """
     if session_id not in sessions:
+        user_settings = settings.load_settings()
         sessions[session_id] = {
             "columns": [init_column_state()],  # start with one column
-            "max_columns": MAX_COLUMNS,
-            "min_columns": 1,
+            "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
+            "min_columns": user_settings.get("default_min_columns", 1),
         }
     sessions[session_id]["_last_accessed"] = time.time()
     return sessions[session_id]
@@ -387,6 +388,7 @@ async def logout(request: Request):
 @app.get("/")
 async def index(request: Request):
     builtin = presets.load_builtin()
+    user_settings = settings.load_settings()
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -418,7 +420,8 @@ async def index(request: Request):
             "edit_size": EDIT_SIZE,
             "final_sizes": FINAL_SIZES,
             "final_size": FINAL_SIZE,
-            "max_columns": MAX_COLUMNS,
+            "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
+            "min_columns": user_settings.get("default_min_columns", 1),
         },
     )
 
@@ -1678,6 +1681,8 @@ async def set_max_columns(session_id: str = Form(...), max_columns: int = Form(.
     sess = get_session(session_id)
     clamped = max(1, min(max_columns, MAX_COLUMNS))
     sess["max_columns"] = clamped
+    # Persist as global default
+    settings.save_settings({"default_max_columns": clamped})
     return {"max_columns": clamped}
 
 
@@ -1687,6 +1692,8 @@ async def set_min_columns(session_id: str = Form(...), min_columns: int = Form(.
     sess = get_session(session_id)
     clamped = max(1, min(min_columns, sess["max_columns"]))
     sess["min_columns"] = clamped
+    # Persist as global default
+    settings.save_settings({"default_min_columns": clamped})
     return {"min_columns": clamped}
 
 

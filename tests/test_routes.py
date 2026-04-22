@@ -6,7 +6,6 @@ in test environments), so no OAuth mocking is required.
 
 import json
 
-import pytest
 from fastapi.testclient import TestClient
 
 from config import BRAINSTORM_SIZE, BRAINSTORM_SIZES, DEFAULT_ASPECT_RATIO, FINAL_SIZE, FINAL_SIZES
@@ -33,8 +32,9 @@ def test_index_contains_config_block():
 
 
 def test_get_builtin_preset():
-    from src.presets import BUILTIN_NAME
     import urllib.parse
+
+    from src.presets import BUILTIN_NAME
     response = client.get(f"/presets/{urllib.parse.quote(BUILTIN_NAME)}")
     assert response.status_code == 200
     data = response.json()

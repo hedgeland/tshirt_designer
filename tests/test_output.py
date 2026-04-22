@@ -3,11 +3,9 @@
 import re
 from pathlib import Path
 
-import pytest
 from PIL import Image
 
 from src.output import safe_design_session_name, save_variants
-
 
 # ── safe_design_session_name ───────────────────────────────────────────────────────────
 # The function appends _YYYYMMDD_HHMMSS, so tests check the sanitized prefix only.
