@@ -668,6 +668,7 @@
                                         <!-- Theme textarea — full width -->
                                         <label :for="'theme-input-' + index" class="sr-only">Design theme</label>
                                         <textarea :id="'theme-input-' + index" x-model="theme" x-ref="themeInput"
+                                            @input="hasUnsubmittedText = true"
                                             @keydown.enter.prevent="doGenerateDirect()" @focus="$el.select()" rows="2"
                                             placeholder="e.g. vintage motorcycles, funny cats, 90s hip-hop..."
                                             class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"></textarea>
@@ -815,6 +816,7 @@
                                             <div>
                                                 <label class="text-xs block mb-1">Edit concept (optional)</label>
                                                 <textarea x-model="editedConcept" rows="2"
+                                                    @input="hasUnsubmittedText = true"
                                                     @keydown.enter.prevent="doGenerate()"
                                                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
                                             </div>
@@ -1075,6 +1077,7 @@
                                                     </select>
                                                 </div>
                                                 <textarea x-model="editPrompt" rows="2"
+                                                    @input="hasUnsubmittedText = true"
                                                     placeholder="Describe your changes (e.g. make the wings gold, remove the border)"
                                                     :disabled="isLoading" @keydown.enter.prevent="doEditVariant()"
                                                     class="w-full text-xs rounded-md px-2 py-1.5 border border-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none disabled:opacity-50"></textarea>

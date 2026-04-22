@@ -152,6 +152,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         promptLog: "",
         showPromptLog: false,
         showPresets: false,
+        hasUnsubmittedText: false,
 
         // ── Settings ───────────────────────────────────────────────────────
         bgColor: cfg.bgColor,
@@ -401,6 +402,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.isLoading = true;
             this.loadingMsg = msg;
             this.error = "";
+            this.hasUnsubmittedText = false;
         },
 
         _stopLoading() {
@@ -431,6 +433,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // Apply server-persisted column state on init.  Determines which workflow
         // step to show based on what data is available (final > variants > concepts > theme).
         _restoreInitialState(state) {
+            this.hasUnsubmittedText = false;
             if (!state || typeof state !== 'object') return;
 
             // Restore text state unconditionally
@@ -534,6 +537,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             if (data.error) { alert(data.error); return; }
 
             // Reset workflow state to variant-only
+            this.hasUnsubmittedText = false;
             this.concepts = [];
             this.selectedConcept = null;
             this.editedConcept = "";
@@ -1389,8 +1393,7 @@ function designer() {
                 const anyWork = this.columns.some((col, i) => {
                     const el = document.querySelector(`[data-col-idx="${i}"]`);
                     const data = el?._x_dataStack?.[0];
-                    // Consider a column "in progress" if it has a theme, concepts, variants, or final image
-                    return data?.theme?.trim() || data?.concepts?.length || data?.variants?.length;
+                    return data?.hasUnsubmittedText;
                 });
                 if (anyWork) {
                     e.preventDefault();
@@ -1511,10 +1514,9 @@ function designer() {
             // Read live Alpine state from the column DOM to decide whether to confirm
             const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
             const colData = el?._x_dataStack?.[0];
-            const hasWork = colData?.theme?.trim() || colData?.concepts?.length
-                         || colData?.variants?.length;
+            const hasWork = colData?.hasUnsubmittedText;
             const label = `Design ${colIdx + 1}`;
-            if (hasWork && !confirm(`Close ${label}? Work in this column will be lost.`)) return;
+            if (hasWork && !confirm(`Close ${label}? Unsubmitted text will be lost.`)) return;
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
             fd.append("column_id", colIdx);
@@ -1550,9 +1552,9 @@ function designer() {
                     const colIdx = this.columns.length - excess + i;
                     const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
                     const d = el?._x_dataStack?.[0];
-                    return d?.theme?.trim() || d?.concepts?.length || d?.variants?.length;
+                    return d?.hasUnsubmittedText;
                 }).some(Boolean);
-                if (hasWip && !confirm(`Lowering the max will close ${excess} column${excess > 1 ? 's' : ''} with work in progress. Continue?`)) {
+                if (hasWip && !confirm(`Lowering the max will close ${excess} column${excess > 1 ? 's' : ''} with unsubmitted text. Continue?`)) {
                     // Revert the input to the current actual column count
                     this.maxColumns = this.columns.length;
                     return;
