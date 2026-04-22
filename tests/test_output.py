@@ -6,40 +6,40 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from src.output import safe_theme_name, save_variants
+from src.output import safe_design_session_name, save_variants
 
 
-# ── safe_theme_name ───────────────────────────────────────────────────────────
+# ── safe_design_session_name ───────────────────────────────────────────────────────────
 # The function appends _YYYYMMDD_HHMMSS, so tests check the sanitized prefix only.
 
 def _prefix(name: str) -> str:
-    """Strip the trailing _YYYYMMDD_HHMMSS timestamp from a safe_theme_name result."""
+    """Strip the trailing _YYYYMMDD_HHMMSS timestamp from a safe_design_session_name result."""
     return re.sub(r"_\d{8}_\d{6}$", "", name)
 
 
-def test_safe_theme_name_replaces_spaces():
-    assert _prefix(safe_theme_name("space cats")) == "space_cats"
+def test_safe_design_session_name_replaces_spaces():
+    assert _prefix(safe_design_session_name("space cats")) == "space_cats"
 
 
-def test_safe_theme_name_replaces_special_chars():
-    assert _prefix(safe_theme_name("hello/world!")) == "hello_world_"
+def test_safe_design_session_name_replaces_special_chars():
+    assert _prefix(safe_design_session_name("hello/world!")) == "hello_world_"
 
 
-def test_safe_theme_name_strips_whitespace():
-    assert _prefix(safe_theme_name("  robots  ")) == "robots"
+def test_safe_design_session_name_strips_whitespace():
+    assert _prefix(safe_design_session_name("  robots  ")) == "robots"
 
 
-def test_safe_theme_name_preserves_hyphens_and_underscores():
-    assert _prefix(safe_theme_name("retro-80s_vibes")) == "retro-80s_vibes"
+def test_safe_design_session_name_preserves_hyphens_and_underscores():
+    assert _prefix(safe_design_session_name("retro-80s_vibes")) == "retro-80s_vibes"
 
 
-def test_safe_theme_name_handles_mixed():
-    assert _prefix(safe_theme_name("  Cats & Dogs! ")) == "Cats___Dogs_"
+def test_safe_design_session_name_handles_mixed():
+    assert _prefix(safe_design_session_name("  Cats & Dogs! ")) == "Cats___Dogs_"
 
 
-def test_safe_theme_name_includes_timestamp():
+def test_safe_design_session_name_includes_timestamp():
     """Result must end with _YYYYMMDD_HHMMSS so output dirs sort chronologically."""
-    result = safe_theme_name("test")
+    result = safe_design_session_name("test")
     assert re.search(r"_\d{8}_\d{6}$", result), f"No timestamp in: {result}"
 
 

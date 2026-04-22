@@ -56,13 +56,13 @@ from src.brainstorm import generate_concepts
 from src.image import finalize_image as finalize_design
 from src.image import generate_image
 from src.output import (
-    archive_files,
     archive_design_session,
+    archive_files,
     delete_files,
     load_concept_to_session,
     load_image_to_session,
     rename_design_session,
-    safe_theme_name,
+    safe_design_session_name,
     save_variants,
     scan_output,
 )
@@ -693,13 +693,13 @@ async def finalize(
         final_name = f"final_v{idx}_{ar_safe}_{final_size}.png"
 
         # Co-locate finals with their variant siblings: derive the theme dir from
-        # the stored variant paths rather than calling safe_theme_name() (which stamps
+        # the stored variant paths rather than calling safe_design_session_name() (which stamps
         # a fresh timestamp and would scatter finals into new directories).
         image_paths = session.get("image_paths", [])
         if image_paths:
             session_dir = Path(image_paths[0]).parent.parent
         else:
-            session_dir = Path(OUTPUT_DIR) / safe_theme_name(theme)
+            session_dir = Path(OUTPUT_DIR) / safe_design_session_name(theme)
 
         final_path = session_dir / final_name
 
