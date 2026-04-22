@@ -422,6 +422,7 @@ async def index(request: Request):
             "final_size": FINAL_SIZE,
             "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
             "min_columns": user_settings.get("default_min_columns", 1),
+            "printify_favorites": user_settings.get("printify_favorites", []),
         },
     )
 
@@ -1695,6 +1696,30 @@ async def set_min_columns(session_id: str = Form(...), min_columns: int = Form(.
     # Persist as global default
     settings.save_settings({"default_min_columns": clamped})
     return {"min_columns": clamped}
+
+
+@app.post("/settings/printify-favorites")
+async def toggle_printify_favorite(request: Request):
+    """Add or remove a Printify blueprint ID from the global favorites list."""
+    data = await request.json()
+    blueprint_id = data.get("blueprint_id")
+    action = data.get("action")  # "add" or "remove"
+
+    if blueprint_id is None or action not in ("add", "remove"):
+        return JSONResponse({"error": "Invalid request"}, status_code=400)
+
+    user_settings = settings.load_settings()
+    favorites = user_settings.get("printify_favorites", [])
+
+    if action == "add":
+        if blueprint_id not in favorites:
+            favorites.append(blueprint_id)
+    else:
+        if blueprint_id in favorites:
+            favorites.remove(blueprint_id)
+
+    settings.save_settings({"printify_favorites": favorites})
+    return {"printify_favorites": favorites}
 
 
 @app.post("/session/select-variant")

@@ -1254,6 +1254,31 @@
                                             </select>
                                         </div>
 
+                                        <!-- Favorites -->
+                                        <div x-show="$store.printifyFavorites.length > 0">
+                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Favorite Styles</label>
+                                            <div class="border border-slate-200 rounded-lg overflow-hidden max-h-[14rem] overflow-y-auto">
+                                                <template x-for="bp in pFavoriteBlueprints" :key="'fav-' + bp.id">
+                                                    <div class="flex items-center hover:bg-slate-50 border-t border-slate-100 first:border-0">
+                                                        <div @click="selectBlueprint(bp)" role="option" tabindex="0"
+                                                            :aria-selected="pBlueprint?.id === bp.id"
+                                                            @keydown.enter.prevent="selectBlueprint(bp)"
+                                                            class="flex-1 px-3 py-2 text-sm cursor-pointer transition-colors focus:outline-none focus:bg-indigo-50"
+                                                            :class="pBlueprint?.id === bp.id ? 'bg-indigo-600 text-white' : ''">
+                                                            <span class="font-medium" x-text="bp.title"></span>
+                                                            <span class="text-xs ml-1 opacity-60"
+                                                                x-text="bp.brand ? '· ' + bp.brand : ''"></span>
+                                                        </div>
+                                                        <button @click.stop="$root._x_dataStack[0].togglePrintifyFavorite(bp.id)"
+                                                            title="Remove from favorites"
+                                                            class="px-3 py-2 text-amber-400 hover:text-amber-500 transition-colors">
+                                                            ★
+                                                        </button>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
                                         <!-- Blueprint search -->
                                         <div>
                                             <label for="blueprint-search"
@@ -1267,14 +1292,22 @@
                                             <div x-show="pFilteredBlueprints.length > 0" role="listbox"
                                                 class="border border-slate-200 rounded-lg overflow-hidden max-h-44 overflow-y-auto">
                                                 <template x-for="bp in pFilteredBlueprints" :key="bp.id">
-                                                    <div @click="selectBlueprint(bp)" role="option" tabindex="0"
-                                                        :aria-selected="pBlueprint?.id === bp.id"
-                                                        @keydown.enter.prevent="selectBlueprint(bp)"
-                                                        class="px-3 py-2 text-sm cursor-pointer transition-colors focus:outline-none focus:bg-indigo-50"
-                                                        :class="pBlueprint?.id === bp.id ? 'bg-indigo-600 text-white' : 'hover:bg-slate-50 border-t border-slate-100 first:border-0'">
-                                                        <span class="font-medium" x-text="bp.title"></span>
-                                                        <span class="text-xs ml-1 opacity-60"
-                                                            x-text="bp.brand ? '· ' + bp.brand : ''"></span>
+                                                    <div class="flex items-center hover:bg-slate-50 border-t border-slate-100 first:border-0"
+                                                        :class="pBlueprint?.id === bp.id ? 'bg-indigo-600 text-white' : ''">
+                                                        <div @click="selectBlueprint(bp)" role="option" tabindex="0"
+                                                            :aria-selected="pBlueprint?.id === bp.id"
+                                                            @keydown.enter.prevent="selectBlueprint(bp)"
+                                                            class="flex-1 px-3 py-2 text-sm cursor-pointer transition-colors focus:outline-none focus:bg-indigo-50">
+                                                            <span class="font-medium" x-text="bp.title"></span>
+                                                            <span class="text-xs ml-1 opacity-60"
+                                                                x-text="bp.brand ? '· ' + bp.brand : ''"></span>
+                                                        </div>
+                                                        <button @click.stop="$root._x_dataStack[0].togglePrintifyFavorite(bp.id)"
+                                                            :title="isFavorite(bp.id) ? 'Remove from favorites' : 'Add to favorites'"
+                                                            class="px-3 py-2 transition-colors"
+                                                            :class="isFavorite(bp.id) ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400'">
+                                                            <span x-text="isFavorite(bp.id) ? '★' : '☆'"></span>
+                                                        </button>
                                                     </div>
                                                 </template>
                                             </div>
@@ -1669,7 +1702,8 @@
             "finalSizes": {{ final_sizes | tojson }},
             "defaultFinalSize": {{ final_size | tojson }},
             "maxColumns": {{ max_columns }},
-            "minColumns": {{ min_columns }}
+            "minColumns": {{ min_columns }},
+            "printifyFavorites": {{ printify_favorites | tojson }}
         }
     </script>
     <script src="/static/app.js"></script>

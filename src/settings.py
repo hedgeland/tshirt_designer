@@ -14,6 +14,7 @@ _SETTINGS_PATH = Path(__file__).parent.parent / "settings.json"
 _DEFAULT_SETTINGS = {
     "default_min_columns": 1,
     "default_max_columns": MAX_COLUMNS,
+    "printify_favorites": [],
 }
 
 
