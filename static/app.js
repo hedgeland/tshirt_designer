@@ -1084,7 +1084,13 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             if (data.error) { this.printifyError = data.error; return; }
             this.pProviders = data;
             if (data.length > 0) {
-                this.pProviderId = String(data[0].id);
+                // Default to 'Printify Choice' if available, otherwise use the first one
+                const choice = data.find(p => (p.title || "").includes("Printify Choice"));
+                if (choice) {
+                    this.pProviderId = String(choice.id);
+                } else {
+                    this.pProviderId = String(data[0].id);
+                }
                 await this.loadVariants();
             }
         },
