@@ -1720,10 +1720,12 @@ function designer() {
                     const text = await res.text();
                     console.error(`400 Detail: ${text}`);
                 }
-            } else if (fromButton) {
-                this.defaultMaxColumns = this.maxColumns;  // reflect the newly saved default
-                this.savingMaxStatus = true;
-                setTimeout(() => this.savingMaxStatus = false, 2000);
+            } else {
+                this.defaultMaxColumns = this.maxColumns;  // endpoint always persists to settings
+                if (fromButton) {
+                    this.savingMaxStatus = true;
+                    setTimeout(() => this.savingMaxStatus = false, 2000);
+                }
             }
 
             // Bring column count up to the new ceiling to automatically change the number of columns shown
@@ -1785,6 +1787,8 @@ function designer() {
                     const text = await res.text();
                     console.error(`400 Detail: ${text}`);
                 }
+            } else {
+                this.defaultMinColumns = this.minColumns;  // endpoint always persists to settings
             }
             // Bring column count up to the new floor if needed
             while (this.columns.length < this.minColumns) {
