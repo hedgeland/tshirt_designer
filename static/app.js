@@ -1451,6 +1451,7 @@ function designer() {
         // ── Session ────────────────────────────────────────────────────────
         sessionId,
         savingVariantsStatus: false,
+        savingMaxStatus: false,
 
         // Expose cfg so the template can read printifyEnabled, etc.
         cfg,
@@ -1654,7 +1655,7 @@ function designer() {
         },
 
         // Persist the user's max-columns preference to the server; trims excess columns.
-        async updateMaxColumns() {
+        async updateMaxColumns(fromButton = false) {
             // Ensure we have a valid number
             const newVal = parseInt(this.maxColumns, 10);
             if (isNaN(newVal) || newVal < 1) {
@@ -1715,6 +1716,9 @@ function designer() {
                     const text = await res.text();
                     console.error(`400 Detail: ${text}`);
                 }
+            } else if (fromButton) {
+                this.savingMaxStatus = true;
+                setTimeout(() => this.savingMaxStatus = false, 2000);
             }
 
             // Bring column count up to the new ceiling to automatically change the number of columns shown

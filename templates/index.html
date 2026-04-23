@@ -90,12 +90,19 @@
                         @change="updateMinColumns()" aria-label="Minimum number of columns"
                         class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
                 </label>
-                <label class="flex items-center gap-1.5 text-xs text-slate-300">
-                    Max columns
-                    <input type="number" x-model.number="maxColumns" min="1" :max="cfg.maxColumns" step="1"
-                        @change="updateMaxColumns()" aria-label="Maximum number of columns"
-                        class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                </label>
+                <div class="flex items-center gap-2 pl-3 border-l border-slate-600 ml-1">
+                    <label class="flex items-center gap-1.5 text-xs text-slate-300">
+                        Max columns
+                        <input type="number" x-model.number="maxColumns" min="1" :max="cfg.maxColumns" step="1"
+                            @change="updateMaxColumns()" aria-label="Maximum number of columns"
+                            class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                    </label>
+                    <button @click="updateMaxColumns(true)" title="Save max columns default"
+                        class="px-3 py-1.5 bg-slate-600 text-white text-xs font-medium rounded-lg hover:bg-slate-500 transition-colors w-24 whitespace-nowrap"
+                        x-text="savingMaxStatus ? 'Saved!' : 'Save Default'"
+                        :class="savingMaxStatus ? '!bg-emerald-600 !hover:bg-emerald-600' : ''">
+                    </button>
+                </div>
                 <div class="flex items-center gap-2 pl-3 border-l border-slate-600 ml-1">
                     <label class="flex items-center gap-1.5 text-xs text-slate-300">
                         Default variants
