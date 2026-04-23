@@ -1722,6 +1722,27 @@ async def toggle_printify_favorite(request: Request):
     return {"printify_favorites": favorites}
 
 
+@app.post("/settings/printify-favorites/reorder")
+async def reorder_printify_favorites(request: Request):
+    """Overwrite the global favorites list with a new ordered list of blueprint IDs."""
+    data = await request.json()
+    new_favorites = data.get("favorites")
+
+    if not isinstance(new_favorites, list):
+        return JSONResponse({"error": "Invalid favorites list"}, status_code=400)
+
+    # Filter to ensure we only have integers
+    valid_ids = []
+    for fid in new_favorites:
+        try:
+            valid_ids.append(int(fid))
+        except (ValueError, TypeError):
+            continue
+
+    settings.save_settings({"printify_favorites": valid_ids})
+    return {"printify_favorites": valid_ids}
+
+
 @app.post("/session/select-variant")
 async def select_variant(
     session_id: str = Form(...),

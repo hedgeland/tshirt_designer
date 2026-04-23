@@ -398,6 +398,34 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             }
         },
 
+        initSortableFavorites(el) {
+            if (!el || el._sortable) return;
+            el._sortable = Sortable.create(el, {
+                animation: 150,
+                handle: '.drag-handle',
+                dataIdAttr: 'data-id',
+                ghostClass: 'bg-indigo-900/30',
+                onEnd: async (evt) => {
+                    const newOrder = el._sortable.toArray().map(id => parseInt(id, 10));
+                    
+                    // Update global store so all columns sync
+                    Alpine.store('printifyFavorites', newOrder);
+
+                    // Persist to server
+                    try {
+                        const res = await fetch("/settings/printify-favorites/reorder", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ favorites: newOrder }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    } catch (err) {
+                        console.error("Failed to save favorites order:", err);
+                    }
+                }
+            });
+        },
+
         get pDesignPx() {
             return this.pScale * this.pPrintWidth;
         },
