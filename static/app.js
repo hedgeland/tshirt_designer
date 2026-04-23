@@ -704,6 +704,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedConcept = concept;
             this.editedConcept = concept;
             this.hasUnsubmittedText = false;
+            this.numVariants = cfg.numVariants;
             this.step = Math.max(this.step, 3);
         },
 
@@ -718,6 +719,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedConcept = null;
             this.editedConcept = "";
             this.hasUnsubmittedText = false;
+            this.numVariants = cfg.numVariants;
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
@@ -753,6 +755,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedConcept = null;
             this.editedConcept = this.theme.trim();
             this.hasUnsubmittedText = false;
+            this.numVariants = cfg.numVariants;
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
