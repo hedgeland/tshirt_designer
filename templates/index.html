@@ -1205,22 +1205,22 @@
                                 class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
                                 @keydown.escape.window="showPrintify = false">
                                 <div
-                                    class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col text-slate-800">
+                                    class="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col text-slate-100 border border-slate-500">
 
                                     <!-- Modal header -->
                                     <div
-                                        class="flex justify-between items-center px-6 py-4 border-b border-slate-200 flex-shrink-0">
+                                        class="flex justify-between items-center px-6 py-4 border-b border-slate-700 flex-shrink-0">
                                         <h2 class="text-base font-semibold"><span aria-hidden="true">👕</span> Publish
                                             to Printify
                                             <span class="text-xs font-normal text-slate-400 ml-1"
                                                 x-text="`— Design ${index + 1}`"></span>
                                         </h2>
                                         <button @click="showPrintify = false" aria-label="Close" title="Close (Esc)"
-                                            class="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+                                            class="text-slate-400 hover:text-slate-200 text-xl leading-none transition-colors">✕</button>
                                     </div>
 
                                     <!-- Modal body (scrollable) -->
-                                    <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+                                    <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5 bg-slate-800">
 
                                         <!-- Resolution upgrade banner -->
                                         <div x-show="pNeedsUpscale"
@@ -1244,9 +1244,9 @@
                                         <!-- Shop selector -->
                                         <div x-show="!cfg.printifyShopId">
                                             <label for="printify-shop"
-                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Shop</label>
+                                                class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Shop</label>
                                             <select id="printify-shop" x-model="pShopId"
-                                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                                 <option value="" disabled>Select a shop…</option>
                                                 <template x-for="s in pShops" :key="s.id">
                                                     <option :value="s.id" x-text="s.title"></option>
@@ -1256,17 +1256,17 @@
 
                                         <!-- Favorites -->
                                         <div x-show="$store.printifyFavorites.length > 0">
-                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Favorite Styles</label>
-                                            <div class="border border-slate-200 rounded-lg overflow-hidden max-h-[14rem] overflow-y-auto">
+                                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Favorite Styles</label>
+                                            <div class="border border-slate-700 rounded-lg overflow-hidden max-h-[14rem] overflow-y-auto bg-slate-700">
                                                 <template x-for="bp in pFavoriteBlueprints" :key="'fav-' + bp.id">
-                                                    <div class="flex items-center hover:bg-slate-50 border-t border-slate-100 first:border-0">
+                                                    <div class="flex items-center hover:bg-slate-600 border-t border-slate-600 first:border-0">
                                                         <div @click="selectBlueprint(bp)" role="option" tabindex="0"
                                                             :aria-selected="pBlueprint?.id === bp.id"
                                                             @keydown.enter.prevent="selectBlueprint(bp)"
-                                                            class="flex-1 px-3 py-2 text-sm cursor-pointer transition-colors focus:outline-none focus:bg-indigo-50"
+                                                            class="flex-1 px-3 py-2 text-sm cursor-pointer transition-colors focus:outline-none focus:bg-indigo-900/50"
                                                             :class="pBlueprint?.id === bp.id ? 'bg-indigo-600 text-white' : ''">
                                                             <span class="font-medium" x-text="bp.title"></span>
-                                                            <span class="text-xs ml-1 opacity-60"
+                                                            <span class="text-xs ml-1 opacity-60 text-slate-300"
                                                                 x-text="bp.brand ? '· ' + bp.brand : ''"></span>
                                                         </div>
                                                         <button @click.stop="togglePrintifyFavorite(bp.id)"
@@ -1282,30 +1282,30 @@
                                         <!-- Blueprint search -->
                                         <div>
                                             <label for="blueprint-search"
-                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">T-Shirt
+                                                class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">T-Shirt
                                                 Style</label>
                                             <input id="blueprint-search" type="text" x-model="pBlueprintSearch"
                                                 @input="filterBlueprints()"
                                                 placeholder="Search styles… (e.g. Bella+Canvas, Gildan)"
                                                 autocomplete="off"
-                                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2">
+                                                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2">
                                             <div x-show="pFilteredBlueprints.length > 0" role="listbox"
-                                                class="border border-slate-200 rounded-lg overflow-hidden max-h-44 overflow-y-auto">
+                                                class="border border-slate-700 rounded-lg overflow-hidden max-h-44 overflow-y-auto bg-slate-700">
                                                 <template x-for="bp in pFilteredBlueprints" :key="bp.id">
-                                                    <div class="flex items-center hover:bg-slate-50 border-t border-slate-100 first:border-0"
+                                                    <div class="flex items-center hover:bg-slate-600 border-t border-slate-600 first:border-0"
                                                         :class="pBlueprint?.id === bp.id ? 'bg-indigo-600 text-white' : ''">
                                                         <div @click="selectBlueprint(bp)" role="option" tabindex="0"
                                                             :aria-selected="pBlueprint?.id === bp.id"
                                                             @keydown.enter.prevent="selectBlueprint(bp)"
-                                                            class="flex-1 px-3 py-2 text-sm cursor-pointer transition-colors focus:outline-none focus:bg-indigo-50">
+                                                            class="flex-1 px-3 py-2 text-sm cursor-pointer transition-colors focus:outline-none focus:bg-indigo-900/50">
                                                             <span class="font-medium" x-text="bp.title"></span>
-                                                            <span class="text-xs ml-1 opacity-60"
+                                                            <span class="text-xs ml-1 opacity-60 text-slate-300"
                                                                 x-text="bp.brand ? '· ' + bp.brand : ''"></span>
                                                         </div>
                                                         <button @click.stop="togglePrintifyFavorite(bp.id)"
                                                             :title="isFavorite(bp.id) ? 'Remove from favorites' : 'Add to favorites'"
                                                             class="px-3 py-2 transition-colors"
-                                                            :class="isFavorite(bp.id) ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400'">
+                                                            :class="isFavorite(bp.id) ? 'text-amber-400 hover:text-amber-500' : 'text-slate-400 hover:text-amber-400'">
                                                             <span x-text="isFavorite(bp.id) ? '★' : '☆'"></span>
                                                         </button>
                                                     </div>
@@ -1319,10 +1319,10 @@
                                         <!-- Print provider -->
                                         <div x-show="pProviders.length > 0">
                                             <label for="print-provider"
-                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Print
+                                                class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Print
                                                 Provider</label>
                                             <select id="print-provider" x-model="pProviderId" @change="loadVariants()"
-                                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                                 <template x-for="p in pProviders" :key="p.id">
                                                     <option :value="p.id"
                                                         x-text="p.title + (p.location?.country ? ' · ' + p.location.country : '')">
@@ -1335,15 +1335,15 @@
                                         <div x-show="pColors.length > 0">
                                             <div class="flex items-baseline justify-between mb-1.5">
                                                 <label class="text-xs font-semibold uppercase tracking-wider"
-                                                    :class="pSelectedColors.length === 0 ? 'text-red-500' : 'text-slate-500'"
+                                                    :class="pSelectedColors.length === 0 ? 'text-red-400' : 'text-slate-400'"
                                                     x-text="pSelectedColors.length === 0 ? 'Select at least one color:' : 'Colors'"></label>
                                                 <div class="flex gap-2">
                                                     <button @click="pSelectedColors = [...pColors]"
-                                                        class="text-xs text-indigo-500 hover:text-indigo-700">Select
+                                                        class="text-xs text-indigo-400 hover:text-indigo-300">Select
                                                         all</button>
-                                                    <span class="text-slate-300" aria-hidden="true">·</span>
+                                                    <span class="text-slate-600" aria-hidden="true">·</span>
                                                     <button @click="pSelectedColors = []"
-                                                        class="text-xs text-indigo-500 hover:text-indigo-700">Deselect
+                                                        class="text-xs text-indigo-400 hover:text-indigo-300">Deselect
                                                         all</button>
                                                 </div>
                                             </div>
@@ -1352,7 +1352,7 @@
                                                     <button @click="togglePColor(color)"
                                                         :aria-pressed="pSelectedColors.includes(color)"
                                                         class="px-2.5 py-1 text-xs rounded-full border transition-colors"
-                                                        :class="pSelectedColors.includes(color) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-300 text-slate-600 hover:border-indigo-400'"
+                                                        :class="pSelectedColors.includes(color) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-800 border-slate-600 text-slate-200 hover:border-indigo-400'"
                                                         x-text="color"></button>
                                                 </template>
                                             </div>
@@ -1362,14 +1362,14 @@
                                         <div x-show="pSizes.length > 0">
                                             <div class="flex items-baseline justify-between mb-1.5">
                                                 <label
-                                                    class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sizes</label>
+                                                    class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sizes</label>
                                                 <div class="flex gap-2">
                                                     <button @click="pSelectedSizes = [...pSizes]"
-                                                        class="text-xs text-indigo-500 hover:text-indigo-700">Select
+                                                        class="text-xs text-indigo-400 hover:text-indigo-300">Select
                                                         all</button>
-                                                    <span class="text-slate-300" aria-hidden="true">·</span>
+                                                    <span class="text-slate-600" aria-hidden="true">·</span>
                                                     <button @click="pSelectedSizes = []"
-                                                        class="text-xs text-indigo-500 hover:text-indigo-700">Deselect
+                                                        class="text-xs text-indigo-400 hover:text-indigo-300">Deselect
                                                         all</button>
                                                 </div>
                                             </div>
@@ -1378,7 +1378,7 @@
                                                     <button @click="togglePSize(size)"
                                                         :aria-pressed="pSelectedSizes.includes(size)"
                                                         class="px-3 py-1 text-xs rounded-full border font-medium transition-colors"
-                                                        :class="pSelectedSizes.includes(size) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-300 text-slate-600 hover:border-indigo-400'"
+                                                        :class="pSelectedSizes.includes(size) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-800 border-slate-600 text-slate-200 hover:border-indigo-400'"
                                                         x-text="size"></button>
                                                 </template>
                                             </div>
@@ -1394,23 +1394,23 @@
                                                     <!-- Preset + allowance -->
                                                     <div>
                                                         <label
-                                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Vertical
+                                                            class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Vertical
                                                             Preset</label>
                                                         <div class="flex items-center gap-2">
                                                             <button @click="applyTopPreset()"
                                                                 :aria-pressed="pIsTopPreset"
-                                                                :class="pIsTopPreset ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-300 text-slate-700 hover:border-indigo-400'"
+                                                                :class="pIsTopPreset ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-800 border-slate-600 text-slate-200 hover:border-indigo-400'"
                                                                 class="flex-1 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors">Align
                                                                 to Top</button>
                                                             <div class="flex items-center gap-1">
-                                                                <span class="text-xs text-slate-400"
+                                                                <span class="text-xs text-slate-500"
                                                                     aria-hidden="true">+</span>
                                                                 <input type="number" x-model.number="pTopAllowance"
                                                                     min="0" max="300" step="1"
                                                                     aria-label="Top gap in pixels"
                                                                     @input="if (pIsTopPreset && pPrintWidth) applyTopPreset()"
-                                                                    class="w-16 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                                                <span class="text-xs text-slate-400">px</span>
+                                                                    class="w-16 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                                <span class="text-xs text-slate-500">px</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1418,25 +1418,25 @@
                                                     <div>
                                                         <div class="flex justify-between items-baseline mb-1.5">
                                                             <label for="design-scale"
-                                                                class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Design
+                                                                class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Design
                                                                 Size</label>
-                                                            <span class="text-xs font-semibold text-indigo-500"
+                                                            <span class="text-xs font-semibold text-indigo-400"
                                                                 x-text="Math.round(pScale * 100) + '%'"></span>
                                                         </div>
                                                         <input id="design-scale" type="range" min="0.4" max="1.0"
-                                                            step="0.05" x-model.number="pScale" class="w-full">
+                                                            step="0.05" x-model.number="pScale" class="w-full accent-indigo-500">
                                                     </div>
                                                     <!-- Rotation -->
                                                     <div>
                                                         <div class="flex justify-between items-baseline mb-1.5">
                                                             <label for="design-rotate"
-                                                                class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rotation</label>
+                                                                class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Rotation</label>
                                                             <div class="flex items-center gap-2">
-                                                                <span class="text-xs font-semibold text-indigo-500"
+                                                                <span class="text-xs font-semibold text-indigo-400"
                                                                     x-text="pRotateDeg + '°'"></span>
                                                                 <button @click="pRotateDeg = 0"
                                                                     x-show="pRotateDeg !== 0"
-                                                                    class="text-xs text-indigo-500 hover:text-indigo-700 font-medium">Reset</button>
+                                                                    class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Reset</button>
                                                             </div>
                                                         </div>
                                                         <!-- min/max are −180…180 so 0 sits exactly at center; @input snaps to 0 within ±5° -->
@@ -1444,19 +1444,19 @@
                                                             step="1" x-model.number="pRotateDeg"
                                                             @input="snapRotation(pRotateDeg)"
                                                             @dblclick="pRotateDeg = 0"
-                                                            class="w-full">
+                                                            class="w-full accent-indigo-500">
                                                     </div>
                                                     <!-- X/Y position -->
                                                     <div x-show="pPrintWidth && pPrintHeight" class="space-y-2">
                                                         <label
-                                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Position
+                                                            class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Position
                                                             (px)</label>
                                                         <div>
                                                             <div class="flex justify-between items-baseline mb-0.5">
                                                                 <label for="pos-x-range"
-                                                                    class="text-xs text-slate-400">X — left edge</label>
+                                                                    class="text-xs text-slate-500">X — left edge</label>
                                                                 <button @click="centerH()"
-                                                                    class="text-xs text-indigo-500 hover:text-indigo-700 font-medium">Center</button>
+                                                                    class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Center</button>
                                                             </div>
                                                             <div class="flex gap-2 items-center">
                                                                 <input id="pos-x-range" type="range"
@@ -1464,20 +1464,20 @@
                                                                     :min="-Math.round(pScale * pPrintWidth)"
                                                                     :max="pPrintWidth" step="1"
                                                                     @input="pIsTopPreset = false" @dblclick="centerH()"
-                                                                    class="flex-1">
+                                                                    class="flex-1 accent-indigo-500">
                                                                 <input type="number" x-model.number="pXPx"
                                                                     :min="-Math.round(pScale * pPrintWidth)"
                                                                     :max="pPrintWidth" step="1"
                                                                     @input="pIsTopPreset = false"
-                                                                    class="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                                    class="w-20 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-white text-right focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                                             </div>
                                                         </div>
                                                         <div>
                                                             <div class="flex justify-between items-baseline mb-0.5">
                                                                 <label for="pos-y-range"
-                                                                    class="text-xs text-slate-400">Y — top edge</label>
+                                                                    class="text-xs text-slate-500">Y — top edge</label>
                                                                 <button @click="centerV()"
-                                                                    class="text-xs text-indigo-500 hover:text-indigo-700 font-medium">Center</button>
+                                                                    class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Center</button>
                                                             </div>
                                                             <div class="flex gap-2 items-center">
                                                                 <input id="pos-y-range" type="range"
@@ -1485,15 +1485,15 @@
                                                                     :min="-Math.round(pScale * pPrintWidth)"
                                                                     :max="pPrintHeight" step="1"
                                                                     @input="pIsTopPreset = false" @dblclick="centerV()"
-                                                                    class="flex-1">
+                                                                    class="flex-1 accent-indigo-500">
                                                                 <input type="number" x-model.number="pYPx"
                                                                     :min="-Math.round(pScale * pPrintWidth)"
                                                                     :max="pPrintHeight" step="1"
                                                                     @input="pIsTopPreset = false"
-                                                                    class="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                                    class="w-20 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-white text-right focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                                             </div>
                                                         </div>
-                                                        <p class="text-xs text-slate-400"
+                                                        <p class="text-xs text-slate-500"
                                                             x-text="'Print area: ' + pPrintWidth + ' × ' + pPrintHeight + ' px'">
                                                         </p>
                                                     </div>
@@ -1503,8 +1503,8 @@
                                                 <div x-show="(activeComboUrl || selectedVariantObj?.url) && pPrintWidth && pPrintHeight"
                                                     class="flex-shrink-0">
                                                     <label
-                                                        class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Preview</label>
-                                                    <div class="group relative overflow-hidden rounded border border-slate-300 bg-slate-100 select-none"
+                                                        class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Preview</label>
+                                                    <div class="group relative overflow-hidden rounded border border-slate-600 bg-slate-700 select-none"
                                                         :style="{ width: '220px', height: Math.round(220 * pPrintHeight / pPrintWidth) + 'px' }">
                                                         <!-- Wrapper: absolutely positioned in canvas, carries the rotation transform.
                                                              Image and handle are children so both rotate around the design center. -->
@@ -1582,22 +1582,22 @@
                                         <div x-show="pSizes.length > 0" class="space-y-3">
                                             <div>
                                                 <label for="product-title"
-                                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Product
+                                                    class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Product
                                                     Title</label>
                                                 <input id="product-title" type="text" x-model="pTitle"
-                                                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                    class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                             </div>
                                             <div>
                                                 <label for="product-description"
-                                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description
+                                                    class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Description
                                                     <span
-                                                        class="normal-case font-normal text-slate-400">(optional)</span></label>
+                                                        class="normal-case font-normal text-slate-500">(optional)</span></label>
                                                 <textarea id="product-description" x-model="pDescription" rows="2"
-                                                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
+                                                    class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
                                             </div>
                                             <div>
                                                 <label for="product-price"
-                                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Retail
+                                                    class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Retail
                                                     Price (USD)</label>
                                                 <div class="relative">
                                                     <span
@@ -1605,7 +1605,7 @@
                                                         aria-hidden="true">$</span>
                                                     <input id="product-price" type="number" x-model="pPrice" min="0.01"
                                                         step="0.01"
-                                                        class="w-full border border-slate-300 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                        class="w-full bg-slate-700 border border-slate-600 rounded-lg pl-7 pr-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                                 </div>
                                             </div>
                                         </div>
@@ -1613,19 +1613,19 @@
                                     </div>
 
                                     <!-- Modal footer -->
-                                    <div class="border-t border-slate-200 flex-shrink-0">
+                                    <div class="border-t border-slate-700 flex-shrink-0 bg-slate-900/50 rounded-b-2xl">
                                         <div x-show="printifyError || printifyStatus || printifyDone"
                                             class="px-6 pt-4 space-y-2">
                                             <div x-show="printifyError" role="alert"
-                                                class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                                                class="flex items-start gap-3 bg-red-900/20 border border-red-900/50 rounded-lg px-4 py-3 text-sm text-red-300">
                                                 <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
                                                 <span x-text="printifyError" class="flex-1"></span>
                                                 <button @click="printifyError = ''"
-                                                    class="text-red-400 hover:text-red-600 ml-2">✕</button>
+                                                    class="text-red-400 hover:text-red-300 ml-2">✕</button>
                                             </div>
                                             <div x-show="printifyStatus && !printifyError" role="status"
                                                 aria-live="polite"
-                                                class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
+                                                class="flex items-center gap-3 bg-indigo-900/20 border border-indigo-900/50 rounded-lg px-4 py-3 text-sm text-indigo-300">
                                                 <svg aria-hidden="true" class="animate-spin h-4 w-4 flex-shrink-0"
                                                     fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10"
@@ -1636,19 +1636,19 @@
                                                 <span x-text="printifyStatus"></span>
                                             </div>
                                             <div x-show="printifyDone" role="status" aria-live="polite"
-                                                class="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700 space-y-1">
+                                                class="bg-emerald-900/20 border border-emerald-900/50 rounded-lg px-4 py-3 text-sm text-emerald-300 space-y-1">
                                                 <p class="font-semibold"><span aria-hidden="true">✅</span> <span
                                                         x-text="printifyDone?.published ? 'Published!' : 'Draft saved!'"></span>
                                                 </p>
                                                 <a :href="printifyDone?.product_url" target="_blank"
-                                                    class="underline text-emerald-600 hover:text-emerald-800">Open in
+                                                    class="underline text-emerald-400 hover:text-emerald-300">Open in
                                                     Printify →</a>
                                             </div>
                                         </div>
                                         <div x-show="pSizes.length > 0" class="flex gap-3 px-6 py-4">
                                             <button @click="doPublish(false)"
                                                 :disabled="printifyBusy || selectedVariantCount === 0 || (pNeedsUpscale && !printifyOverride)"
-                                                class="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                class="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-slate-700 text-slate-200 border border-slate-600 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                 x-text="(pNeedsUpscale && !printifyOverride) ? `${cfg.printifyMinSize} Required` : pSelectedColors.length === 0 ? 'Select Color First' : 'Save as Draft'"></button>
                                             <button @click="doPublish(true)"
                                                 :disabled="printifyBusy || selectedVariantCount === 0 || (pNeedsUpscale && !printifyOverride)"
