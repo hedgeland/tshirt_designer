@@ -11,7 +11,7 @@ graph TD
 
     %% 2. Session and Column Management
     subgraph ColMgmt [2. Session and Column Management]
-        SessionInit([Session init - UUID per tab]) --> RestoreState[GET /session/columns Restore column states and maxColumns on page load]
+        SessionInit([Session init - UUID per tab]) --> RestoreState[GET /session/columns Restore column states, maxColumns, and num_variants on page load]
         RestoreState --> ColView(Column area - horizontal layout one panel per column)
         ColView --> AddColBtn{Add Column button}
         AddColBtn -- "Below maxColumns limit" --> AddCol[POST /columns Append new column state to session]
@@ -19,6 +19,8 @@ graph TD
         AddCol --> ColView
         ColView --> SetMaxCols[POST /session/max-columns User updates maxColumns via header input]
         SetMaxCols --> ColView
+        ColView --> SetDefaultVariants[POST /session/num-variants User updates default num_variants via header input]
+        SetDefaultVariants --> ColView
         ColView --> CloseColBtn{Close column x}
         CloseColBtn -- "isLoading=true OR last column" --> ColView
         CloseColBtn -- "isLoading=false AND not last column" --> ConfirmClose{Has work?}
@@ -143,6 +145,7 @@ graph TD
     style RestoreState fill:#cfe2ff,stroke:#0d6efd
     style AddCol fill:#cfe2ff,stroke:#0d6efd
     style SetMaxCols fill:#cfe2ff,stroke:#0d6efd
+    style SetDefaultVariants fill:#cfe2ff,stroke:#0d6efd
     style RemoveCol fill:#cfe2ff,stroke:#0d6efd
     style Brainstorm fill:#cfe2ff,stroke:#0d6efd
     style ApplyPreset fill:#cfe2ff,stroke:#0d6efd

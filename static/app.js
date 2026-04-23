@@ -1524,6 +1524,7 @@ function designer() {
                     // Use session values if present, otherwise fall back to cfg (global defaults)
                     this.maxColumns = data.max_columns ?? cfg.maxColumns;
                     this.minColumns = data.min_columns ?? cfg.minColumns ?? 1;
+                    this.cfg.numVariants = data.num_variants ?? cfg.numVariants;
 
                     Alpine.store('minColumns', this.minColumns);
                     // Re-create the column list from persisted server state; each entry
@@ -1733,6 +1734,24 @@ function designer() {
             // Bring column count up to the new floor if needed
             while (this.columns.length < this.minColumns) {
                 await this.addColumn();
+            }
+        },
+
+        // Persist the user's default number of variants preference to the server
+        async updateNumVariants() {
+            const newVal = parseInt(this.cfg.numVariants, 10);
+            if (isNaN(newVal) || newVal < 1) {
+                this.cfg.numVariants = 1;
+            } else {
+                this.cfg.numVariants = Math.min(newVal, 8);
+            }
+
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("num_variants", this.cfg.numVariants);
+            const res = await fetch("/session/num-variants", { method: "POST", body: fd });
+            if (!res.ok) {
+                console.error(`Failed to set default variants: ${res.status}`);
             }
         },
 

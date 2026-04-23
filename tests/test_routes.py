@@ -158,3 +158,21 @@ def test_columns_in_same_session_are_isolated():
     cols = r.json()["columns"]
     assert cols[0]["selected_idx"] == 7
     assert cols[1]["selected_idx"] is None
+
+
+def test_session_num_variants_persistence():
+    """Default num_variants set in one turn must survive a hard reload of the session state."""
+    sid = "test-session-num-variants"
+
+    # Set default num_variants to 3
+    r = client.post("/session/num-variants", data={
+        "session_id": sid,
+        "num_variants": 3,
+    })
+    assert r.status_code == 200
+    assert r.json()["num_variants"] == 3
+
+    # Hard reload column state — session default must be 3
+    r = client.get("/session/columns", params={"session_id": sid})
+    assert r.status_code == 200
+    assert r.json()["num_variants"] == 3

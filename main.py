@@ -197,6 +197,7 @@ def get_session(session_id: str) -> dict:
             "columns": [init_column_state()],  # start with one column
             "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
             "min_columns": user_settings.get("default_min_columns", 1),
+            "num_variants": user_settings.get("default_num_variants", NUM_VARIANTS),
         }
     sessions[session_id]["_last_accessed"] = time.time()
     return sessions[session_id]
@@ -1654,6 +1655,7 @@ async def session_columns(session_id: str):
         "columns": cols,
         "max_columns": sess["max_columns"],
         "min_columns": sess.get("min_columns", 1),
+        "num_variants": sess.get("num_variants", NUM_VARIANTS),
     }
 
 
@@ -1677,6 +1679,7 @@ async def remove_column(session_id: str = Form(...), column_id: int = Form(...))
         "columns": cols,
         "max_columns": sess["max_columns"],
         "min_columns": sess.get("min_columns", 1),
+        "num_variants": sess.get("num_variants", NUM_VARIANTS),
     }
 
 
@@ -1700,6 +1703,17 @@ async def set_min_columns(session_id: str = Form(...), min_columns: int = Form(.
     # Persist as global default
     settings.save_settings({"default_min_columns": clamped})
     return {"min_columns": clamped}
+
+
+@app.post("/session/num-variants")
+async def set_num_variants(session_id: str = Form(...), num_variants: int = Form(...)):
+    """Update the user's default number of variants for new columns, clamped to [1, 8]."""
+    sess = get_session(session_id)
+    clamped = max(1, min(num_variants, 8))
+    sess["num_variants"] = clamped
+    # Persist as global default
+    settings.save_settings({"default_num_variants": clamped})
+    return {"num_variants": clamped}
 
 
 @app.post("/settings/printify-favorites")
