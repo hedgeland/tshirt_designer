@@ -1082,15 +1082,25 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.printifyStatus = "";
 
             if (data.error) { this.printifyError = data.error; return; }
+            
+            // Sort providers: Printify Choice (0), Monster Digital (1), SwiftPOD (2), others (3) + Alphabetical
+            const priority = ["Printify Choice", "Monster Digital", "SwiftPOD"];
+            data.sort((a, b) => {
+                const getRank = (title) => {
+                    for (let i = 0; i < priority.length; i++) {
+                        if (title.includes(priority[i])) return i;
+                    }
+                    return priority.length;
+                };
+                const rankA = getRank(a.title || "");
+                const rankB = getRank(b.title || "");
+                if (rankA !== rankB) return rankA - rankB;
+                return (a.title || "").localeCompare(b.title || "");
+            });
+
             this.pProviders = data;
             if (data.length > 0) {
-                // Default to 'Printify Choice' if available, otherwise use the first one
-                const choice = data.find(p => (p.title || "").includes("Printify Choice"));
-                if (choice) {
-                    this.pProviderId = String(choice.id);
-                } else {
-                    this.pProviderId = String(data[0].id);
-                }
+                this.pProviderId = String(data[0].id);
                 await this.loadVariants();
             }
         },
