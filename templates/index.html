@@ -564,28 +564,50 @@
 
                                 <!-- Sliders -->
                                 <div class="space-y-3">
-                                    <template x-for="slider in [
-                                        { key: 'numVariants',   label: 'Number of variants',    min: 1, max: 8,   step: 1,  hint: '' },
-                                        { key: 'bgTolerance',   label: 'BG removal tolerance',  min: 0, max: 128, step: 1,  hint: 'Higher = removes more color variation at edges.' },
-                                        { key: 'decontaminate', label: 'Color spill removal',   min: 0, max: 100, step: 5,  hint: 'Reduces background hue bleed on edges.' },
-                                        { key: 'edgeErode',     label: 'Edge shrink (px)',       min: 0, max: 5,   step: 1,  hint: 'Clips residual fringe by shrinking the alpha mask.' },
-                                        { key: 'maxColors',     label: 'Max colors',            min: 1, max: 8,   step: 1,  hint: 'Applies to image generation.' }
-                                    ]">
-                                        <div>
-                                            <div class="flex justify-between items-baseline mb-1">
-                                                <label :for="'slider-' + index + '-' + slider.key"
-                                                    class="text-xs font-medium" x-text="slider.label"></label>
-                                                <span class="text-xs font-semibold text-indigo-300"
-                                                    x-text="$data[slider.key]"
-                                                    :aria-label="slider.label + ': ' + $data[slider.key]"></span>
-                                            </div>
-                                            <input type="range" :id="'slider-' + index + '-' + slider.key"
-                                                :aria-label="slider.label" :min="slider.min" :max="slider.max"
-                                                :step="slider.step" x-model.number="$data[slider.key]">
-                                            <p x-show="slider.hint" x-text="slider.hint"
-                                                class="text-xs text-slate-300 mt-0.5"></p>
+                                    <!-- Number of variants -->
+                                    <div>
+                                        <div class="flex justify-between items-baseline mb-1">
+                                            <label :for="'slider-' + index + '-numVariants'" class="text-xs font-medium">Number of variants</label>
+                                            <span class="text-xs font-semibold text-indigo-300" x-text="numVariants"></span>
                                         </div>
-                                    </template>
+                                        <input type="range" :id="'slider-' + index + '-numVariants'" aria-label="Number of variants" min="1" max="8" step="1" x-model.number="numVariants">
+                                    </div>
+                                    <!-- BG removal tolerance -->
+                                    <div>
+                                        <div class="flex justify-between items-baseline mb-1">
+                                            <label :for="'slider-' + index + '-bgTolerance'" class="text-xs font-medium">BG removal tolerance</label>
+                                            <span class="text-xs font-semibold text-indigo-300" x-text="bgTolerance"></span>
+                                        </div>
+                                        <input type="range" :id="'slider-' + index + '-bgTolerance'" aria-label="BG removal tolerance" min="0" max="128" step="1" x-model.number="bgTolerance">
+                                        <p class="text-xs text-slate-300 mt-0.5">Higher = removes more color variation at edges.</p>
+                                    </div>
+                                    <!-- Color spill removal -->
+                                    <div>
+                                        <div class="flex justify-between items-baseline mb-1">
+                                            <label :for="'slider-' + index + '-decontaminate'" class="text-xs font-medium">Color spill removal</label>
+                                            <span class="text-xs font-semibold text-indigo-300" x-text="decontaminate"></span>
+                                        </div>
+                                        <input type="range" :id="'slider-' + index + '-decontaminate'" aria-label="Color spill removal" min="0" max="100" step="5" x-model.number="decontaminate">
+                                        <p class="text-xs text-slate-300 mt-0.5">Reduces background hue bleed on edges.</p>
+                                    </div>
+                                    <!-- Edge shrink (px) -->
+                                    <div>
+                                        <div class="flex justify-between items-baseline mb-1">
+                                            <label :for="'slider-' + index + '-edgeErode'" class="text-xs font-medium">Edge shrink (px)</label>
+                                            <span class="text-xs font-semibold text-indigo-300" x-text="edgeErode"></span>
+                                        </div>
+                                        <input type="range" :id="'slider-' + index + '-edgeErode'" aria-label="Edge shrink (px)" min="0" max="5" step="1" x-model.number="edgeErode">
+                                        <p class="text-xs text-slate-300 mt-0.5">Clips residual fringe by shrinking the alpha mask.</p>
+                                    </div>
+                                    <!-- Max colors -->
+                                    <div>
+                                        <div class="flex justify-between items-baseline mb-1">
+                                            <label :for="'slider-' + index + '-maxColors'" class="text-xs font-medium">Max colors</label>
+                                            <span class="text-xs font-semibold text-indigo-300" x-text="maxColors"></span>
+                                        </div>
+                                        <input type="range" :id="'slider-' + index + '-maxColors'" aria-label="Max colors" min="1" max="8" step="1" x-model.number="maxColors">
+                                        <p class="text-xs text-slate-300 mt-0.5">Applies to image generation.</p>
+                                    </div>
                                 </div>
 
                                 <!-- Generation options -->
@@ -883,10 +905,14 @@
                                                 <select x-model.number="numVariants"
                                                     title="Number of variants to generate"
                                                     class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 w-24">
-                                                    <template x-for="n in [1,2,3,4,5,6,7,8]" :key="n">
-                                                        <option :value="n"
-                                                            x-text="n + (n === 1 ? ' variant' : ' variants')"></option>
-                                                    </template>
+                                                    <option value="1">1 variant</option>
+                                                    <option value="2">2 variants</option>
+                                                    <option value="3">3 variants</option>
+                                                    <option value="4">4 variants</option>
+                                                    <option value="5">5 variants</option>
+                                                    <option value="6">6 variants</option>
+                                                    <option value="7">7 variants</option>
+                                                    <option value="8">8 variants</option>
                                                 </select>
                                                 <button @click="doGenerate()" :disabled="isLoading"
                                                     title="Generate image variants from the concept"
