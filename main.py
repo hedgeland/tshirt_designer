@@ -166,6 +166,8 @@ _SERIALIZABLE_COLUMN_KEYS = {
     "iteration_roots",       # rootIdx for each iteration in order; parallel to image_paths[len(original_image_paths):]
     "selected_idx",
     "final_path",
+    "num_variants",
+    "hasUnsubmittedText",
     "concept_dir",  # str path — needed by /render to locate/save variant files after page reload
 }
 
@@ -179,6 +181,8 @@ def init_column_state() -> dict:
         "images": [],  # PIL Images kept in memory for bg removal
         "image_paths": [],  # on-disk paths, used to build static URLs
         "selected_idx": None,
+        "num_variants": NUM_VARIANTS,
+        "hasUnsubmittedText": False,
         "concept_dir": None,  # str path to concept_N/ dir; set by /generate, used by /render
         "final_image": None,  # kept for /finalize backward compat during transition
         "final_path": None,
@@ -627,6 +631,7 @@ async def generate(
         session.update(
             {
                 "prompts": prompts,
+                "num_variants": num_variants,
                 "variant_size": variant_size,
                 "variant_aspect_ratio": aspect_ratio,
                 "images": images,
@@ -1615,7 +1620,9 @@ async def add_column(session_id: str = Form(...)):
             {"error": f"Maximum of {sess['max_columns']} columns reached."},
             status_code=400,
         )
-    columns.append(init_column_state())
+    new_col = init_column_state()
+    new_col["num_variants"] = sess.get("num_variants", NUM_VARIANTS)
+    columns.append(new_col)
     return {"column_id": len(columns) - 1, "count": len(columns)}
 
 
@@ -1774,6 +1781,31 @@ async def select_variant(
     session = get_column(session_id, column_id)
     session["selected_idx"] = selected_idx
     return {}
+
+
+@app.post("/session/sync-state")
+async def sync_column_state(
+    session_id: str = Form(...),
+    column_id: int = Form(0),
+    field: str = Form(...),
+    value: str = Form(...),  # Value is sent as string; parsed as JSON if possible
+):
+    """Generic endpoint to persist serializable column fields.
+    
+    Used for fire-and-forget updates of flags like hasUnsubmittedText or settings.
+    """
+    if field not in _SERIALIZABLE_COLUMN_KEYS:
+        return JSONResponse({"error": f"Field '{field}' is not serializable."}, status_code=400)
+    
+    session = get_column(session_id, column_id)
+    
+    try:
+        parsed_value = json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        parsed_value = value
+
+    session[field] = parsed_value
+    return {"ok": True}
 
 
 if __name__ == "__main__":

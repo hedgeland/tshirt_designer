@@ -153,11 +153,11 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         promptLog: "",
         showPromptLog: false,
         showPresets: false,
-        hasUnsubmittedText: false,
+        hasUnsubmittedText: initialState.hasUnsubmittedText ?? false,
 
         // ── Settings ───────────────────────────────────────────────────────
         bgColor: cfg.bgColor,
-        numVariants: cfg.numVariants,
+        numVariants: initialState.num_variants ?? cfg.numVariants,
         bgTolerance: cfg.bgTolerance,
         edgeErode: cfg.edgeErode,
         decontaminate: cfg.decontaminate,
@@ -703,6 +703,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         selectConcept(concept) {
             this.selectedConcept = concept;
             this.editedConcept = concept;
+            this.hasUnsubmittedText = false;
             this.step = Math.max(this.step, 3);
         },
 
@@ -716,6 +717,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.concepts = [];
             this.selectedConcept = null;
             this.editedConcept = "";
+            this.hasUnsubmittedText = false;
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
@@ -750,6 +752,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.concepts = [];
             this.selectedConcept = null;
             this.editedConcept = this.theme.trim();
+            this.hasUnsubmittedText = false;
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
