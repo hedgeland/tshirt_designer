@@ -1052,7 +1052,11 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             const pool = q ? (() => {
                 const terms = q.split(/\s+/);
                 return this.pAllBlueprints.filter(bp =>
-                    terms.every(t => bp.title.toLowerCase().includes(t) || (bp.brand || "").toLowerCase().includes(t))
+                    terms.every(t =>
+                        bp.title.toLowerCase().includes(t) ||
+                        (bp.brand || "").toLowerCase().includes(t) ||
+                        (bp.model || "").toLowerCase().includes(t)
+                    )
                 );
             })() : this.pAllBlueprints;
             // Sort by blueprint ID ascending — lower IDs are older, more established products

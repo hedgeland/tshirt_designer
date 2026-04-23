@@ -1267,7 +1267,7 @@
                                                             :class="pBlueprint?.id === bp.id ? 'bg-indigo-600 text-white' : ''">
                                                             <span class="font-medium" x-text="bp.title"></span>
                                                             <span class="text-xs ml-1 opacity-60 text-slate-300"
-                                                                x-text="bp.brand ? '· ' + bp.brand : ''"></span>
+                                                                x-text="(bp.brand || bp.model) ? '· ' + [bp.brand, bp.model].filter(Boolean).join(' ') : ''"></span>
                                                         </div>
                                                         <button @click.stop="togglePrintifyFavorite(bp.id)"
                                                             title="Remove from favorites"
@@ -1300,7 +1300,7 @@
                                                             class="flex-1 px-3 py-2 text-sm cursor-pointer transition-colors focus:outline-none focus:bg-indigo-900/50">
                                                             <span class="font-medium" x-text="bp.title"></span>
                                                             <span class="text-xs ml-1 opacity-60 text-slate-300"
-                                                                x-text="bp.brand ? '· ' + bp.brand : ''"></span>
+                                                                x-text="(bp.brand || bp.model) ? '· ' + [bp.brand, bp.model].filter(Boolean).join(' ') : ''"></span>
                                                         </div>
                                                         <button @click.stop="togglePrintifyFavorite(bp.id)"
                                                             :title="isFavorite(bp.id) ? 'Remove from favorites' : 'Add to favorites'"
