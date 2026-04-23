@@ -1716,6 +1716,11 @@ function designer() {
                     console.error(`400 Detail: ${text}`);
                 }
             }
+
+            // Bring column count up to the new ceiling to automatically change the number of columns shown
+            while (this.columns.length < this.maxColumns) {
+                await this.addColumn();
+            }
         },
 
         // Persist the user's min-columns floor to the server
@@ -1726,6 +1731,39 @@ function designer() {
                 this.minColumns = 1;
             } else {
                 this.minColumns = Math.min(newVal, this.maxColumns);
+            }
+
+            // If lowering min below the current column count, remove columns to match
+            const excess = this.columns.length - this.minColumns;
+            if (excess > 0) {
+                // Warn once if any of the columns being removed have work in progress
+                const hasWip = Array.from({ length: excess }, (_, i) => {
+                    const colIdx = this.columns.length - excess + i;
+                    const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
+                    const d = el?._x_dataStack?.[0];
+                    return d?.hasUnsubmittedText;
+                }).some(Boolean);
+                
+                if (hasWip && !confirm(`Lowering the min will close ${excess} column${excess > 1 ? 's' : ''} with unsubmitted text. Continue?`)) {
+                    // Revert the input to the current actual column count
+                    this.minColumns = this.columns.length;
+                    return;
+                }
+                
+                // Close excess columns from the right, one at a time
+                while (this.columns.length > this.minColumns) {
+                    const fd = new FormData();
+                    const targetIdx = this.columns.length - 1;
+                    fd.append("session_id", this.sessionId);
+                    fd.append("column_id", targetIdx);
+                    const res = await fetch("/session/remove-column", { method: "POST", body: fd });
+                    if (!res.ok) {
+                        console.error(`Failed to remove column ${targetIdx}: ${res.status}`);
+                        break;
+                    }
+                    this.columns.pop();
+                    Alpine.store('columnCount', this.columns.length);
+                }
             }
 
             const fd = new FormData();
