@@ -440,6 +440,7 @@ async def index(request: Request):
             "final_sizes": FINAL_SIZES,
             "final_size": FINAL_SIZE,
             "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
+            "max_columns_hard_cap": MAX_COLUMNS,   # server-side ceiling; never changes at runtime
             "min_columns": user_settings.get("default_min_columns", 1),
             "printify_favorites": user_settings.get("printify_favorites", []),
         },

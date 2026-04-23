@@ -94,7 +94,7 @@
                 <div class="flex items-center gap-2 pl-3 border-l border-slate-600 ml-1">
                     <label class="flex items-center gap-1.5 text-xs text-slate-300">
                         Max columns
-                        <input type="number" x-model.number="maxColumns" min="1" :max="cfg.maxColumns" step="1"
+                        <input type="number" x-model.number="maxColumns" min="1" :max="cfg.maxColumnsHardCap" step="1"
                             @change="updateMaxColumns()" aria-label="Maximum number of columns"
                             class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
                         <span class="text-slate-400" x-text="'(' + defaultMaxColumns + ')'"></span>
@@ -1753,6 +1753,7 @@
             "finalSizes": {{ final_sizes | tojson }},
             "defaultFinalSize": {{ final_size | tojson }},
             "maxColumns": {{ max_columns }},
+            "maxColumnsHardCap": {{ max_columns_hard_cap }},
             "minColumns": {{ min_columns }},
             "defaultMaxColumns": {{ max_columns }},
             "defaultMinColumns": {{ min_columns }},

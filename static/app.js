@@ -1666,7 +1666,7 @@ function designer() {
                 this.maxColumns = this.columns.length;
                 return;
             }
-            this.maxColumns = Math.min(newVal, cfg.maxColumns);
+            this.maxColumns = Math.min(newVal, cfg.maxColumnsHardCap);
 
             // Clamp minColumns down if it would exceed the new max
             if (this.minColumns > this.maxColumns) {
