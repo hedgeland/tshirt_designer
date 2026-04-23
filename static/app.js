@@ -1447,6 +1447,7 @@ function designer() {
     return {
         // ── Session ────────────────────────────────────────────────────────
         sessionId,
+        savingVariantsStatus: false,
 
         // Expose cfg so the template can read printifyEnabled, etc.
         cfg,
@@ -1756,6 +1757,9 @@ function designer() {
             const res = await fetch("/session/num-variants", { method: "POST", body: fd });
             if (!res.ok) {
                 console.error(`Failed to set default variants: ${res.status}`);
+            } else {
+                this.savingVariantsStatus = true;
+                setTimeout(() => this.savingVariantsStatus = false, 2000);
             }
         },
 
