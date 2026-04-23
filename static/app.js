@@ -1465,6 +1465,10 @@ function designer() {
         columns: [],
         maxColumns: cfg.maxColumns,
         minColumns: cfg.minColumns || 1,
+        // Saved defaults — shown in header as read-only labels; updated when user saves a new default
+        defaultMaxColumns: cfg.defaultMaxColumns,
+        defaultMinColumns: cfg.defaultMinColumns,
+        defaultNumVariants: cfg.defaultNumVariants,
 
         // ── Output browser ────────────────────────────────────────────────
         showBrowser: false,
@@ -1717,6 +1721,7 @@ function designer() {
                     console.error(`400 Detail: ${text}`);
                 }
             } else if (fromButton) {
+                this.defaultMaxColumns = this.maxColumns;  // reflect the newly saved default
                 this.savingMaxStatus = true;
                 setTimeout(() => this.savingMaxStatus = false, 2000);
             }
@@ -1803,6 +1808,7 @@ function designer() {
             if (!res.ok) {
                 console.error(`Failed to set default variants: ${res.status}`);
             } else {
+                this.defaultNumVariants = this.cfg.numVariants;  // reflect the newly saved default
                 this.savingVariantsStatus = true;
                 setTimeout(() => this.savingVariantsStatus = false, 2000);
             }

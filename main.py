@@ -411,7 +411,7 @@ async def index(request: Request):
         request,
         "index.html",
         {
-            "num_variants": NUM_VARIANTS,
+            "num_variants": user_settings.get("default_num_variants", NUM_VARIANTS),
             "max_variants": MAX_VARIANTS,
             "bg_color": DEFAULT_BG_COLOR,
             "bg_color_name": DEFAULT_BG_COLOR_NAME,
@@ -1678,11 +1678,14 @@ async def session_columns(session_id: str):
     """
     sess = get_session(session_id)
     cols = [_serialize_column(col) for col in sess["columns"]]
+    user_settings = settings.load_settings()
     return {
         "columns": cols,
         "max_columns": sess["max_columns"],
         "min_columns": sess.get("min_columns", 1),
         "num_variants": sess.get("num_variants", NUM_VARIANTS),
+        "default_max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
+        "default_num_variants": user_settings.get("default_num_variants", NUM_VARIANTS),
     }
 
 
@@ -1702,11 +1705,14 @@ async def remove_column(session_id: str = Form(...), column_id: int = Form(...))
     columns.pop(column_id)
     # Return the compacted list so the client can reassign indices in one step
     cols = [_serialize_column(col) for col in columns]
+    user_settings = settings.load_settings()
     return {
         "columns": cols,
         "max_columns": sess["max_columns"],
         "min_columns": sess.get("min_columns", 1),
         "num_variants": sess.get("num_variants", NUM_VARIANTS),
+        "default_max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
+        "default_num_variants": user_settings.get("default_num_variants", NUM_VARIANTS),
     }
 
 
