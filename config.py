@@ -24,7 +24,8 @@ HTTPS_ONLY = os.getenv("HTTPS_ONLY", "true").lower() == "true"
 MODEL = "gemini-3.1-flash-image-preview"
 
 NUM_CONCEPTS = 5        # default number of concepts to brainstorm
-NUM_VARIANTS = 1        # default; overridden by the UI slider at runtime
+NUM_VARIANTS = 4        # default; overridden by the UI slider at runtime
+MAX_VARIANTS = 4        # maximum allowed variants per generation
 DEFAULT_BG_COLOR = "#FF00FF"  # solid magenta — easy to key out in Canva
 DEFAULT_BG_COLOR_NAME = "Magenta"
 BG_REMOVAL_TOLERANCE = 50  # 0–255; higher = removes more color variation at edges

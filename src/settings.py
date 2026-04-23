@@ -6,7 +6,7 @@ Settings are stored in settings.json (gitignored).
 import json
 from pathlib import Path
 
-from config import MAX_COLUMNS
+from config import MAX_COLUMNS, NUM_VARIANTS
 
 _SETTINGS_PATH = Path(__file__).parent.parent / "settings.json"
 
@@ -14,7 +14,7 @@ _SETTINGS_PATH = Path(__file__).parent.parent / "settings.json"
 _DEFAULT_SETTINGS = {
     "default_min_columns": 1,
     "default_max_columns": MAX_COLUMNS,
-    "default_num_variants": 1,
+    "default_num_variants": NUM_VARIANTS,
     "printify_favorites": [],
 }
 

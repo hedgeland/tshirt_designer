@@ -38,6 +38,7 @@ from config import (
     HTTPS_ONLY,
     MAX_COLORS,
     MAX_COLUMNS,
+    MAX_VARIANTS,
     NUM_VARIANTS,
     OUTPUT_DIR,
     PRINTIFY_DEFAULT_SEARCH,
@@ -197,11 +198,19 @@ def get_session(session_id: str) -> dict:
     """
     if session_id not in sessions:
         user_settings = settings.load_settings()
+        
+        # Clamp num_variants from settings against the current hard max
+        loaded_num_variants = user_settings.get("default_num_variants", NUM_VARIANTS)
+        clamped_num_variants = max(1, min(loaded_num_variants, MAX_VARIANTS))
+        
+        initial_col = init_column_state()
+        initial_col["num_variants"] = clamped_num_variants
+        
         sessions[session_id] = {
-            "columns": [init_column_state()],  # start with one column
+            "columns": [initial_col],  # start with one column
             "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
             "min_columns": user_settings.get("default_min_columns", 1),
-            "num_variants": user_settings.get("default_num_variants", NUM_VARIANTS),
+            "num_variants": clamped_num_variants,
         }
     sessions[session_id]["_last_accessed"] = time.time()
     return sessions[session_id]
@@ -403,6 +412,7 @@ async def index(request: Request):
         "index.html",
         {
             "num_variants": NUM_VARIANTS,
+            "max_variants": MAX_VARIANTS,
             "bg_color": DEFAULT_BG_COLOR,
             "bg_color_name": DEFAULT_BG_COLOR_NAME,
             "bg_tolerance": BG_REMOVAL_TOLERANCE,
@@ -1718,9 +1728,9 @@ async def set_min_columns(session_id: str = Form(...), min_columns: int = Form(.
 
 @app.post("/session/num-variants")
 async def set_num_variants(session_id: str = Form(...), num_variants: int = Form(...)):
-    """Update the user's default number of variants for new columns, clamped to [1, 8]."""
+    """Update the user's default number of variants for new columns, clamped to [1, MAX_VARIANTS]."""
     sess = get_session(session_id)
-    clamped = max(1, min(num_variants, 8))
+    clamped = max(1, min(num_variants, MAX_VARIANTS))
     sess["num_variants"] = clamped
     # Persist as global default
     settings.save_settings({"default_num_variants": clamped})

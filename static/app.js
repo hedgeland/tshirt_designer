@@ -1746,7 +1746,7 @@ function designer() {
             if (isNaN(newVal) || newVal < 1) {
                 this.cfg.numVariants = 1;
             } else {
-                this.cfg.numVariants = Math.min(newVal, 8);
+                this.cfg.numVariants = Math.min(newVal, this.cfg.maxVariants);
             }
 
             const fd = new FormData();
