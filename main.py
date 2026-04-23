@@ -1621,7 +1621,10 @@ async def printify_publish(
 
 
 @app.post("/columns")
-async def add_column(session_id: str = Form(...)):
+async def add_column(
+    session_id: str = Form(...),
+    num_variants: int | None = Form(None)
+):
     """Append a new column to the session up to the session's max_columns limit."""
     sess = get_session(session_id)
     columns = sess["columns"]
@@ -1631,7 +1634,10 @@ async def add_column(session_id: str = Form(...)):
             status_code=400,
         )
     new_col = init_column_state()
-    new_col["num_variants"] = sess.get("num_variants", NUM_VARIANTS)
+    if num_variants is not None:
+        new_col["num_variants"] = max(1, min(num_variants, MAX_VARIANTS))
+    else:
+        new_col["num_variants"] = sess.get("num_variants", NUM_VARIANTS)
     columns.append(new_col)
     return {
         "column_id": len(columns) - 1,

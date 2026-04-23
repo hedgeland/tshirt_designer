@@ -1601,6 +1601,7 @@ function designer() {
             if (this.columns.length >= this.maxColumns) return;
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
+            fd.append("num_variants", this.cfg.numVariants);
             const res = await fetch("/columns", { method: "POST", body: fd });
             const data = await res.json();
             if (data.error) return;
