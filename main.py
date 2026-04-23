@@ -1623,7 +1623,11 @@ async def add_column(session_id: str = Form(...)):
     new_col = init_column_state()
     new_col["num_variants"] = sess.get("num_variants", NUM_VARIANTS)
     columns.append(new_col)
-    return {"column_id": len(columns) - 1, "count": len(columns)}
+    return {
+        "column_id": len(columns) - 1,
+        "count": len(columns),
+        "column": _serialize_column(new_col)
+    }
 
 
 def _serialize_column(col: dict) -> dict:

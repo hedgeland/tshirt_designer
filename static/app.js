@@ -1604,7 +1604,7 @@ function designer() {
             const res = await fetch("/columns", { method: "POST", body: fd });
             const data = await res.json();
             if (data.error) return;
-            this.columns.push({ uid: colUidSeq++ });
+            this.columns.push({ uid: colUidSeq++, initialState: data.column || {} });
             Alpine.store('columnCount', this.columns.length);
         },
 
