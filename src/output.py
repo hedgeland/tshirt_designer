@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from config import OUTPUT_DIR
+from config import ASPECT_RATIOS, OUTPUT_DIR, SIZE_PX
 
 
 def _resolve_output_path(url: str) -> Path:
@@ -113,7 +113,7 @@ def scan_output() -> list[dict]:
             display_session, concept_text, _ = parse_concept_from_prompts(concept_dir)
             
             # Group variants in this concept
-            _RES_ORDER = {"512": 0, "1K": 1, "2K": 2, "4K": 3}
+            _AR_ORDER = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
             groups: dict[int, list] = {}
             for v in concept_dir.glob("variant_*.png"):
                 if "_no_bg" in v.name:
@@ -129,7 +129,13 @@ def scan_output() -> list[dict]:
                 key=lambda kv: max(r[1].st_mtime for r in kv[1]),
                 reverse=True,
             ):
-                renders_sorted = sorted(renders, key=lambda r: (_RES_ORDER.get(r[3], -1), r[2]))
+                # Sort renders by resolution (highest first) then aspect ratio (dropdown order)
+                renders_sorted = sorted(
+                    renders, 
+                    key=lambda r: (
+                        -SIZE_PX.get(r[3], 0),
+                        _AR_ORDER.get(r[2].replace("x", ":"), 99)
+                    )                )
                 render_list = []
                 for v, v_stat, ar_safe, res in renders_sorted:
                     no_bg = v.with_name(v.stem + "_no_bg.png")
@@ -351,7 +357,7 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
         raise ValueError("No variants found in concept directory.")
 
     # Sort groups and identify "original" variants vs iterations
-    _RES_ORDER = {"512": 0, "1K": 1, "2K": 2, "4K": 3}
+    _AR_ORDER = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
     
     variant_indices = sorted(groups.keys())
     image_paths = []
@@ -359,8 +365,14 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
     
     for idx in variant_indices:
         renders = groups[idx]
-        # Sort renders by resolution
-        renders_sorted = sorted(renders, key=lambda p: _RES_ORDER.get(p.stem.split("_")[-1], 99))
+        # Sort renders by resolution (highest first) then aspect ratio (dropdown order)
+        renders_sorted = sorted(
+            renders,
+            key=lambda p: (
+                -SIZE_PX.get(p.stem.split("_")[-1], 0),
+                _AR_ORDER.get(p.stem.split("_")[2].replace("x", ":"), 99)
+            )
+        )
         
         # The first render is our "primary" one for this variant slot
         primary = renders_sorted[0]

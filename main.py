@@ -246,9 +246,11 @@ def _scan_existing_finals(session_dir: Path, idx: int) -> list[dict]:
     """Return all finalized images for a given variant index in session_dir.
 
     Parses deterministic filenames of the form final_v{idx}_{ar_safe}_{size}.png
-    and returns [{size, aspectRatio, url}] sorted by size descending.
+    and returns [{size, aspectRatio, url}] sorted by resolution (highest first)
+    then by aspect ratio (dropdown order).
     NOTE: deprecated — used only by the legacy /finalize endpoint during transition.
     """
+    ar_order = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
     results = []
     for p in session_dir.glob(f"final_v{idx}_*.png"):
         if "_no_bg" in p.name:
@@ -262,6 +264,7 @@ def _scan_existing_finals(session_dir: Path, idx: int) -> list[dict]:
             "aspectRatio": ar_safe.replace("x", ":"),
             "url": f"/{p}",
         })
+    results.sort(key=lambda r: (-SIZE_PX.get(r["size"], 0), ar_order.get(r["aspectRatio"], 99)))
     return results
 
 
@@ -269,9 +272,10 @@ def _scan_variant_combos(concept_dir: Path, variant_num: int) -> list[dict]:
     """Return all rendered combos for variant_num (1-indexed) in concept_dir.
 
     Parses variant_{N}_{ar_safe}_{size}.png filenames.
-    Returns [{size, aspectRatio, url}] sorted largest-first by size.
+    Returns [{size, aspectRatio, url}] sorted by resolution (highest first)
+    then by aspect ratio (dropdown order).
     """
-    size_order = {"512": 0, "1K": 1, "2K": 2, "4K": 3}
+    ar_order = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
     results = []
     for p in concept_dir.glob(f"variant_{variant_num}_*.png"):
         if "_no_bg" in p.name:
@@ -285,7 +289,7 @@ def _scan_variant_combos(concept_dir: Path, variant_num: int) -> list[dict]:
             "aspectRatio": ar_safe.replace("x", ":"),
             "url": f"/{p}",
         })
-    results.sort(key=lambda r: size_order.get(r["size"], -1), reverse=True)
+    results.sort(key=lambda r: (-SIZE_PX.get(r["size"], 0), ar_order.get(r["aspectRatio"], 99)))
     return results
 
 

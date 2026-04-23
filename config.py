@@ -23,6 +23,7 @@ HTTPS_ONLY = os.getenv("HTTPS_ONLY", "true").lower() == "true"
 # Gemini 3.1 Flash Image Preview; not Imagen.
 MODEL = "gemini-3.1-flash-image-preview"
 
+NUM_CONCEPTS = 5        # default number of concepts to brainstorm
 NUM_VARIANTS = 1        # default; overridden by the UI slider at runtime
 DEFAULT_BG_COLOR = "#FF00FF"  # solid magenta — easy to key out in Canva
 DEFAULT_BG_COLOR_NAME = "Magenta"

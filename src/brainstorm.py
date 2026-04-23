@@ -4,14 +4,14 @@ import json
 import logging
 import re
 
-from config import MODEL
+from config import MODEL, NUM_CONCEPTS
 from src.client import get_client
 from src.prompt_templates import concepts_prompt
 
 logger = logging.getLogger(__name__)
 
 
-def generate_concepts(theme: str, api_key: str, concepts_template: str, num_concepts: int = 5) -> list[str]:
+def generate_concepts(theme: str, api_key: str, concepts_template: str, num_concepts: int = NUM_CONCEPTS) -> list[str]:
     client = get_client(api_key)
 
     # Ask the model to return strict JSON so parsing is reliable.

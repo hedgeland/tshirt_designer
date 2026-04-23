@@ -3,7 +3,7 @@
 import json
 import re
 
-from config import MODEL
+from config import DEFAULT_BG_COLOR, MAX_COLORS, MODEL, NUM_VARIANTS
 from src.client import get_client
 from src.prompt_templates import style_suffix, variants_prompt
 
@@ -13,9 +13,9 @@ def build_prompts(
     api_key: str,
     variants_template: str,
     style_template: str,
-    bg_color: str = "#FFFFFF",
-    num_variants: int = 3,
-    max_colors: int = 6,
+    bg_color: str = DEFAULT_BG_COLOR,
+    num_variants: int = NUM_VARIANTS,
+    max_colors: int = MAX_COLORS,
 ) -> list[str]:
     client = get_client(api_key)
 
