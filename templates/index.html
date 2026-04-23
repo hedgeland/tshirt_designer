@@ -961,14 +961,14 @@
                                                     @keydown.enter.prevent="selectedVariant = v._origIdx"
                                                     @keydown.space.prevent="selectedVariant = v._origIdx"
                                                     class="relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                                    :class="selectedVariant === v._origIdx ? 'border-indigo-500 shadow-md' : 'border-slate-200 hover:border-slate-300'">
+                                                    :class="selectedVariant === v._origIdx ? 'border-indigo-500 shadow-md' : 'border-transparent hover:border-slate-300'">
                                                     <img :src="v.url + '?t=' + v.ts" alt=""
                                                         class="w-full aspect-square object-contain bg-slate-100 block">
                                                     <div aria-hidden="true" x-show="selectedVariant === v._origIdx"
                                                         class="absolute top-1.5 right-1.5 bg-indigo-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow">
                                                         ✓</div>
-                                                    <span x-show="generatedVariantSize"
-                                                        x-text="`${generatedVariantSize} ${generatedVariantAspectRatio}`"
+                                                    <span x-show="getVariantResolutions(v._origIdx).length > 0"
+                                                        x-text="getVariantResolutions(v._origIdx).join(', ')"
                                                         aria-hidden="true"
                                                         class="absolute bottom-1.5 right-1.5 text-xs font-semibold text-white pointer-events-none"
                                                         style="text-shadow: 0 0 3px #000, 0 0 3px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"></span>
@@ -1129,7 +1129,7 @@
                                         <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-100 flex items-baseline gap-2">
                                             <span>6 · Finalize</span>
                                             <span x-show="activeComboSize"
-                                                :class="(cfg.sizePx[activeComboSize] ?? 0) < cfg.sizePx['4K'] ? 'text-red-400 font-bold' : 'text-slate-400 font-normal'"
+                                                :class="(cfg.sizePx[activeComboSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize] ? 'text-red-400 font-bold' : 'text-slate-400 font-normal'"
                                                 class="normal-case tracking-normal text-xs"
                                                 x-text="`${aspectRatio} @ ${activeComboSize}`"></span>
                                         </h2>
@@ -1145,16 +1145,16 @@
                                     </div>
                                     <div x-show="!sCollapsed[6]">
                                         <div class="space-y-3">
-                                            <!-- Finalize: single 4K render button — all iteration (aspect ratio, resolution, bg) happens in step 5 -->
+                                            <!-- Finalize: render button based on PRINTIFY_MIN_SIZE -->
                                             <div class="flex gap-2 flex-wrap items-center">
-                                                <button @click="doRender('4K')"
-                                                    :disabled="isLoading || (variantCombos[selectedVariant ?? 0] || []).some(c => c.size === '4K' && c.aspectRatio === aspectRatio)"
-                                                    :title="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === '4K' && c.aspectRatio === aspectRatio)
-                                                        ? 'Already rendered at 4K — click the pill above to select it'
-                                                        : 'Render final image at 4K for publishing'"
-                                                    x-text="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === '4K' && c.aspectRatio === aspectRatio)
-                                                        ? '✨ 4K — already rendered'
-                                                        : '✨ Render at 4K'"
+                                                <button @click="doRender(cfg.printifyMinSize)"
+                                                    :disabled="isLoading || (variantCombos[selectedVariant ?? 0] || []).some(c => c.size === cfg.printifyMinSize && c.aspectRatio === aspectRatio)"
+                                                    :title="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === cfg.printifyMinSize && c.aspectRatio === aspectRatio)
+                                                        ? `Already rendered at ${cfg.printifyMinSize} — click the pill above to select it`
+                                                        : `Render final image at ${cfg.printifyMinSize} for publishing`"
+                                                    x-text="(variantCombos[selectedVariant ?? 0] || []).some(c => c.size === cfg.printifyMinSize && c.aspectRatio === aspectRatio)
+                                                        ? `✨ ${cfg.printifyMinSize} — already rendered`
+                                                        : `✨ Render at ${cfg.printifyMinSize}`"
                                                     class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"></button>
                                                 <!-- Publish button — disabled and red when below 4K; override checkbox below unlocks for testing -->
                                                 <button x-show="cfg.printifyEnabled" @click="openPrintify()"
@@ -1570,11 +1570,11 @@
                                                                      : pDrag ? 'border-l border-slate-400 opacity-50' : 'opacity-0'">
                                                         </div>
                                                     </div>
-                                                    <!-- Resolution + aspect ratio — centered under preview; red when below 4K -->
+                                                    <!-- Resolution + aspect ratio — centered under preview; red when below cfg.printifyMinSize -->
                                                     <p class="mt-1 text-xs font-bold text-center"
-                                                        :class="activeComboSize && cfg.sizePx[activeComboSize] < cfg.sizePx['4K'] ? 'text-red-600' : 'text-slate-500'"
+                                                        :class="activeComboSize && cfg.sizePx[activeComboSize] < cfg.sizePx[cfg.printifyMinSize] ? 'text-red-600' : 'text-slate-500'"
                                                         x-text="activeComboSize && aspectRatio
-                                                            ? (cfg.sizePx[activeComboSize] < cfg.sizePx['4K']
+                                                            ? (cfg.sizePx[activeComboSize] < cfg.sizePx[cfg.printifyMinSize]
                                                                 ? '! ' + activeComboSize + ' · ' + aspectRatio
                                                                 : activeComboSize + ' · ' + aspectRatio)
                                                             : ''">
