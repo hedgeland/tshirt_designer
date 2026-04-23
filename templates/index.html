@@ -108,7 +108,7 @@
                             class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
                     </label>
                     <button @click="updateNumVariants()" title="Save default variants"
-                        class="px-3 py-1.5 bg-slate-600 text-white text-xs font-medium rounded-lg hover:bg-slate-500 transition-colors w-24"
+                        class="px-3 py-1.5 bg-slate-600 text-white text-xs font-medium rounded-lg hover:bg-slate-500 transition-colors w-24 whitespace-nowrap"
                         x-text="savingVariantsStatus ? 'Saved!' : 'Save Default'"
                         :class="savingVariantsStatus ? '!bg-emerald-600 !hover:bg-emerald-600' : ''">
                     </button>
