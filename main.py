@@ -62,6 +62,7 @@ from src.output import (
     delete_files,
     load_concept_to_session,
     load_image_to_session,
+    record_iteration_variant,
     rename_design_session,
     safe_design_session_name,
     save_variants,
@@ -965,6 +966,16 @@ async def edit_variant(
             return
 
         await asyncio.to_thread(edited_img.save, str(save_path), "PNG")
+
+        # Determine the root variant number (1-indexed filename number, not session array index)
+        # so variants.json can store a file-independent reference that survives session resets.
+        root_image_paths = session.get("image_paths", [])
+        root_variant_num: int | None = None
+        if root_idx < len(root_image_paths):
+            rm = re.match(r"variant_(\d+)_", Path(root_image_paths[root_idx]).name)
+            if rm:
+                root_variant_num = int(rm.group(1))
+        await asyncio.to_thread(record_iteration_variant, concept_dir, next_variant_num, root_variant_num)
 
         # Append to session so /render can index into images[] and prompts[] by variant_idx.
         # iteration_roots[j] mirrors the j-th appended iteration's rootIdx so the client

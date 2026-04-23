@@ -1,6 +1,7 @@
 """Save generated images to disk under output/<theme>/concept_N/variant_N_ARxAR_SIZE.png."""
 
 import io
+import json
 import re
 import zipfile
 from datetime import datetime
@@ -9,6 +10,34 @@ from pathlib import Path
 from PIL import Image
 
 from config import ASPECT_RATIOS, OUTPUT_DIR, SIZE_PX
+
+
+def _read_variants_json(concept_dir: Path) -> list[dict]:
+    """Read variants.json from a concept directory; return [] if missing or corrupt."""
+    p = concept_dir / "variants.json"
+    if not p.exists():
+        return []
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return []
+
+
+def _write_variants_json(concept_dir: Path, entries: list[dict]) -> None:
+    """Write variants.json atomically to a concept directory."""
+    p = concept_dir / "variants.json"
+    p.write_text(json.dumps(entries, indent=2))
+
+
+def record_iteration_variant(concept_dir: Path, variant_num: int, root_variant_num: int | None) -> None:
+    """Append an iteration entry to variants.json, recording its root ancestor variant number.
+
+    root_variant_num is the variant number of the original (non-iteration) ancestor, not the
+    direct parent — this is what the UI's iteration_roots index needs on reload.
+    """
+    entries = _read_variants_json(concept_dir)
+    entries.append({"variant": variant_num, "root": root_variant_num})
+    _write_variants_json(concept_dir, entries)
 
 
 def _resolve_output_path(url: str) -> Path:
@@ -210,6 +239,17 @@ def delete_files(paths: list[str]) -> dict:
     freed = 0
     errors = []
 
+    # Collect concept dirs that will be affected before touching the filesystem,
+    # so we can reconcile variants.json after the deletes complete.
+    affected_concept_dirs: set[Path] = set()
+    for p_str in paths:
+        try:
+            resolved = _resolve_output_path(p_str)
+            if resolved.parent.name.startswith("concept_"):
+                affected_concept_dirs.add(resolved.parent)
+        except ValueError:
+            pass
+
     for p_str in paths:
         try:
             resolved = _resolve_output_path(p_str)
@@ -221,6 +261,34 @@ def delete_files(paths: list[str]) -> dict:
             errors.append(f"Refused: {p_str}")
         except Exception as e:
             errors.append(str(e))
+
+    # Reconcile variants.json for each affected concept directory.
+    # Entries for deleted variants are removed; entries whose root was deleted are orphaned
+    # (root set to null) so they become standalone variants in the UI instead of breaking.
+    for concept_dir in affected_concept_dirs:
+        if not concept_dir.exists():
+            continue
+        entries = _read_variants_json(concept_dir)
+        if not entries:
+            continue
+        # Determine which variant numbers still have at least one file on disk
+        surviving: set[int] = set()
+        for f in concept_dir.glob("variant_*.png"):
+            if "_no_bg" in f.name:
+                continue
+            m = re.match(r"variant_(\d+)_", f.name)
+            if m:
+                surviving.add(int(m.group(1)))
+        updated = []
+        for entry in entries:
+            if entry["variant"] not in surviving:
+                continue  # all renders for this variant were deleted — drop the entry
+            root = entry.get("root")
+            if root is not None and root not in surviving:
+                # Parent was deleted — orphan this child so it becomes a root variant
+                entry = {**entry, "root": None}
+            updated.append(entry)
+        _write_variants_json(concept_dir, updated)
 
     # Prune empty directories bottom-up.
     # Collect first, then remove — modifying a directory while iterating it is
@@ -401,14 +469,27 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
         img.load()
         images.append(img)
 
-    # Differentiate originals vs iterations
-    # If variant_count is 0 (missing metadata), assume all are originals (old session)
-    orig_count = variant_count if variant_count > 0 else len(image_paths)
+    # Differentiate originals vs iterations using variants.json when available.
+    # Fall back to prompts.md variant_count for sessions created before variants.json existed.
+    vj_entries = _read_variants_json(concept_dir)
+    if vj_entries:
+        # Build variant_num → root_variant_num from the JSON
+        vj_map: dict[int, int | None] = {e["variant"]: e.get("root") for e in vj_entries}
+        # Build variant_num → index-in-image_paths so we can convert root nums to rootIdx values
+        num_to_pos = {num: pos for pos, num in enumerate(variant_indices)}
+        orig_count = sum(1 for num in variant_indices if vj_map.get(num) is None)
+        iteration_roots = [
+            num_to_pos.get(vj_map[num], 0)
+            for num in variant_indices
+            if vj_map.get(num) is not None  # only emit an entry for each iteration
+        ]
+    else:
+        # Backward compat: no variants.json — assume all beyond variant_count are iterations
+        # from root 0 (same as the old best-guess behaviour)
+        orig_count = variant_count if variant_count > 0 else len(image_paths)
+        iteration_roots = [0] * (len(image_paths) - orig_count)
+
     original_image_paths = image_paths[:orig_count]
-    
-    # Best-effort iteration_roots: assume iterations come from the first original variant
-    # since we don't have true per-iteration rootIdx metadata on disk yet.
-    iteration_roots = [0] * (len(image_paths) - orig_count)
 
     # Reset and populate session
     session["theme"] = display_session or session_dir_name
@@ -469,5 +550,8 @@ def save_variants(
         path = dir_path / f"variant_{i + 1}_{ar_safe}_{size}.png"
         img.save(path, "PNG")
         paths.append(str(path))
+
+    # All originals have no root ancestor; write fresh variants.json for this concept
+    _write_variants_json(dir_path, [{"variant": i + 1, "root": None} for i in range(len(images))])
 
     return paths, dir_path
