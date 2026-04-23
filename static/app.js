@@ -196,7 +196,13 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // ── Settings panel state ──────────────────────────────────────────
         settingsOpen: false,    // controls collapsible per-column settings panel
 
-        // ── Load-from-browser state ───────────────────────────────────────
+        // ── Variant resolutions ──────────────────────────────────────────
+        getVariantResolutions(idx) {
+            // Returns sorted list of unique sizes for variant idx
+            const combos = this.variantCombos[idx] || [];
+            const sizes = [...new Set(combos.map(c => c.size))];
+            return sizes.sort((a, b) => (cfg.sizePx[b] || 0) - (cfg.sizePx[a] || 0));
+        },
         loadedImageRes: null,   // {width, height} when variants came from the output browser
 
         // ── Drag / rotate state (Printify placement preview) ──────────────
