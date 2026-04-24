@@ -2017,6 +2017,32 @@ function designer() {
             a.click();
         },
 
+        // Delete a variant and all its iterations (all renders across every size/AR combo).
+        // variant_num is the raw integer from scan_output, which maps directly to filenames.
+        async deleteVariant(sessionDirName, conceptName, variantNum, iterationCount) {
+            const iterNote = iterationCount > 0
+                ? ` and ${iterationCount} iteration${iterationCount > 1 ? 's' : ''}`
+                : '';
+            if (!confirm(`Delete this variant${iterNote}? This cannot be undone.`)) return;
+            await fetch("/browse/variant", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_dir: sessionDirName,
+                    concept_dir: conceptName,
+                    variant_num: variantNum,
+                }),
+            });
+            await this.reloadBrowser();
+        },
+
+        // Delete an entire session directory (all concepts, finals, and renders).
+        async deleteSession(dirName, displayName) {
+            if (!confirm(`Delete session "${displayName}"? This cannot be undone.`)) return;
+            await fetch(`/browse/session/${encodeURIComponent(dirName)}`, { method: "DELETE" });
+            await this.reloadBrowser();
+        },
+
         async downloadSelectedZip() {
             const paths = Object.keys(this.selectedFiles);
             if (!paths.length) return;

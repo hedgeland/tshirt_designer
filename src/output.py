@@ -140,7 +140,16 @@ def scan_output() -> list[dict]:
 
         for concept_dir in concept_dirs:
             display_session, concept_text, _ = parse_concept_from_prompts(concept_dir)
-            
+
+            # Build a map of variant_num → iteration count so delete confirms are informative.
+            # Each entry whose root == variant_num counts as one iteration of that variant.
+            vj_entries = _read_variants_json(concept_dir)
+            iteration_counts: dict[int, int] = {}
+            for entry in vj_entries:
+                root = entry.get("root")
+                if root is not None:
+                    iteration_counts[root] = iteration_counts.get(root, 0) + 1
+
             # Group variants in this concept
             _AR_ORDER = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
             groups: dict[int, list] = {}
@@ -194,6 +203,8 @@ def scan_output() -> list[dict]:
                     "width": rep["width"],
                     "height": rep["height"],
                     "renders": render_list,
+                    "variant_num": _n,                      # raw variant number; needed by delete_variant
+                    "iteration_count": iteration_counts.get(_n, 0),  # how many iterations will also be removed
                 })
 
             if concept_images:
@@ -315,6 +326,57 @@ def delete_files(paths: list[str]) -> dict:
                 pass
 
     return {"deleted": deleted, "freed_bytes": freed, "errors": errors}
+
+
+def delete_variant(session_dir_name: str, concept_dir_name: str, variant_num: int) -> dict:
+    """Delete a variant and all its iterations from a concept directory.
+
+    Collects the target variant number plus any variant whose root == variant_num in
+    variants.json (iterations always store the original root ancestor, so one pass suffices),
+    then delegates to delete_files() which handles variants.json reconciliation and empty-dir
+    pruning.
+    """
+    root = Path(OUTPUT_DIR).resolve()
+    concept_dir = root / session_dir_name / concept_dir_name
+
+    if not concept_dir.is_dir():
+        raise ValueError(f"Concept directory not found: {concept_dir_name}")
+
+    # Find variant numbers to delete: the target and all iterations rooted at it
+    entries = _read_variants_json(concept_dir)
+    nums_to_delete: set[int] = {variant_num}
+    for entry in entries:
+        if entry.get("root") == variant_num:
+            nums_to_delete.add(entry["variant"])
+
+    # Collect all file paths (all size/AR renders and no_bg files) for those variant numbers
+    paths: list[str] = []
+    for f in concept_dir.glob("variant_*.png"):
+        m = re.match(r"variant_(\d+)_", f.name)
+        if m and int(m.group(1)) in nums_to_delete:
+            # URL format expected by delete_files: /output/session/concept/file.png
+            paths.append("/" + f.relative_to(root.parent).as_posix())
+
+    return delete_files(paths)
+
+
+def delete_session(dir_name: str) -> dict:
+    """Delete an entire session directory and all its contents."""
+    import shutil
+
+    root = Path(OUTPUT_DIR).resolve()
+    session_dir = (root / dir_name).resolve()
+
+    # Refuse anything that escapes OUTPUT_DIR
+    if not session_dir.is_relative_to(root):
+        raise ValueError(f"Path not in output directory: {dir_name}")
+    if not session_dir.is_dir():
+        raise ValueError(f"Session not found: {dir_name}")
+
+    total_size = sum(f.stat().st_size for f in session_dir.rglob("*") if f.is_file())
+    file_count = sum(1 for f in session_dir.rglob("*") if f.is_file())
+    shutil.rmtree(session_dir)
+    return {"deleted": file_count, "freed_bytes": total_size, "errors": []}
 
 
 def archive_design_session(dir_name: str) -> bytes:

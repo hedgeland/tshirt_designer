@@ -60,6 +60,8 @@ from src.output import (
     archive_design_session,
     archive_files,
     delete_files,
+    delete_session,
+    delete_variant,
     load_concept_to_session,
     load_image_to_session,
     record_iteration_variant,
@@ -1276,6 +1278,32 @@ async def delete_output_files(request: Request):
     body = await request.json()
     paths = body.get("paths", [])
     return await asyncio.to_thread(delete_files, paths)
+
+
+@app.delete("/browse/variant")
+async def delete_output_variant(request: Request):
+    """Delete a variant and all its iterations from a concept directory."""
+    body = await request.json()
+    try:
+        result = await asyncio.to_thread(
+            delete_variant,
+            body["session_dir"],
+            body["concept_dir"],
+            int(body["variant_num"]),
+        )
+    except (KeyError, ValueError) as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return result
+
+
+@app.delete("/browse/session/{dir_name}")
+async def delete_output_session(dir_name: str):
+    """Delete an entire session directory and all its contents."""
+    try:
+        result = await asyncio.to_thread(delete_session, dir_name)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return result
 
 
 @app.get("/browse/archive/{dir_name}")

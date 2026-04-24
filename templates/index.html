@@ -83,21 +83,25 @@
                 <p class="text-xs text-slate-300">Brainstorm → Select → Generate · Gemini 3.1 Flash Image Preview</p>
             </div>
             <!-- Column controls — immediately right of app name -->
-            <div class="flex items-center gap-3 flex-shrink-0">
-                <label class="flex items-center gap-1.5 text-xs text-slate-300">
-                    Min columns
-                    <input type="number" x-model.number="minColumns" min="1" :max="maxColumns" step="1"
-                        @change="updateMinColumns()" aria-label="Minimum number of columns"
-                        class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                    <span class="text-slate-400" x-text="'(' + defaultMinColumns + ')'"></span>
-                </label>
-                <div class="flex items-center gap-2 pl-3 border-l border-slate-600 ml-1">
-                    <label class="flex items-center gap-1.5 text-xs text-slate-300">
-                        Max columns
-                        <input type="number" x-model.number="maxColumns" min="1" :max="cfg.maxColumnsHardCap" step="1"
-                            @change="updateMaxColumns()" aria-label="Maximum number of columns"
+            <div class="flex items-start gap-3 flex-shrink-0">
+                <label class="flex flex-col gap-0 text-xs text-slate-300">
+                    <span class="flex items-center gap-1.5">
+                        Min columns
+                        <input type="number" x-model.number="minColumns" min="1" :max="maxColumns" step="1"
+                            @change="updateMinColumns()" aria-label="Minimum number of columns"
                             class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                        <span class="text-slate-400" x-text="'(' + defaultMaxColumns + ')'"></span>
+                    </span>
+                    <span class="text-slate-500 text-xs" x-text="'Current: ' + defaultMinColumns"></span>
+                </label>
+                <div class="flex items-start gap-2 pl-3 border-l border-slate-600 ml-1">
+                    <label class="flex flex-col gap-0 text-xs text-slate-300">
+                        <span class="flex items-center gap-1.5">
+                            Max columns
+                            <input type="number" x-model.number="maxColumns" min="1" :max="cfg.maxColumnsHardCap" step="1"
+                                @change="updateMaxColumns()" aria-label="Maximum number of columns"
+                                class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                        </span>
+                        <span class="text-slate-500 text-xs" x-text="'Current: ' + defaultMaxColumns"></span>
                     </label>
                     <button @click="updateMaxColumns(true)" title="Save max columns default"
                         class="px-3 py-1.5 bg-slate-600 text-white text-xs font-medium rounded-lg hover:bg-slate-500 transition-colors w-24 whitespace-nowrap"
@@ -105,13 +109,15 @@
                         :class="savingMaxStatus ? '!bg-emerald-600 !hover:bg-emerald-600' : ''">
                     </button>
                 </div>
-                <div class="flex items-center gap-2 pl-3 border-l border-slate-600 ml-1">
-                    <label class="flex items-center gap-1.5 text-xs text-slate-300">
-                        Default variants
-                        <input type="number" x-model.number="cfg.numVariants" min="1" max="{{ max_variants }}" step="1"
-                            aria-label="Default number of variants"
-                            class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                        <span class="text-slate-400" x-text="'(' + defaultNumVariants + ')'"></span>
+                <div class="flex items-start gap-2 pl-3 border-l border-slate-600 ml-1">
+                    <label class="flex flex-col gap-0 text-xs text-slate-300">
+                        <span class="flex items-center gap-1.5">
+                            Default variants
+                            <input type="number" x-model.number="cfg.numVariants" min="1" max="{{ max_variants }}" step="1"
+                                aria-label="Default number of variants"
+                                class="w-14 text-center border border-slate-500 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                        </span>
+                        <span class="text-slate-500 text-xs" x-text="'Current: ' + defaultNumVariants"></span>
                     </label>
                     <button @click="updateNumVariants()" title="Save default variants"
                         class="px-3 py-1.5 bg-slate-600 text-white text-xs font-medium rounded-lg hover:bg-slate-500 transition-colors w-24 whitespace-nowrap"
@@ -344,6 +350,9 @@
                                     <button @click.stop="downloadSessionZip(session.dir_name)" title="Download ZIP"
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">⬇
                                         ZIP</button>
+                                    <button @click.stop="deleteSession(session.dir_name, session.design_session)"
+                                        title="Delete entire session"
+                                        class="flex-shrink-0 text-xs text-slate-500 hover:text-red-400 px-1 transition-colors">🗑</button>
                                 </div>
 
                                 <div x-show="session.expanded" class="px-4 pb-3 space-y-4">
@@ -453,6 +462,10 @@
                                                                     <button @click.stop="setReferenceFromBrowser(v.url)"
                                                                         title="Set as reference image"
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-orange-400 hover:bg-orange-600 transition-colors">🎯</button>
+                                                                    <button
+                                                                        @click.stop="deleteVariant(session.dir_name, concept.name, v.variant_num, v.iteration_count)"
+                                                                        title="Delete this variant and all its iterations"
+                                                                        class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-red-400 hover:bg-red-600 transition-colors">🗑</button>
                                                                 </div>
                                                             </div>
                                                         </div>
