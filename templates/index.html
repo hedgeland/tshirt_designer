@@ -355,7 +355,7 @@
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-red-400 px-1 transition-colors">🗑</button>
                                 </div>
 
-                                <div x-show="session.expanded" class="px-4 pb-3 space-y-4">
+                                <div x-show="session.expanded" class="px-4 pt-2 pb-3 space-y-3">
 
                                     <!-- Finals -->
                                     <template x-if="session.finals.length > 0">
@@ -416,7 +416,7 @@
 
                                     <!-- Concepts -->
                                     <template x-for="(concept, ci) in session.concepts" :key="concept.name">
-                                        <div class="space-y-2 border-t border-slate-700/30 pt-3 first:border-t-0 first:pt-0">
+                                        <div class="space-y-2 border-t border-slate-700/30 pt-2">
                                             <div class="flex items-center justify-between gap-2">
                                                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
