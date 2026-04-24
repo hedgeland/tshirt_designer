@@ -32,6 +32,7 @@ Create {num_variants} distinct prompt variations for this concept. Each should:
 - Preserve the subject's natural anatomy — do not add limbs, appendages, or physical features the subject does not naturally possess (e.g. a shark has fins, not legs).
 - Focus only on the subject and any props — do NOT describe a background scene or environment
 - NOT include style instructions — those will be appended automatically
+- NOT depict a t-shirt, garment, clothing, or mockup of any kind — generate the print artwork itself, not a t-shirt wearing it
 - If the concept includes text or a slogan, render it SHORT — 5 words or fewer, exactly as specified. Do not expand, subtitle, or add extra text to the design.
 
 Return ONLY a JSON array of {num_variants} prompt strings. No other text.
@@ -49,4 +50,6 @@ limited color palette, solid {bg_color} background filling the entire frame, \
 high contrast, screen print ready, \
 no gradients, no shading, no photographic textures, \
 strictly no elements touching the image borders, \
-anatomically accurate to the subject's real-world form"""
+anatomically accurate to the subject's real-world form, \
+this is the PRINT ARTWORK ITSELF — do NOT render a t-shirt, garment, clothing, \
+fabric, or wearable item of any kind, no shirt shape, no collar, no sleeves"""
