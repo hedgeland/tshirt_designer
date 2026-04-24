@@ -1126,7 +1126,7 @@
                                                     :disabled="isLoading" @keydown.enter.prevent="doEditVariant()"
                                                     class="w-full text-xs rounded-md px-2 py-1.5 border border-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none disabled:opacity-50"></textarea>
                                                 <button @click="doEditVariant()"
-                                                    :disabled="isLoading"
+                                                    :disabled="isLoading || (!editPrompt.trim() && (variantCombos[selectedVariant ?? 0] || []).some(c => c.size === editSize && c.aspectRatio === editAspectRatio))"
                                                     class="self-start flex items-center gap-2 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                                     <svg x-show="isLoading && loadingStep === 4" aria-hidden="true"
                                                         class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
