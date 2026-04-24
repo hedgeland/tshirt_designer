@@ -883,7 +883,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 const existing = this.variantCombos[idx] || [];
                 if (existing.some(c => c.size === this.editSize && c.aspectRatio === this.editAspectRatio)) return;
 
-                this.loadingStep = 5;
+                this.loadingStep = 4;  // matches the step-5 panel's spinner/status check
                 this._startLoading(`Rendering at ${this.editSize} (${this.editAspectRatio})...`);
 
                 const fd = new FormData();
