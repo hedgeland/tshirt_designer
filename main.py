@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import logging
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -832,7 +833,14 @@ async def render_combo(
 
         concept_dir = Path(concept_dir_str)
         ar_safe = aspect_ratio.replace(":", "x")
-        variant_num = variant_idx + 1  # filenames are 1-indexed
+        # Parse the on-disk variant number from the stored path — variant_idx + 1 is wrong
+        # when numbering is non-consecutive (e.g. variants 2 and 3 remain after deleting 1).
+        _stored = session.get("image_paths", [])
+        if variant_idx < len(_stored):
+            _m = re.match(r"variant_(\d+)_", Path(_stored[variant_idx]).name)
+            variant_num = int(_m.group(1)) if _m else variant_idx + 1
+        else:
+            variant_num = variant_idx + 1
         target_path = concept_dir / f"variant_{variant_num}_{ar_safe}_{size}.png"
 
         # Disk cache hit — no API call needed
@@ -943,10 +951,14 @@ async def edit_variant(
 
         concept_dir.mkdir(parents=True, exist_ok=True)
 
-        # Assign the next sequential variant number so the file matches the variant_N_* pattern
-        # that _scan_variant_combos and /render both expect
-        current_image_count = len(session.get("images", []))
-        next_variant_num = current_image_count + 1  # 1-indexed to match existing variant filenames
+        # Assign the next variant number by scanning the concept dir — len(images)+1 breaks when
+        # existing variants are non-consecutive (e.g. only variants 2 and 3 remain after deleting 1).
+        _existing_nums = [
+            int(_m2.group(1))
+            for p in concept_dir.glob("variant_*.png")
+            if (_m2 := re.match(r"variant_(\d+)_", p.name))
+        ]
+        next_variant_num = max(_existing_nums) + 1 if _existing_nums else len(session.get("images", [])) + 1
         ar_safe = aspect_ratio.replace(":", "x")
         save_path = concept_dir / f"variant_{next_variant_num}_{ar_safe}_{size}.png"
 
