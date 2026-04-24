@@ -1122,11 +1122,11 @@
                                                 </div>
                                                 <textarea x-model="editPrompt" rows="2"
                                                     @input="hasUnsubmittedText = true"
-                                                    placeholder="Describe your changes (e.g. make the wings gold, remove the border)"
+                                                    placeholder="Describe changes, or leave blank to re-render at the selected size/aspect ratio"
                                                     :disabled="isLoading" @keydown.enter.prevent="doEditVariant()"
                                                     class="w-full text-xs rounded-md px-2 py-1.5 border border-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none disabled:opacity-50"></textarea>
                                                 <button @click="doEditVariant()"
-                                                    :disabled="isLoading || !editPrompt.trim()"
+                                                    :disabled="isLoading"
                                                     class="self-start flex items-center gap-2 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                                                     <svg x-show="isLoading && loadingStep === 4" aria-hidden="true"
                                                         class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
@@ -1135,7 +1135,7 @@
                                                         <path class="opacity-75" fill="currentColor"
                                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                                     </svg>
-                                                    ✏️ Generate Iteration
+                                                    <span x-text="editPrompt.trim() ? '✏️ Generate Iteration' : '🔁 Re-render'"></span>
                                                 </button>
                                             </div>
                                         </div>

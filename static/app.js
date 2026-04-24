@@ -869,20 +869,54 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         },
 
         async doEditVariant() {
-            if (this.isLoading || !this.editPrompt.trim()) return;
+            if (this.isLoading) return;
 
-            // Use the selected variant's thumbnail URL as the source image for editing.
-            // origUrl is the un-bg-removed version, which avoids sending transparent pixels
-            // that would just be flattened to white on the server.
-            const sourceVariant = this.variants[this.selectedVariant ?? 0];
+            const idx = this.selectedVariant ?? 0;
+            const sourceVariant = this.variants[idx];
             if (!sourceVariant) return;
+
+            // When no prompt is entered, re-render the current variant at the chosen size/AR
+            // via /render (adds a combo, no new variant).  When a prompt is given, call
+            // /stream/edit to apply content changes and append a new iteration variant.
+            if (!this.editPrompt.trim()) {
+                // Skip if this combo already exists on disk (same logic as doRender)
+                const existing = this.variantCombos[idx] || [];
+                if (existing.some(c => c.size === this.editSize && c.aspectRatio === this.editAspectRatio)) return;
+
+                this.loadingStep = 5;
+                this._startLoading(`Rendering at ${this.editSize} (${this.editAspectRatio})...`);
+
+                const fd = new FormData();
+                fd.append("session_id", this.sessionId);
+                fd.append("column_id", this.colIdx);
+                fd.append("variant_idx", idx);
+                fd.append("aspect_ratio", this.editAspectRatio);
+                fd.append("size", this.editSize);
+
+                await streamSSE("/render", fd, {
+                    status: (e) => { this.loadingMsg = e.message; },
+                    render: (e) => {
+                        const updated = { ...this.variantCombos };
+                        updated[e.variant_idx] = e.combos;
+                        this.variantCombos = updated;
+                        this.activeComboUrl = e.url;
+                        this.activeComboSize = this.editSize;
+                        this._stopLoading();
+                    },
+                    error: (e) => { this._onError(e.message); },
+                });
+                return;
+            }
+
+            // origUrl is the un-bg-removed version — avoids sending transparent pixels that
+            // would be flattened to white on the server anyway.
             const sourceUrl = sourceVariant.origUrl || sourceVariant.url;
 
             this.loadingStep = 4;
             this._startLoading(`Generating iteration at ${this.editSize} (${this.editAspectRatio})...`);
 
             // Compute rootIdx here so it can be sent to the server for persistence
-            const parentIdx = this.selectedVariant ?? 0;
+            const parentIdx = idx;
             const parentVariant = this.variants[parentIdx];
             const rootIdx = parentVariant?.isIteration ? parentVariant.rootIdx : parentIdx;
 
