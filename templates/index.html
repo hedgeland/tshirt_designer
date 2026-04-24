@@ -355,11 +355,11 @@
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-red-400 px-1 transition-colors">🗑</button>
                                 </div>
 
-                                <div x-show="session.expanded" class="px-4 pt-2 pb-3 space-y-3">
+                                <div x-show="session.expanded" class="px-4 pt-2 pb-3">
 
                                     <!-- Finals -->
                                     <template x-if="session.finals.length > 0">
-                                        <div>
+                                        <div class="mb-3">
                                             <p
                                                 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
@@ -414,9 +414,9 @@
                                         </div>
                                     </template>
 
-                                    <!-- Concepts -->
+                                    <!-- Concepts — ci > 0 gets the separator; first concept sits flush under the header/finals -->
                                     <template x-for="(concept, ci) in session.concepts" :key="concept.name">
-                                        <div class="space-y-2 border-t border-slate-700/30 pt-2">
+                                        <div class="space-y-2" :class="ci > 0 ? 'border-t border-slate-700/30 mt-2 pt-2' : ''">
                                             <div class="flex items-center justify-between gap-2">
                                                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
