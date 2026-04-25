@@ -295,9 +295,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // ── Printify state ─────────────────────────────────────────────────
         showPrintify: false,
         printifyBusy: false,
-        printifyStatus: "",
+        printifyStatus: "",   // publish-only status messages (upload, create, etc.)
         printifyError: "",
         printifyDone: null,
+        pVariantLoading: false, // true while fetching catalog/providers/variants; separate from publish status
 
         pShops: [],
         pShopId: cfg.printifyShopId || "",
@@ -1273,12 +1274,15 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
             // Load blueprint catalog (fetched once per column; subsequent opens reuse cache)
             if (this.pAllBlueprints.length === 0) {
-                this.printifyStatus = "Loading catalog…";
-                const res = await fetch("/printify/blueprints");
-                const data = await res.json();
-                this.printifyStatus = "";
-                if (data.error) { this.printifyError = data.error; return; }
-                this.pAllBlueprints = data;
+                this.pVariantLoading = true;
+                try {
+                    const res = await fetch("/printify/blueprints");
+                    const data = await res.json();
+                    if (data.error) { this.printifyError = data.error; return; }
+                    this.pAllBlueprints = data;
+                } finally {
+                    this.pVariantLoading = false;
+                }
             }
 
             this.pBlueprintSearch = "";
@@ -1316,11 +1320,17 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pPrintHeight = 0;
             this.pPrintProfiles = [];
             this.printifyError = "";
+            // A new blueprint selection starts fresh — clear any previous publish result
+            this.printifyDone = null;
 
-            this.printifyStatus = "Loading print providers…";
-            const res = await fetch(`/printify/blueprints/${bp.id}/providers`);
-            const data = await res.json();
-            this.printifyStatus = "";
+            this.pVariantLoading = true;
+            let data;
+            try {
+                const res = await fetch(`/printify/blueprints/${bp.id}/providers`);
+                data = await res.json();
+            } finally {
+                this.pVariantLoading = false;
+            }
 
             if (data.error) { this.printifyError = data.error; return; }
             
@@ -1364,16 +1374,20 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             const provId = this.pProviderId;
 
             // Fire all three catalog reads in parallel — none depends on the others.
-            this.printifyStatus = "Loading variants…";
-            const [varRes, detailRes, imgRes] = await Promise.all([
-                fetch(`/printify/blueprints/${bpId}/providers/${provId}/variants`),
-                fetch(`/printify/blueprints/${bpId}/providers/${provId}/print_details`),
-                fetch(`/printify/blueprints/${bpId}/providers/${provId}/images`),
-            ]);
-            const [data, details, images] = await Promise.all([
-                varRes.json(), detailRes.json(), imgRes.json(),
-            ]);
-            this.printifyStatus = "";
+            this.pVariantLoading = true;
+            let data, details, images;
+            try {
+                const [varRes, detailRes, imgRes] = await Promise.all([
+                    fetch(`/printify/blueprints/${bpId}/providers/${provId}/variants`),
+                    fetch(`/printify/blueprints/${bpId}/providers/${provId}/print_details`),
+                    fetch(`/printify/blueprints/${bpId}/providers/${provId}/images`),
+                ]);
+                [data, details, images] = await Promise.all([
+                    varRes.json(), detailRes.json(), imgRes.json(),
+                ]);
+            } finally {
+                this.pVariantLoading = false;
+            }
 
             if (data.error) { this.printifyError = data.error; return; }
             this.pAllVariants = data;
