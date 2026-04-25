@@ -179,6 +179,32 @@ def get_print_details(token: str, blueprint_id: int, provider_id: int) -> Any:
     return result
 
 
+@functools.lru_cache(maxsize=512)
+def list_blueprint_images(token: str, blueprint_id: int, provider_id: int) -> Any:
+    """Return mockup images for a blueprint+provider pair.
+
+    Each entry has src (CDN URL), variant_ids, and position ('front', 'back', etc.).
+    One image per color variant showing the blank shirt — no design composite.
+    Cached per (blueprint_id, provider_id) — stable catalog data.
+    """
+    path = _cache_path("images", blueprint_id, provider_id)
+    cached = _cache_load(path)
+    if cached is not None:
+        return cached
+
+    url = (
+        f"{_BASE}/catalog/blueprints/{blueprint_id}"
+        f"/print_providers/{provider_id}/images.json"
+    )
+    def _call():
+        r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    result = with_retry(_call)
+    _cache_save(path, result)
+    return result
+
+
 # ── Publishing ─────────────────────────────────────────────────────────────────
 
 def upload_image(token: str, image_path: str) -> str:

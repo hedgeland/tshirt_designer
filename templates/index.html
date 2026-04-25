@@ -1436,7 +1436,9 @@
                                             </div>
                                             <div class="flex flex-wrap gap-1.5" role="group" aria-label="Colors">
                                                 <template x-for="color in sortedColors" :key="color">
-                                                    <div class="relative group">
+                                                    <div class="relative group"
+                                                         @mouseenter="showColorPopup(color, $el)"
+                                                         @mouseleave="hideColorPopup()">
                                                         <button @click="togglePColor(color)"
                                                             :aria-pressed="pSelectedColors.includes(color)"
                                                             class="flex items-center gap-1.5 pl-2.5 pr-8 py-1 text-xs rounded-full border transition-colors"
@@ -1453,6 +1455,25 @@
                                                         </button>
                                                     </div>
                                                 </template>
+                                            </div>
+                                        </div>
+
+                                        <!-- Shirt mockup popup — fixed-position, appears above the hovered color chip -->
+                                        <div x-teleport="body">
+                                            <div x-show="pHoveredColor && pColorImages[pHoveredColor]"
+                                                 x-transition:enter="transition ease-out duration-150"
+                                                 x-transition:enter-start="opacity-0 scale-95"
+                                                 x-transition:enter-end="opacity-100 scale-100"
+                                                 x-transition:leave="transition ease-in duration-100"
+                                                 x-transition:leave-start="opacity-100 scale-100"
+                                                 x-transition:leave-end="opacity-0 scale-95"
+                                                 :style="{ top: pColorPopupPos.top + 'px', left: pColorPopupPos.left + 'px' }"
+                                                 class="fixed z-50 pointer-events-none rounded-xl overflow-hidden shadow-2xl border border-slate-600 bg-slate-900">
+                                                <img :src="pColorImages[pHoveredColor]"
+                                                     :alt="pHoveredColor"
+                                                     class="w-40 h-40 object-cover block">
+                                                <div class="px-2 py-1 text-xs text-center text-slate-300 truncate max-w-[160px]"
+                                                     x-text="pHoveredColor"></div>
                                             </div>
                                         </div>
 
