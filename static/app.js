@@ -324,12 +324,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // with its own dimensions (e.g. plus sizes often have a larger front print area)
         pPrintProfiles: [],
 
-        // colorName → CDN image URL for the blank shirt mockup (front, per color)
-        pColorImages: {},
-        // Which color chip is currently hovered; drives the mockup popup
-        pHoveredColor: null,
-        // { top, left } in viewport px for the fixed-position popup
-        pColorPopupPos: { top: 0, left: 0 },
 
         pXPx: 0,                    // left edge of design in print-area pixels
         pYPx: 0,                    // top edge of image in print-area pixels
@@ -499,22 +493,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         isColorFavorite(colorName) {
             return Alpine.store('printifyColorFavorites').includes(colorName);
-        },
-
-        showColorPopup(colorName, chipEl) {
-            if (!colorName || !this.pColorImages[colorName]) return;
-            const rect = chipEl.getBoundingClientRect();
-            const popupH = 180; // approx popup height in px; keeps it above the chip
-            this.pColorPopupPos = {
-                // Clamp to viewport top so it never clips above the screen
-                top: Math.max(8, rect.top - popupH - 8),
-                left: rect.left,
-            };
-            this.pHoveredColor = colorName;
-        },
-
-        hideColorPopup() {
-            this.pHoveredColor = null;
         },
 
         async togglePrintifyColorFavorite(colorName) {
@@ -1366,25 +1344,20 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pPrintWidth = 0;
             this.pPrintHeight = 0;
             this.pPrintProfiles = [];
-            this.pColorImages = {};
-            this.pHoveredColor = null;
             this.printifyError = "";
 
             const bpId = this.pBlueprint.id;
             const provId = this.pProviderId;
 
-            // Fire all three catalog reads in parallel — none depends on the others.
+            // Fire variants and print_details in parallel — neither depends on the other.
             this.pVariantLoading = true;
-            let data, details, images;
+            let data, details;
             try {
-                const [varRes, detailRes, imgRes] = await Promise.all([
+                const [varRes, detailRes] = await Promise.all([
                     fetch(`/printify/blueprints/${bpId}/providers/${provId}/variants`),
                     fetch(`/printify/blueprints/${bpId}/providers/${provId}/print_details`),
-                    fetch(`/printify/blueprints/${bpId}/providers/${provId}/images`),
                 ]);
-                [data, details, images] = await Promise.all([
-                    varRes.json(), detailRes.json(), imgRes.json(),
-                ]);
+                [data, details] = await Promise.all([varRes.json(), detailRes.json()]);
             } finally {
                 this.pVariantLoading = false;
             }
@@ -1424,30 +1397,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             }
             this.pColors = colors;
             this.pSizes = sizes;
-
-            // Build colorName → image URL from the mockup images response.
-            // Each image entry covers one or more variant_ids; map those ids back to
-            // their color name to produce a direct color → src lookup.
-            if (Array.isArray(images) && images.length) {
-                // Index variant id → color name for fast lookup
-                const idToColor = {};
-                for (const v of data) {
-                    if (v.id && v.options?.color) idToColor[v.id] = v.options.color;
-                }
-                const colorImages = {};
-                for (const img of images) {
-                    // Only use front-position images; skip back/sleeve mockups
-                    if (img.position !== "front" || !img.src) continue;
-                    for (const vid of (img.variant_ids ?? [])) {
-                        const colorName = idToColor[vid];
-                        // First match wins — avoid overwriting with a duplicate entry
-                        if (colorName && !colorImages[colorName]) {
-                            colorImages[colorName] = img.src;
-                        }
-                    }
-                }
-                this.pColorImages = colorImages;
-            }
 
             // Auto-select favorite colors that are actually available for this specific shirt.
             // If no favorites are available (or none are set), this naturally defaults to [].

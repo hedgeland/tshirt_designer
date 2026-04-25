@@ -1538,19 +1538,6 @@ async def printify_variants(blueprint_id: int, provider_id: int):
     return variants
 
 
-@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/images")
-async def printify_blueprint_images(blueprint_id: int, provider_id: int):
-    """Return mockup images (color → CDN URL) for a blueprint+provider pair."""
-    if not PRINTIFY_TOKEN:
-        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
-    try:
-        images = await asyncio.to_thread(
-            printify.list_blueprint_images, PRINTIFY_TOKEN, blueprint_id, provider_id
-        )
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=502)
-    return images
-
 
 @app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/print_details")
 async def printify_print_details(blueprint_id: int, provider_id: int):
