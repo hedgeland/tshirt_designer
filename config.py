@@ -51,6 +51,13 @@ PRINTIFY_DEFAULT_SEARCH = "shirt tee"
 # Timeout for standard Printify API calls; image uploads use the longer value.
 PRINTIFY_API_TIMEOUT = 30
 PRINTIFY_UPLOAD_TIMEOUT = 120
+# Persistent disk cache for Printify catalog to speed up API responses across server restarts
+PRINTIFY_USE_DISK_CACHE = os.getenv("PRINTIFY_USE_DISK_CACHE", "true").lower() in ("true", "1", "yes")
+# Directory (relative to project root) where Printify cache JSON files are stored
+PRINTIFY_CACHE_DIR = os.getenv("PRINTIFY_CACHE_DIR", ".printify_cache")
+# Hours before a disk-cached response is considered stale and refetched from the API
+PRINTIFY_CACHE_TTL_HOURS = float(os.getenv("PRINTIFY_CACHE_TTL_HOURS", "24"))
+
 OUTPUT_DIR = "output"   # root folder for saved PNGs; gitignored
 
 # Aspect ratio options supported by the Gemini 3.1 Flash Image Preview model.

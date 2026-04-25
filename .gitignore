@@ -11,6 +11,9 @@ __pycache__/
 # App output
 output/
 
+# Printify API disk cache (auto-populated at runtime)
+.printify_cache/
+
 # macOS
 .DS_Store
 
