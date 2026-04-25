@@ -323,6 +323,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // Full profiles array from print_details; each profile covers a subset of variant_ids
         // with its own dimensions (e.g. plus sizes often have a larger front print area)
         pPrintProfiles: [],
+        pColorsExpanded: false,  // whether the non-favorite colors section is expanded
 
 
         pXPx: 0,                    // left edge of design in print-area pixels
@@ -611,15 +612,14 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 || dcy + b.minY < -1.5 || dcy + b.maxY > this.pPrintHeight + 1.5;
         },
 
-        get sortedColors() {
+        get favoriteColors() {
             const favs = Alpine.store('printifyColorFavorites') || [];
-            return [...this.pColors].sort((a, b) => {
-                const aFav = favs.includes(a);
-                const bFav = favs.includes(b);
-                if (aFav && !bFav) return -1;
-                if (!aFav && bFav) return 1;
-                return a.localeCompare(b);
-            });
+            return this.pColors.filter(c => favs.includes(c));
+        },
+
+        get nonFavoriteColors() {
+            const favs = Alpine.store('printifyColorFavorites') || [];
+            return this.pColors.filter(c => !favs.includes(c)).sort((a, b) => a.localeCompare(b));
         },
 
         get selectedVariantCount() {
@@ -1297,6 +1297,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pPrintWidth = 0;
             this.pPrintHeight = 0;
             this.pPrintProfiles = [];
+            this.pColorsExpanded = false;
             this.printifyError = "";
             // A new blueprint selection starts fresh — clear any previous publish result
             this.printifyDone = null;
@@ -1344,6 +1345,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pPrintWidth = 0;
             this.pPrintHeight = 0;
             this.pPrintProfiles = [];
+            this.pColorsExpanded = false;
             this.printifyError = "";
 
             const bpId = this.pBlueprint.id;
