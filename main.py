@@ -447,6 +447,7 @@ async def index(request: Request):
             "max_columns_hard_cap": MAX_COLUMNS,   # server-side ceiling; never changes at runtime
             "min_columns": user_settings.get("default_min_columns", 1),
             "printify_favorites": user_settings.get("printify_favorites", []),
+            "printify_color_favorites": user_settings.get("printify_color_favorites", []),
         },
     )
 
@@ -1823,6 +1824,30 @@ async def toggle_printify_favorite(request: Request):
 
     settings.save_settings({"printify_favorites": favorites})
     return {"printify_favorites": favorites}
+
+
+@app.post("/settings/printify-color-favorites")
+async def toggle_printify_color_favorite(request: Request):
+    """Add or remove a color name from global favorites."""
+    data = await request.json()
+    color_name = data.get("color_name")
+    action = data.get("action")  # "add" or "remove"
+
+    if not color_name or action not in ("add", "remove"):
+        return JSONResponse({"error": "Invalid request"}, status_code=400)
+
+    user_settings = settings.load_settings()
+    favorites = user_settings.get("printify_color_favorites", [])
+
+    if action == "add":
+        if color_name not in favorites:
+            favorites.append(color_name)
+    else:
+        if color_name in favorites:
+            favorites.remove(color_name)
+
+    settings.save_settings({"printify_color_favorites": favorites})
+    return {"printify_color_favorites": favorites}
 
 
 @app.post("/settings/printify-favorites/reorder")

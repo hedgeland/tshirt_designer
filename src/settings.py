@@ -16,6 +16,7 @@ _DEFAULT_SETTINGS = {
     "default_max_columns": MAX_COLUMNS,
     "default_num_variants": NUM_VARIANTS,
     "printify_favorites": [],
+    "printify_color_favorites": [],
 }
 
 
