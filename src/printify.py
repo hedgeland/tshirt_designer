@@ -151,6 +151,34 @@ def list_variants(token: str, blueprint_id: int, provider_id: int) -> list[dict]
     return result
 
 
+@functools.lru_cache(maxsize=512)
+def get_print_details(token: str, blueprint_id: int, provider_id: int) -> Any:
+    """Return print area profiles for a blueprint+provider pair.
+
+    The response contains a 'profiles' list; each profile covers a subset of
+    variant_ids and has a 'first_dimension' dict with width, height, unit, and dpi.
+    Most shirts have one profile for all variants; some (e.g. plus sizes) have a
+    second profile with a larger print area.
+    Cached per (blueprint_id, provider_id) alongside variants — equally stable.
+    """
+    path = _cache_path("print_details", blueprint_id, provider_id)
+    cached = _cache_load(path)
+    if cached is not None:
+        return cached
+
+    url = (
+        f"{_BASE}/catalog/blueprints/{blueprint_id}"
+        f"/print_providers/{provider_id}/print_details.json"
+    )
+    def _call():
+        r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    result = with_retry(_call)
+    _cache_save(path, result)
+    return result
+
+
 # ── Publishing ─────────────────────────────────────────────────────────────────
 
 def upload_image(token: str, image_path: str) -> str:

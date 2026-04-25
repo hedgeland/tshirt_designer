@@ -316,9 +316,12 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         pSelectedColors: [],
         pSelectedSizes: [],
 
-        // Print area dimensions — extracted from the variant placeholder data
+        // Print area dimensions — set from the print_details API (authoritative source)
         pPrintWidth: 0,
         pPrintHeight: 0,
+        // Full profiles array from print_details; each profile covers a subset of variant_ids
+        // with its own dimensions (e.g. plus sizes often have a larger front print area)
+        pPrintProfiles: [],
 
         pXPx: 0,                    // left edge of design in print-area pixels
         pYPx: 0,                    // top edge of image in print-area pixels
@@ -1288,6 +1291,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pSelectedSizes = [];
             this.pPrintWidth = 0;
             this.pPrintHeight = 0;
+            this.pPrintProfiles = [];
             this.printifyError = "";
 
             this.printifyStatus = "Loading print providers…";
@@ -1328,24 +1332,42 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pSelectedSizes = [];
             this.pPrintWidth = 0;
             this.pPrintHeight = 0;
+            this.pPrintProfiles = [];
             this.printifyError = "";
 
+            const bpId = this.pBlueprint.id;
+            const provId = this.pProviderId;
+
+            // Fire variants and print_details in parallel — both are needed before we render.
             this.printifyStatus = "Loading variants…";
-            const url = `/printify/blueprints/${this.pBlueprint.id}/providers/${this.pProviderId}/variants`;
-            const res = await fetch(url);
-            const data = await res.json();
+            const [varRes, detailRes] = await Promise.all([
+                fetch(`/printify/blueprints/${bpId}/providers/${provId}/variants`),
+                fetch(`/printify/blueprints/${bpId}/providers/${provId}/print_details`),
+            ]);
+            const [data, details] = await Promise.all([varRes.json(), detailRes.json()]);
             this.printifyStatus = "";
 
             if (data.error) { this.printifyError = data.error; return; }
             this.pAllVariants = data;
 
-            // Extract the front print area dimensions from the first variant that has them
-            for (const v of data) {
-                const front = (v.placeholders ?? []).find(p => p.position === "front");
-                if (front?.width && front?.height) {
-                    this.pPrintWidth = front.width;
-                    this.pPrintHeight = front.height;
-                    break;
+            // Use print_details as the authoritative source for print area dimensions.
+            // profiles[0].first_dimension covers the majority of variants; fall back to
+            // scraping variant.placeholders if the endpoint fails or returns no profiles.
+            const profiles = details?.profiles ?? [];
+            this.pPrintProfiles = profiles;
+            const dim = profiles[0]?.first_dimension;
+            if (dim?.width && dim?.height) {
+                this.pPrintWidth = dim.width;
+                this.pPrintHeight = dim.height;
+            } else {
+                // Fallback: scan variant placeholders (older blueprint data)
+                for (const v of data) {
+                    const front = (v.placeholders ?? []).find(p => p.position === "front");
+                    if (front?.width && front?.height) {
+                        this.pPrintWidth = front.width;
+                        this.pPrintHeight = front.height;
+                        break;
+                    }
                 }
             }
             if (this.pPrintWidth) this.applyTopPreset();

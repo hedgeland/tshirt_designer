@@ -1538,6 +1538,20 @@ async def printify_variants(blueprint_id: int, provider_id: int):
     return variants
 
 
+@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/print_details")
+async def printify_print_details(blueprint_id: int, provider_id: int):
+    """Return authoritative print area profiles for a blueprint+provider pair."""
+    if not PRINTIFY_TOKEN:
+        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
+    try:
+        details = await asyncio.to_thread(
+            printify.get_print_details, PRINTIFY_TOKEN, blueprint_id, provider_id
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    return details
+
+
 @app.post("/printify/publish")
 async def printify_publish(
     session_id: str = Form(...),
