@@ -3,6 +3,87 @@
 // never see undefined on first render. Values are updated by designer.init().
 let colUidSeq = 1;
 
+// Approximate mapping of common Printify shirt colors to hex codes for UI swatches
+const PRINTIFY_COLORS = {
+    // Bella+Canvas 3001 specific colors (and common cross-brand matches)
+    "aqua": "#00B5CB",
+    "army": "#4B5320",
+    "ash": "#D8D8D8",
+    "asphalt": "#40424A",
+    "athletic heather": "#9B9EA0",
+    "baby blue": "#90C2EB",
+    "berry": "#9F2553",
+    "black": "#121212",
+    "brown": "#473029",
+    "cardinal": "#7D1226",
+    "charcoal": "#4C4E52",
+    "chocolate/brown": "#3D2314",
+    "coral": "#F05C5B",
+    "dark grey": "#3E3E3E",
+    "dark grey heather": "#424244",
+    "deep heather": "#55575A",
+    "deep teal": "#004751",
+    "forest green": "#1B3B36",
+    "gold": "#F3AF22",
+    "heather grey": "#9B9EA0",
+    "heather navy": "#323B4C",
+    "heather true royal": "#4267B2",
+    "irish green": "#008848",
+    "kelly": "#007A33",
+    "leaf": "#5C8C46",
+    "light blue": "#ADD8E6",
+    "light pink": "#F5C8D4",
+    "lilac": "#B5A1CB",
+    "maroon": "#4D1F2D",
+    "mauve": "#8E6A70",
+    "military green": "#4D5645",
+    "mint green": "#A3D1C6",
+    "natural": "#EFE6D5",
+    "navy": "#202A44",
+    "ocean blue": "#005F8A",
+    "olive": "#393C2A",
+    "orange": "#F47920",
+    "pebble brown": "#917E6B",
+    "pink": "#F4A3BE",
+    "purple": "#3B215E",
+    "red": "#C8102E",
+    "royal": "#00539F",
+    "seafoam blue": "#89C5CC",
+    "silver": "#C2C6C8",
+    "soft cream": "#E8E2D5",
+    "solid black": "#121212",
+    "solid white": "#FFFFFF",
+    "sport grey": "#999999",
+    "steel blue": "#3A5A78",
+    "storm": "#6D7278",
+    "tan": "#C2A882",
+    "teal": "#006778",
+    "team purple": "#5C2D91",
+    "true royal": "#005EB8",
+    "turquoise": "#009AA6",
+    "white": "#FFFFFF",
+    "yellow": "#FFD100",
+};
+
+window.getPrintifyColorHex = function(colorName) {
+    if (!colorName) return "#888888";
+    const normal = colorName.toLowerCase().trim();
+    if (PRINTIFY_COLORS[normal]) return PRINTIFY_COLORS[normal];
+    
+    // Fallback parsing (e.g. "Heather Royal" -> check "Royal")
+    for (const [key, hex] of Object.entries(PRINTIFY_COLORS)) {
+        if (normal.includes(key)) return hex;
+    }
+    // Generic fallbacks
+    if (normal.includes('blue')) return '#3b82f6';
+    if (normal.includes('red')) return '#ef4444';
+    if (normal.includes('green')) return '#22c55e';
+    if (normal.includes('yellow')) return '#eab308';
+    if (normal.includes('grey') || normal.includes('gray') || normal.includes('silver')) return '#9ca3af';
+    
+    return "#555555"; // default dot color
+};
+
 document.addEventListener('alpine:init', () => {
     Alpine.store('columnCount', 1); // updated to actual count after session restore
     Alpine.store('minColumns', 1);  // updated after session restore; drives close-button disable
@@ -13,6 +94,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('activeColIdx', 0);
     Alpine.store('presetsOpen', false);
     Alpine.store('printifyFavorites', []); // global list of favorite blueprint IDs
+    Alpine.store('printifyColorFavorites', []); // global list of favorite color names
     // Tracks which image URLs were downloaded this browser session; cleared on close.
     Alpine.store('downloadedUrls', {});
 });
@@ -54,7 +136,7 @@ async function streamSSE(url, formData, handlers, noDataTimeoutMs = 60000) {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
             controller.abort();
-        }, noDataTimeoutMs);
+    }, noDataTimeoutMs);
     };
 
     resetTimeout();
@@ -404,6 +486,50 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             }
         },
 
+        isColorFavorite(colorName) {
+            return Alpine.store('printifyColorFavorites').includes(colorName);
+        },
+
+        async togglePrintifyColorFavorite(colorName) {
+            if (!colorName) return;
+            
+            const favs = [...Alpine.store('printifyColorFavorites')];
+            const isFav = favs.includes(colorName);
+            const action = isFav ? "remove" : "add";
+
+            if (isFav) {
+                const idx = favs.indexOf(colorName);
+                favs.splice(idx, 1);
+            } else {
+                favs.push(colorName);
+            }
+
+            // Optimistic update
+            Alpine.store('printifyColorFavorites', favs);
+
+            try {
+                const res = await fetch("/settings/printify-color-favorites", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ color_name: colorName, action }),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (data.printify_color_favorites) {
+                    Alpine.store('printifyColorFavorites', data.printify_color_favorites);
+                }
+            } catch (err) {
+                console.error("Failed to toggle Printify color favorite:", err);
+                // Rollback on error
+                if (isFav) favs.push(colorName);
+                else {
+                    const idx = favs.indexOf(colorName);
+                    if (idx !== -1) favs.splice(idx, 1);
+                }
+                Alpine.store('printifyColorFavorites', favs);
+            }
+        },
+
         initSortableFavorites(el) {
             if (!el || el._sortable) return;
             el._sortable = Sortable.create(el, {
@@ -440,43 +566,55 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             return (cfg.sizePx[this.activeComboSize] ?? 0) < cfg.sizePx[cfg.printifyMinSize];
         },
 
-        get pImageOutOfBounds() {
-            if (!this.pPrintWidth || !this.pPrintHeight) return false;
+        // Helper to compute the design's AABB relative to its center, considering rotation
+        // and tight content bounds.
+        _getRotatedRelativeAabb() {
             const designPx = this.pDesignPx;
             const rad = this.pRotateDeg * Math.PI / 180;
             const cos = Math.cos(rad), sin = Math.sin(rad);
-
+            
             if (this.pTightBounds) {
-                // BG removed: rotate the 4 corners of the content sub-rectangle around the
-                // design-square center, then check if any corner escapes the print area.
                 const b = this.pTightBounds;
-                // Corner positions relative to design-square center (before rotation)
                 const left_rel   = (b.left   - 0.5) * designPx;
                 const right_rel  = (b.right  - 0.5) * designPx;
                 const top_rel    = (b.top    - 0.5) * designPx;
                 const bottom_rel = (b.bottom - 0.5) * designPx;
-                // Rotate all 4 corners and collect absolute print-space coordinates
-                const dcx = this.pXPx + designPx / 2;
-                const dcy = this.pYPx + designPx / 2;
                 const corners = [
                     [left_rel, top_rel], [right_rel, top_rel],
                     [right_rel, bottom_rel], [left_rel, bottom_rel],
                 ];
-                const xs = corners.map(([x, y]) => dcx + x * cos - y * sin);
-                const ys = corners.map(([x, y]) => dcy + x * sin + y * cos);
-                const minX = Math.min(...xs), maxX = Math.max(...xs);
-                const minY = Math.min(...ys), maxY = Math.max(...ys);
-                return minX < 0 || maxX > this.pPrintWidth
-                    || minY < 0 || maxY > this.pPrintHeight;
+                const xs = corners.map(([x, y]) => x * cos - y * sin);
+                const ys = corners.map(([x, y]) => x * sin + y * cos);
+                return {
+                    minX: Math.min(...xs), maxX: Math.max(...xs),
+                    minY: Math.min(...ys), maxY: Math.max(...ys)
+                };
+            } else {
+                const h = designPx / 2;
+                const halfAabb = h * (Math.abs(cos) + Math.abs(sin));
+                return { minX: -halfAabb, maxX: halfAabb, minY: -halfAabb, maxY: halfAabb };
             }
+        },
 
-            // No BG removal: axis-aligned bounding box of the full rotated square
-            // Each side of the AABB expands by |cos θ| + |sin θ| relative to the square side
-            const aabb = designPx * (Math.abs(cos) + Math.abs(sin));
-            const cx = this.pXPx + designPx / 2;
-            const cy = this.pYPx + designPx / 2;
-            return cx - aabb / 2 < 0 || cx + aabb / 2 > this.pPrintWidth
-                || cy - aabb / 2 < 0 || cy + aabb / 2 > this.pPrintHeight;
+        get pImageOutOfBounds() {
+            if (!this.pPrintWidth || !this.pPrintHeight) return false;
+            const b = this._getRotatedRelativeAabb();
+            const dcx = this.pXPx + this.pDesignPx / 2;
+            const dcy = this.pYPx + this.pDesignPx / 2;
+            // Use a 1.5px tolerance to avoid false positives from rounding/precision
+            return dcx + b.minX < -1.5 || dcx + b.maxX > this.pPrintWidth + 1.5
+                || dcy + b.minY < -1.5 || dcy + b.maxY > this.pPrintHeight + 1.5;
+        },
+
+        get sortedColors() {
+            const favs = Alpine.store('printifyColorFavorites') || [];
+            return [...this.pColors].sort((a, b) => {
+                const aFav = favs.includes(a);
+                const bFav = favs.includes(b);
+                if (aFav && !bFav) return -1;
+                if (!aFav && bFav) return 1;
+                return a.localeCompare(b);
+            });
         },
 
         get selectedVariantCount() {
@@ -1117,22 +1255,24 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 this.pAllBlueprints = data;
             }
 
-            this.pBlueprintSearch = "shirt";
+            this.pBlueprintSearch = "";
             this.filterBlueprints();
         },
 
         filterBlueprints() {
             const q = this.pBlueprintSearch.trim().toLowerCase();
-            const pool = q ? (() => {
-                const terms = q.split(/\s+/);
-                return this.pAllBlueprints.filter(bp =>
-                    terms.every(t =>
-                        bp.title.toLowerCase().includes(t) ||
-                        (bp.brand || "").toLowerCase().includes(t) ||
-                        (bp.model || "").toLowerCase().includes(t)
-                    )
-                );
-            })() : this.pAllBlueprints;
+            if (!q) {
+                this.pFilteredBlueprints = [];
+                return;
+            }
+            const terms = q.split(/\s+/);
+            const pool = this.pAllBlueprints.filter(bp =>
+                terms.every(t =>
+                    bp.title.toLowerCase().includes(t) ||
+                    (bp.brand || "").toLowerCase().includes(t) ||
+                    (bp.model || "").toLowerCase().includes(t)
+                )
+            );
             // Sort by blueprint ID ascending — lower IDs are older, more established products
             this.pFilteredBlueprints = pool.slice().sort((a, b) => a.id - b.id).slice(0, 50);
         },
@@ -1220,8 +1360,13 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             }
             this.pColors = colors;
             this.pSizes = sizes;
-            this.pSelectedColors = [];
-            // Default sizes: no colors selected; sizes default to S–2XL only
+            
+            // Auto-select favorite colors that are actually available for this specific shirt.
+            // If no favorites are available (or none are set), this naturally defaults to [].
+            const favs = Alpine.store('printifyColorFavorites') || [];
+            this.pSelectedColors = colors.filter(c => favs.includes(c));
+
+            // Default sizes: sizes default to S–2XL only
             const defaultSizes = new Set(["S", "M", "L", "XL", "2XL", "XXL"]);
             this.pSelectedSizes = sizes.filter(s => defaultSizes.has(s.toUpperCase()));
         },
@@ -1233,6 +1378,10 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             const self = this;
             const scale = 220 / self.pPrintWidth;  // preview px per print px
             const designPx = self.pDesignPx;
+            // Snapping targets (center of print area)
+            const centerX = Math.round((self.pPrintWidth - designPx) / 2);
+            const centerY = Math.round((self.pPrintHeight - designPx) / 2);
+
             const drag = {
                 startX: e.clientX,
                 startY: e.clientY,
@@ -1240,8 +1389,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                 startPY: self.pYPx,
                 scale,
                 snapThreshold: 8 / scale,  // 8 screen px → print px; feels consistent across sizes
-                centerX: Math.round((self.pPrintWidth - designPx) / 2),
-                centerY: Math.round((self.pPrintHeight - designPx) / 2),
+                centerX,
+                centerY,
+                // Allow dragging mostly out, but keep at least 1px overlap of the square
                 minX: -(designPx - 1),
                 maxX: self.pPrintWidth - 1,
                 minY: -(designPx - 1),
@@ -1277,6 +1427,19 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // Snap rotation angle to 0 when within ±5°; called from slider @input and rotate mousemove
         snapRotation(raw) {
             this.pRotateDeg = Math.abs(raw) <= 5 ? 0 : Math.round(raw);
+            this._clampForRotation();
+        },
+
+        // Recompute valid pXPx/pYPx range for the current rotation and clamp the design
+        // position into it. Loosely constrained to allow dragging partially out.
+        _clampForRotation() {
+            if (!this.pPrintWidth || !this.pPrintHeight) return;
+            const designPx = this.pDesignPx;
+            const minX = -(designPx - 1), maxX = this.pPrintWidth - 1;
+            const minY = -(designPx - 1), maxY = this.pPrintHeight - 1;
+
+            this.pXPx = Math.round(Math.min(Math.max(this.pXPx, minX), maxX));
+            this.pYPx = Math.round(Math.min(Math.max(this.pYPx, minY), maxY));
         },
 
         startRotate(e) {
@@ -1341,12 +1504,14 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         centerH() {
             if (!this.pPrintWidth) return;
             this.pXPx = Math.round((this.pPrintWidth - this.pDesignPx) / 2);
+            this._clampForRotation();
             this.pIsTopPreset = false;
         },
 
         centerV() {
             if (!this.pPrintWidth) return;
             this.pYPx = Math.round((this.pPrintHeight - this.pDesignPx) / 2);
+            this._clampForRotation();
             this.pIsTopPreset = false;
         },
 
@@ -1539,6 +1704,7 @@ function designer() {
         async init() {
             // Initialize global favorites from server config
             Alpine.store('printifyFavorites', cfg.printifyFavorites || []);
+            Alpine.store('printifyColorFavorites', cfg.printifyColorFavorites || []);
 
             // Route browser-open and presets-open requests dispatched by column components
             window.addEventListener('designer-open-browser', (e) => this.openBrowser(e.detail.colIdx));
