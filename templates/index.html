@@ -1467,23 +1467,23 @@
                                             </div>
                                         </div>
 
-                                        <!-- Shirt mockup popup — fixed-position, appears above the hovered color chip -->
-                                        <div x-teleport="body">
-                                            <div x-show="pHoveredColor && pColorImages[pHoveredColor]"
-                                                 x-transition:enter="transition ease-out duration-150"
-                                                 x-transition:enter-start="opacity-0 scale-95"
-                                                 x-transition:enter-end="opacity-100 scale-100"
-                                                 x-transition:leave="transition ease-in duration-100"
-                                                 x-transition:leave-start="opacity-100 scale-100"
-                                                 x-transition:leave-end="opacity-0 scale-95"
-                                                 :style="{ top: pColorPopupPos.top + 'px', left: pColorPopupPos.left + 'px' }"
-                                                 class="fixed z-50 pointer-events-none rounded-xl overflow-hidden shadow-2xl border border-slate-600 bg-slate-900">
-                                                <img :src="pColorImages[pHoveredColor]"
-                                                     :alt="pHoveredColor"
-                                                     class="w-40 h-40 object-cover block">
-                                                <div class="px-2 py-1 text-xs text-center text-slate-300 truncate max-w-[160px]"
-                                                     x-text="pHoveredColor"></div>
-                                            </div>
+                                        <!-- Shirt mockup popup — fixed-position, appears above the hovered color chip.
+                                             No x-teleport needed: position:fixed already escapes overflow ancestors,
+                                             and nested teleports inside the modal's x-teleport break Alpine reactivity. -->
+                                        <div x-show="pHoveredColor && pColorImages[pHoveredColor]"
+                                             x-transition:enter="transition ease-out duration-150"
+                                             x-transition:enter-start="opacity-0 scale-95"
+                                             x-transition:enter-end="opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-100"
+                                             x-transition:leave-start="opacity-100 scale-100"
+                                             x-transition:leave-end="opacity-0 scale-95"
+                                             :style="{ top: pColorPopupPos.top + 'px', left: pColorPopupPos.left + 'px' }"
+                                             class="fixed z-[200] pointer-events-none rounded-xl overflow-hidden shadow-2xl border border-slate-600 bg-slate-900">
+                                            <img :src="pColorImages[pHoveredColor]"
+                                                 :alt="pHoveredColor"
+                                                 class="w-40 h-40 object-cover block">
+                                            <div class="px-2 py-1 text-xs text-center text-slate-300 truncate max-w-[160px]"
+                                                 x-text="pHoveredColor"></div>
                                         </div>
 
                                         <!-- Size picker -->
@@ -1743,7 +1743,7 @@
                                     <!-- Modal footer -->
                                     <div class="border-t border-slate-700 flex-shrink-0 bg-slate-900/50 rounded-b-2xl">
                                         <div x-show="printifyError || printifyStatus || printifyDone"
-                                            class="px-6 pt-4 space-y-2"><!-- printifyStatus is publish-only; pVariantLoading handles catalog loads -->
+                                            class="px-6 pt-4 space-y-2">
                                             <div x-show="printifyError" role="alert"
                                                 class="flex items-start gap-3 bg-red-900/20 border border-red-900/50 rounded-lg px-4 py-3 text-sm text-red-300">
                                                 <span class="flex-shrink-0" aria-hidden="true">⚠️</span>
