@@ -260,55 +260,42 @@ def _has_transparency(img: Image.Image) -> bool:
     return img.split()[3].getextrema()[0] == 0
 
 
+def _scan_combo_files(directory: Path, glob_pattern: str) -> list[dict]:
+    """Scan directory for PNG files matching glob_pattern and return sorted combo dicts.
+
+    Parses deterministic 4-part stems (prefix_prefix_ar_safe_size) and returns
+    [{size, aspectRatio, url}] sorted by resolution (highest first) then aspect
+    ratio (dropdown order). Files containing '_no_bg' are skipped.
+    """
+    ar_order = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
+    results = []
+    for p in directory.glob(glob_pattern):
+        if "_no_bg" in p.name:
+            continue
+        parts = p.stem.split("_")
+        if len(parts) != 4:
+            continue
+        ar_safe, size = parts[2], parts[3]
+        results.append({
+            "size": size,
+            "aspectRatio": ar_safe.replace("x", ":"),
+            "url": f"/{p}",
+        })
+    results.sort(key=lambda r: (-SIZE_PX.get(r["size"], 0), ar_order.get(r["aspectRatio"], 99)))
+    return results
+
+
 def _scan_existing_finals(session_dir: Path, idx: int) -> list[dict]:
     """Return all finalized images for a given variant index in session_dir.
 
-    Parses deterministic filenames of the form final_v{idx}_{ar_safe}_{size}.png
-    and returns [{size, aspectRatio, url}] sorted by resolution (highest first)
-    then by aspect ratio (dropdown order).
     NOTE: deprecated — used only by the legacy /finalize endpoint during transition.
     """
-    ar_order = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
-    results = []
-    for p in session_dir.glob(f"final_v{idx}_*.png"):
-        if "_no_bg" in p.name:
-            continue
-        parts = p.stem.split("_")  # ["final", "v{idx}", ar_safe, size]
-        if len(parts) != 4:
-            continue
-        ar_safe, size = parts[2], parts[3]
-        results.append({
-            "size": size,
-            "aspectRatio": ar_safe.replace("x", ":"),
-            "url": f"/{p}",
-        })
-    results.sort(key=lambda r: (-SIZE_PX.get(r["size"], 0), ar_order.get(r["aspectRatio"], 99)))
-    return results
+    return _scan_combo_files(session_dir, f"final_v{idx}_*.png")
 
 
 def _scan_variant_combos(concept_dir: Path, variant_num: int) -> list[dict]:
-    """Return all rendered combos for variant_num (1-indexed) in concept_dir.
-
-    Parses variant_{N}_{ar_safe}_{size}.png filenames.
-    Returns [{size, aspectRatio, url}] sorted by resolution (highest first)
-    then by aspect ratio (dropdown order).
-    """
-    ar_order = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
-    results = []
-    for p in concept_dir.glob(f"variant_{variant_num}_*.png"):
-        if "_no_bg" in p.name:
-            continue
-        parts = p.stem.split("_")  # ["variant", str(N), ar_safe, size]
-        if len(parts) != 4:
-            continue
-        ar_safe, size = parts[2], parts[3]
-        results.append({
-            "size": size,
-            "aspectRatio": ar_safe.replace("x", ":"),
-            "url": f"/{p}",
-        })
-    results.sort(key=lambda r: (-SIZE_PX.get(r["size"], 0), ar_order.get(r["aspectRatio"], 99)))
-    return results
+    """Return all rendered combos for variant_num (1-indexed) in concept_dir."""
+    return _scan_combo_files(concept_dir, f"variant_{variant_num}_*.png")
 
 
 # ── Session cleanup ───────────────────────────────────────────────────────────
