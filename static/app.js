@@ -1379,10 +1379,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.pColors = colors;
             this.pSizes = sizes;
 
-            // Auto-select favorite colors that are actually available for this specific shirt.
-            // If no favorites are available (or none are set), this naturally defaults to [].
-            const favs = Alpine.store('printifyColorFavorites') || [];
-            this.pSelectedColors = colors.filter(c => favs.includes(c));
+            this.pSelectedColors = [];
 
             // Default sizes: sizes default to S–2XL only
             const defaultSizes = new Set(["S", "M", "L", "XL", "2XL", "XXL"]);
