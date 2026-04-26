@@ -85,7 +85,18 @@ graph TD
         SelectShop --> SelectBlueprint[GET /printify/blueprints Select blueprint]
         SelectBlueprint --> SelectProvider[GET /printify/blueprints/:id/providers Select provider]
         SelectProvider --> SelectVariants[GET /printify/blueprints/:id/providers/:provider_id/variants Select colors and sizes]
-        SelectVariants --> AnalyzeFinal[GET /analysis/final column_id scoped Get content bounds for vertical placement]
+        SelectVariants --> ContrastAssess[POST /contrast/assess column_id scoped Gemini assesses design visibility against each selected shirt color]
+        ContrastAssess --> AssessResult{Any contrast issues?}
+        AssessResult -- "No issues" --> AnalyzeFinal[GET /analysis/final column_id scoped Get content bounds for vertical placement]
+        AssessResult -- "Issues found" --> ShowWarnings(View per-color warnings Gemini explanation per shirt color)
+        ShowWarnings --> AdaptLoop{Action per flagged color}
+        AdaptLoop -- "Skip color" --> RemoveVariant[Remove color variants from selection]
+        AdaptLoop -- "Generate adapted design" --> AdaptVariant[POST /contrast/adapt column_id scoped Gemini regenerates design optimized for shirt color streams result]
+        AdaptVariant --> ShowAdapted(View adapted design thumbnail)
+        RemoveVariant --> AdaptLoop
+        ShowAdapted --> AdaptLoop
+        AdaptLoop -- "All resolved" --> MapGroups(Assign each design original or adapted to shirt color groups)
+        MapGroups --> AnalyzeFinal
         AnalyzeFinal --> SetDetails[Set details Adjust position and scale]
         SetDetails --> PublishChoice{Publish now?}
         PublishChoice -- Yes --> PublishNow[POST /printify/publish column_id scoped Upload and publish]
@@ -138,6 +149,8 @@ graph TD
     style VariantChoice fill:#fff3cd,stroke:#ffc107
     style RenderCheck fill:#fff3cd,stroke:#ffc107
     style PublishChoice fill:#fff3cd,stroke:#ffc107
+    style AssessResult fill:#fff3cd,stroke:#ffc107
+    style AdaptLoop fill:#fff3cd,stroke:#ffc107
     style BrowserAction fill:#fff3cd,stroke:#ffc107
 
     %% API call nodes - blue
@@ -164,6 +177,9 @@ graph TD
     style SetDetails fill:#cfe2ff,stroke:#0d6efd
     style PublishNow fill:#cfe2ff,stroke:#0d6efd
     style SaveDraft fill:#cfe2ff,stroke:#0d6efd
+    style ContrastAssess fill:#cfe2ff,stroke:#0d6efd
+    style AdaptVariant fill:#cfe2ff,stroke:#0d6efd
+    style RemoveVariant fill:#cfe2ff,stroke:#0d6efd
     style ScanOutput fill:#cfe2ff,stroke:#0d6efd
     style ReloadSession fill:#cfe2ff,stroke:#0d6efd
     style LoadSingle fill:#cfe2ff,stroke:#0d6efd
