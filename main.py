@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 
 from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -1450,11 +1450,14 @@ async def delete_preset_route(name: str):
 # These routes are only useful when PRINTIFY_TOKEN is set. Callers should check
 # the `printify_enabled` flag from /config before hitting these.
 
-
-@app.get("/printify/shops")
-async def printify_shops():
+def _require_printify_token():
+    """FastAPI dependency that aborts with 503 when PRINTIFY_TOKEN is not configured."""
     if not PRINTIFY_TOKEN:
-        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
+        raise HTTPException(status_code=503, detail="PRINTIFY_TOKEN not configured.")
+
+
+@app.get("/printify/shops", dependencies=[Depends(_require_printify_token)])
+async def printify_shops():
     try:
         shops = await asyncio.to_thread(printify.list_shops, PRINTIFY_TOKEN)
     except Exception as e:
@@ -1462,11 +1465,9 @@ async def printify_shops():
     return shops
 
 
-@app.get("/printify/blueprints")
+@app.get("/printify/blueprints", dependencies=[Depends(_require_printify_token)])
 async def printify_blueprints(q: str = ""):
     """Return blueprints, optionally filtered by a search query."""
-    if not PRINTIFY_TOKEN:
-        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
     try:
         all_bps = await asyncio.to_thread(printify.list_blueprints, PRINTIFY_TOKEN)
     except Exception as e:
@@ -1488,10 +1489,8 @@ async def printify_blueprints(q: str = ""):
     return filtered
 
 
-@app.get("/printify/blueprints/{blueprint_id}/providers")
+@app.get("/printify/blueprints/{blueprint_id}/providers", dependencies=[Depends(_require_printify_token)])
 async def printify_providers(blueprint_id: int):
-    if not PRINTIFY_TOKEN:
-        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
     try:
         providers = await asyncio.to_thread(
             printify.list_print_providers, PRINTIFY_TOKEN, blueprint_id
@@ -1501,10 +1500,8 @@ async def printify_providers(blueprint_id: int):
     return providers
 
 
-@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/variants")
+@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/variants", dependencies=[Depends(_require_printify_token)])
 async def printify_variants(blueprint_id: int, provider_id: int):
-    if not PRINTIFY_TOKEN:
-        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
     try:
         variants = await asyncio.to_thread(
             printify.list_variants, PRINTIFY_TOKEN, blueprint_id, provider_id
@@ -1515,11 +1512,9 @@ async def printify_variants(blueprint_id: int, provider_id: int):
 
 
 
-@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/print_details")
+@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/print_details", dependencies=[Depends(_require_printify_token)])
 async def printify_print_details(blueprint_id: int, provider_id: int):
     """Return authoritative print area profiles for a blueprint+provider pair."""
-    if not PRINTIFY_TOKEN:
-        return JSONResponse({"error": "PRINTIFY_TOKEN not configured."}, status_code=503)
     try:
         details = await asyncio.to_thread(
             printify.get_print_details, PRINTIFY_TOKEN, blueprint_id, provider_id
