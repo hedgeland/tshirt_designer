@@ -82,6 +82,22 @@ def list_shops(token: str) -> list[dict]:
     return with_retry(_call)
 
 
+def _cached_get(token: str, url: str, cache_key: tuple, transform=None) -> Any:
+    """GET url with disk-cache and retry. transform maps raw JSON → return value."""
+    path = _cache_path(*cache_key)
+    cached = _cache_load(path)
+    if cached is not None:
+        return cached
+    def _call():
+        r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+        return transform(data) if transform else data
+    result = with_retry(_call)
+    _cache_save(path, result)
+    return result
+
+
 @functools.lru_cache(maxsize=1)
 def list_blueprints(token: str) -> list[dict]:
     """Return all product blueprints from the Printify catalog.
@@ -90,19 +106,7 @@ def list_blueprints(token: str) -> list[dict]:
     Results are persisted to disk so subsequent server starts don't need an API
     round-trip for the ~700-entry catalog.
     """
-    # Check disk cache before hitting the API.
-    path = _cache_path("blueprints")
-    cached = _cache_load(path)
-    if cached is not None:
-        return cached
-
-    def _call():
-        r = httpx.get(f"{_BASE}/catalog/blueprints.json", headers=_h(token), timeout=_TIMEOUT)
-        r.raise_for_status()
-        return r.json()
-    result = with_retry(_call)
-    _cache_save(path, result)
-    return result
+    return _cached_get(token, f"{_BASE}/catalog/blueprints.json", ("blueprints",))
 
 
 @functools.lru_cache(maxsize=128)
@@ -111,19 +115,11 @@ def list_print_providers(token: str, blueprint_id: int) -> list[dict]:
 
     Cached per blueprint_id — provider lists change very rarely.
     """
-    path = _cache_path("providers", blueprint_id)
-    cached = _cache_load(path)
-    if cached is not None:
-        return cached
-
-    url = f"{_BASE}/catalog/blueprints/{blueprint_id}/print_providers.json"
-    def _call():
-        r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
-        r.raise_for_status()
-        return r.json()
-    result = with_retry(_call)
-    _cache_save(path, result)
-    return result
+    return _cached_get(
+        token,
+        f"{_BASE}/catalog/blueprints/{blueprint_id}/print_providers.json",
+        ("providers", blueprint_id),
+    )
 
 
 @functools.lru_cache(maxsize=512)
@@ -133,22 +129,12 @@ def list_variants(token: str, blueprint_id: int, provider_id: int) -> list[dict]
     Each variant has: id, title, options (dict with color/size keys), is_enabled.
     Cached per (blueprint_id, provider_id) — variant lists are stable catalog data.
     """
-    path = _cache_path("variants", blueprint_id, provider_id)
-    cached = _cache_load(path)
-    if cached is not None:
-        return cached
-
-    url = (
-        f"{_BASE}/catalog/blueprints/{blueprint_id}"
-        f"/print_providers/{provider_id}/variants.json"
+    return _cached_get(
+        token,
+        f"{_BASE}/catalog/blueprints/{blueprint_id}/print_providers/{provider_id}/variants.json",
+        ("variants", blueprint_id, provider_id),
+        transform=lambda data: data.get("variants", []),
     )
-    def _call():
-        r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
-        r.raise_for_status()
-        return r.json().get("variants", [])
-    result = with_retry(_call)
-    _cache_save(path, result)
-    return result
 
 
 @functools.lru_cache(maxsize=512)
@@ -161,22 +147,11 @@ def get_print_details(token: str, blueprint_id: int, provider_id: int) -> Any:
     second profile with a larger print area.
     Cached per (blueprint_id, provider_id) alongside variants — equally stable.
     """
-    path = _cache_path("print_details", blueprint_id, provider_id)
-    cached = _cache_load(path)
-    if cached is not None:
-        return cached
-
-    url = (
-        f"{_BASE}/catalog/blueprints/{blueprint_id}"
-        f"/print_providers/{provider_id}/print_details.json"
+    return _cached_get(
+        token,
+        f"{_BASE}/catalog/blueprints/{blueprint_id}/print_providers/{provider_id}/print_details.json",
+        ("print_details", blueprint_id, provider_id),
     )
-    def _call():
-        r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
-        r.raise_for_status()
-        return r.json()
-    result = with_retry(_call)
-    _cache_save(path, result)
-    return result
 
 
 # ── Publishing ─────────────────────────────────────────────────────────────────
