@@ -446,50 +446,46 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             return Alpine.store('printifyFavorites').includes(blueprintId);
         },
 
+        // Shared toggle logic for blueprint and color favorites.
+        // Performs an optimistic store update, POSTs to endpoint, and rolls back on error.
+        async _toggleFavorite({ storeKey, endpoint, itemKey, itemValue }) {
+            const favs = [...Alpine.store(storeKey)];
+            const isFav = favs.includes(itemValue);
+            const action = isFav ? "remove" : "add";
+
+            if (isFav) favs.splice(favs.indexOf(itemValue), 1);
+            else favs.push(itemValue);
+            Alpine.store(storeKey, favs);
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ [itemKey]: itemValue, action }),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                // Server confirms the authoritative list under a key that starts with "printify_"
+                const confirmedKey = Object.keys(data).find(k => Array.isArray(data[k]));
+                if (confirmedKey) Alpine.store(storeKey, data[confirmedKey]);
+            } catch (err) {
+                console.error("Failed to toggle favorite:", err);
+                // Rollback: undo the optimistic change
+                if (isFav) favs.push(itemValue);
+                else { const i = favs.indexOf(itemValue); if (i !== -1) favs.splice(i, 1); }
+                Alpine.store(storeKey, favs);
+            }
+        },
+
         async togglePrintifyFavorite(blueprintId) {
             const id = parseInt(blueprintId, 10);
             if (isNaN(id)) return;
-            
-            const favs = [...Alpine.store('printifyFavorites')];
-            const isFav = favs.includes(id);
-            const action = isFav ? "remove" : "add";
-
-            console.log(`Toggling favorite: ID=${id}, current_is_fav=${isFav}, action=${action}`);
-
-            if (isFav) {
-                const idx = favs.indexOf(id);
-                favs.splice(idx, 1);
-            } else {
-                favs.push(id);
-            }
-
-            // Optimistic update
-            Alpine.store('printifyFavorites', favs);
-
-            try {
-                const res = await fetch("/settings/printify-favorites", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ blueprint_id: id, action }),
-                });
-                if (!res.ok) {
-                    const errText = await res.text();
-                    throw new Error(`HTTP ${res.status}: ${errText}`);
-                }
-                const data = await res.json();
-                if (data.printify_favorites) {
-                    Alpine.store('printifyFavorites', data.printify_favorites);
-                }
-            } catch (err) {
-                console.error("Failed to toggle Printify favorite:", err);
-                // Rollback on error
-                if (isFav) favs.push(id);
-                else {
-                    const idx = favs.indexOf(id);
-                    if (idx !== -1) favs.splice(idx, 1);
-                }
-                Alpine.store('printifyFavorites', favs);
-            }
+            await this._toggleFavorite({
+                storeKey: 'printifyFavorites',
+                endpoint: '/settings/printify-favorites',
+                itemKey: 'blueprint_id',
+                itemValue: id,
+            });
         },
 
         isColorFavorite(colorName) {
@@ -498,42 +494,12 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         async togglePrintifyColorFavorite(colorName) {
             if (!colorName) return;
-            
-            const favs = [...Alpine.store('printifyColorFavorites')];
-            const isFav = favs.includes(colorName);
-            const action = isFav ? "remove" : "add";
-
-            if (isFav) {
-                const idx = favs.indexOf(colorName);
-                favs.splice(idx, 1);
-            } else {
-                favs.push(colorName);
-            }
-
-            // Optimistic update
-            Alpine.store('printifyColorFavorites', favs);
-
-            try {
-                const res = await fetch("/settings/printify-color-favorites", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ color_name: colorName, action }),
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                if (data.printify_color_favorites) {
-                    Alpine.store('printifyColorFavorites', data.printify_color_favorites);
-                }
-            } catch (err) {
-                console.error("Failed to toggle Printify color favorite:", err);
-                // Rollback on error
-                if (isFav) favs.push(colorName);
-                else {
-                    const idx = favs.indexOf(colorName);
-                    if (idx !== -1) favs.splice(idx, 1);
-                }
-                Alpine.store('printifyColorFavorites', favs);
-            }
+            await this._toggleFavorite({
+                storeKey: 'printifyColorFavorites',
+                endpoint: '/settings/printify-color-favorites',
+                itemKey: 'color_name',
+                itemValue: colorName,
+            });
         },
 
         initSortableFavorites(el) {
