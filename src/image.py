@@ -9,6 +9,27 @@ from config import BRAINSTORM_SIZE, DEFAULT_ASPECT_RATIO, FINAL_SIZE, MODEL
 from src.client import get_client
 from src.retry import with_retry
 
+# Mode-specific prefix prepended to the prompt when a reference image is supplied.
+# Exported so callers (e.g. sidecar writers in main.py) always use the same text.
+REFERENCE_INSTRUCTIONS: dict[str, str] = {
+    "copy": (
+        "Use the provided image as a compositional reference — "
+        "recreate a similar layout, subject placement, and design structure. "
+        "Apply it to this design: "
+    ),
+    "edit": (
+        "Apply the following changes to the provided image and return the modified design. "
+        "Preserve all other visual elements — composition, color palette, style, and subject matter — exactly as they appear. "
+        "Changes: "
+    ),
+    "style": (
+        "Use the provided image as a visual style reference only. "
+        "Do not reproduce its subject matter or composition. "
+        "Match its color palette, line weight, and graphic aesthetic, "
+        "then apply that style to this design: "
+    ),
+}
+
 
 def _extract_image(response) -> Image.Image:
     """Pull the first image out of a Gemini response, regardless of how it was generated."""
@@ -53,27 +74,8 @@ def generate_image(
 
         # Prepend a mode-specific instruction so the model knows whether to borrow
         # only the visual style or to replicate the composition and subject matter.
-        if reference_mode == "copy":
-            instruction = (
-                "Use the provided image as a compositional reference — "
-                "recreate a similar layout, subject placement, and design structure. "
-                "Apply it to this design: "
-            )
-        elif reference_mode == "edit":
-            # Treat the image as the design to modify rather than a style/composition anchor.
-            # The prompt describes the changes; everything else should be preserved.
-            instruction = (
-                "Apply the following changes to the provided image and return the modified design. "
-                "Preserve all other visual elements — composition, color palette, style, and subject matter — exactly as they appear. "
-                "Changes: "
-            )
-        else:  # "style"
-            instruction = (
-                "Use the provided image as a visual style reference only. "
-                "Do not reproduce its subject matter or composition. "
-                "Match its color palette, line weight, and graphic aesthetic, "
-                "then apply that style to this design: "
-            )
+        # Defaults to "style" for unrecognised modes.
+        instruction = REFERENCE_INSTRUCTIONS.get(reference_mode, REFERENCE_INSTRUCTIONS["style"])
 
         contents = [
             types.Part(inline_data=types.Blob(data=buf.getvalue(), mime_type="image/png")),

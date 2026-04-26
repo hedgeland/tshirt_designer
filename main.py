@@ -55,7 +55,7 @@ from config import (
 from src import presets, printify, settings
 from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
-from src.image import finalize_image as finalize_design
+from src.image import REFERENCE_INSTRUCTIONS, finalize_image as finalize_design
 from src.image import generate_image
 from src.output import (
     archive_design_session,
@@ -615,19 +615,8 @@ async def generate(
             # Mirror the instruction prefix that generate_image prepends when a reference
             # image is present, so the sidecar shows the exact text sent to the model.
             if ref_image is not None:
-                if reference_mode == "copy":
-                    instruction = (
-                        "Use the provided image as a compositional reference — "
-                        "recreate a similar layout, subject placement, and design structure. "
-                        "Apply it to this design: "
-                    )
-                else:
-                    instruction = (
-                        "Use the provided image as a visual style reference only. "
-                        "Do not reproduce its subject matter or composition. "
-                        "Match its color palette, line weight, and graphic aesthetic, "
-                        "then apply that style to this design: "
-                    )
+                # Mirror the exact prefix generate_image prepends so the sidecar matches what the model received.
+                instruction = REFERENCE_INSTRUCTIONS.get(reference_mode, REFERENCE_INSTRUCTIONS["style"])
                 full_prompts = [instruction + p for p in prompts]
             else:
                 full_prompts = prompts
