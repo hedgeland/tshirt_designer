@@ -1067,8 +1067,13 @@
                                                         <li>
                                                             <button @click="selectedVariant = h._origIdx"
                                                                 :class="selectedVariant === h._origIdx ? 'text-white font-semibold' : 'text-indigo-300 hover:text-indigo-100'"
-                                                                class="text-xs underline text-left w-full"
-                                                                x-text="h._isRoot ? 'Original' : formatEditTs(h.ts)"></button>
+                                                                class="text-xs underline text-left w-full flex items-center gap-1">
+                                                                <span x-text="h._isRoot ? 'Original' : formatEditTs(h.ts)"></span>
+                                                                <!-- Amber badge marks variants adapted for a specific shirt color -->
+                                                                <span x-show="h.adaptedFor"
+                                                                    class="inline-flex items-center px-1 rounded text-[10px] font-medium bg-amber-900/60 text-amber-300 border border-amber-700/50 leading-4"
+                                                                    x-text="'for ' + h.adaptedFor"></span>
+                                                            </button>
                                                         </li>
                                                     </template>
                                                 </ul>

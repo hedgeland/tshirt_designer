@@ -306,7 +306,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         contrastResults: {},    // {colorName: {ok: bool, reason: str}} from Gemini assessment
         contrastBusy: false,
         contrastError: "",
-        adaptedDesigns: {},          // {colorName: url} adapted images generated per shirt color
         adaptingColors: [],          // color names currently being adapted (in-flight)
         colorDesignAssignment: {},   // {colorName: "original" | "adapted"} — which image to print per color
         pVariantLoading: false, // true while fetching catalog/providers/variants; separate from publish status
@@ -438,6 +437,16 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         get selectedVariantObj() {
             return this.variants[this.selectedVariant ?? 0];
+        },
+
+        // Derived map of shirt color → variant URL for variants that were adapted for a specific color.
+        // Replaces the old adaptedDesigns state property — always in sync with the variants array.
+        get adaptedDesigns() {
+            const result = {};
+            for (const v of this.variants) {
+                if (v.adaptedFor) result[v.adaptedFor] = v.url;
+            }
+            return result;
         },
 
         // Finds the combo object whose url or origUrl matches the active combo URL.
@@ -671,6 +680,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                     : state.image_paths.length;  // fallback: treat all as originals (old sessions)
                 // iteration_roots[j] is the rootIdx for the j-th iteration (0-based among iterations only)
                 const iterRoots = Array.isArray(state.iteration_roots) ? state.iteration_roots : [];
+                // iteration_adapted_for[j] is the shirt color name if iteration j is an adapted design, else null
+                const iterAdaptedFor = Array.isArray(state.iteration_adapted_for) ? state.iteration_adapted_for : [];
                 this.variants = state.image_paths.map((p, i) => {
                     const isIter = i >= origCount;
                     return {
@@ -680,6 +691,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
                         ts: isIter ? 1 : 0,  // non-zero so iterations render in the list
                         isIteration: isIter,
                         rootIdx: isIter ? (iterRoots[i - origCount] ?? Math.max(0, origCount - 1)) : undefined,
+                        adaptedFor: isIter ? (iterAdaptedFor[i - origCount] ?? null) : null,
                     };
                 });
                 if (state.selected_idx != null) this.selectedVariant = state.selected_idx;
@@ -1214,10 +1226,20 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             fd.append("shirt_color", shirtColor);
             fd.append("final_url", this.activeComboUrl ?? "");
             try {
-                await streamSSE("/contrast/adapt", fd, (e) => {
-                    if (e.type === "done") {
-                        this.adaptedDesigns = { ...this.adaptedDesigns, [shirtColor]: e.url };
-                    }
+                await streamSSE("/contrast/adapt", fd, {
+                    done: (e) => {
+                        // Push as a proper variant entry so it appears in the iterations panel
+                        // and survives a page reload via variants.json.
+                        const ts = Date.now();
+                        this.variants.push({
+                            url: e.url, origUrl: e.url, noBgUrl: null, ts,
+                            isIteration: true, rootIdx: e.root_idx ?? 0,
+                            adaptedFor: shirtColor,
+                        });
+                        if (e.combos) this.variantCombos = { ...this.variantCombos, [e.index]: e.combos };
+                        this.editModeActive = true;
+                    },
+                    error: (e) => { this.contrastError = e.message; },
                 });
             } finally {
                 this.adaptingColors = this.adaptingColors.filter(c => c !== shirtColor);
@@ -1231,7 +1253,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.printifyDone = null;
             this.contrastResults = {};
             this.contrastError = "";
-            this.adaptedDesigns = {};
             this.adaptingColors = [];
             this.colorDesignAssignment = {};
             this.pBlueprint = null;

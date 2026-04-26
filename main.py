@@ -66,6 +66,7 @@ from src.output import (
     load_concept_to_session,
     load_image_to_session,
     record_iteration_variant,
+    record_adapted_variant,
     rename_design_session,
     safe_design_session_name,
     save_variants,
@@ -1594,6 +1595,13 @@ async def contrast_adapt(
 
         yield sse({"type": "status", "message": f"Adapting design for {shirt_color}…"})
 
+        # Resolve the concept dir from session; adapted variants live alongside other variants.
+        concept_dir_raw = session.get("concept_dir")
+        if not concept_dir_raw:
+            yield sse({"type": "error", "message": "No active concept directory."})
+            return
+        concept_dir = Path(concept_dir_raw)
+
         try:
             ref_img = await asyncio.to_thread(lambda: Image.open(str(final_path)).copy())
             adapted = await asyncio.to_thread(
@@ -1603,13 +1611,40 @@ async def contrast_adapt(
             yield sse({"type": "error", "message": f"Adaptation failed: {e}"})
             return
 
-        # Save alongside the source image; color name normalized for a safe filename.
-        color_safe = shirt_color.lower().replace(" ", "_").replace("/", "_")
-        save_dir = Path(final_path).parent
-        save_path = save_dir / f"adapted_{color_safe}.png"
-        await asyncio.to_thread(adapted.save, str(save_path))
+        # Number the adapted image as the next variant so the session loader picks it up on reload.
+        _existing_nums = [
+            int(_m2.group(1))
+            for p in concept_dir.glob("variant_*.png")
+            if (_m2 := re.match(r"variant_(\d+)_", p.name))
+        ]
+        next_variant_num = max(_existing_nums) + 1 if _existing_nums else len(session.get("images", [])) + 1
+        ar_safe = aspect_ratio.replace(":", "x")
+        save_path = concept_dir / f"variant_{next_variant_num}_{ar_safe}_{size}.png"
+        await asyncio.to_thread(adapted.save, str(save_path), "PNG")
 
-        yield sse({"type": "done", "url": "/" + str(save_path), "shirt_color": shirt_color})
+        # Determine the root variant number from final_path so variants.json links back to it.
+        root_variant_num: int | None = None
+        rm = re.match(r"variant_(\d+)_", Path(str(final_path)).name)
+        if rm:
+            root_variant_num = int(rm.group(1))
+        await asyncio.to_thread(record_adapted_variant, concept_dir, next_variant_num, root_variant_num, shirt_color)
+
+        # Mirror how /stream/edit appends to session so the variant is immediately usable.
+        # root_idx is the session-array index of the parent (final_path), needed for iteration_roots.
+        image_paths = session.get("image_paths", [])
+        final_path_str = str(final_path)
+        root_idx = next(
+            (i for i, p in enumerate(image_paths) if Path(p).name == Path(final_path_str).name),
+            max(0, len(session.get("original_image_paths", image_paths)) - 1),
+        )
+        session.setdefault("images", []).append(adapted)
+        session.setdefault("image_paths", []).append(str(save_path))
+        session.setdefault("iteration_roots", []).append(root_idx)
+        session.setdefault("iteration_adapted_for", []).append(shirt_color)
+
+        new_idx = len(session["images"]) - 1
+        combos = _scan_variant_combos(concept_dir, next_variant_num)
+        yield sse({"type": "done", "url": f"/{save_path}", "shirt_color": shirt_color, "index": new_idx, "combos": combos, "root_idx": root_idx})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 

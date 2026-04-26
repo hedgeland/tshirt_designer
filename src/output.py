@@ -40,6 +40,17 @@ def record_iteration_variant(concept_dir: Path, variant_num: int, root_variant_n
     _write_variants_json(concept_dir, entries)
 
 
+def record_adapted_variant(concept_dir: Path, variant_num: int, root_variant_num: int | None, shirt_color: str) -> None:
+    """Append an adapted-design entry to variants.json.
+
+    Same as record_iteration_variant but carries the shirt color the design was adapted for,
+    so the publish panel can auto-wire the right variant to the right color on reload.
+    """
+    entries = _read_variants_json(concept_dir)
+    entries.append({"variant": variant_num, "root": root_variant_num, "adapted_for": shirt_color})
+    _write_variants_json(concept_dir, entries)
+
+
 def _resolve_output_path(url: str) -> Path:
     """Resolve a URL path to an absolute Path, raising ValueError if outside OUTPUT_DIR."""
     root = Path(OUTPUT_DIR).resolve()
@@ -535,21 +546,22 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
     # Fall back to prompts.md variant_count for sessions created before variants.json existed.
     vj_entries = _read_variants_json(concept_dir)
     if vj_entries:
-        # Build variant_num → root_variant_num from the JSON
+        # Build variant_num → root_variant_num and adapted_for from the JSON
         vj_map: dict[int, int | None] = {e["variant"]: e.get("root") for e in vj_entries}
+        vj_adapted: dict[int, str | None] = {e["variant"]: e.get("adapted_for") for e in vj_entries}
         # Build variant_num → index-in-image_paths so we can convert root nums to rootIdx values
         num_to_pos = {num: pos for pos, num in enumerate(variant_indices)}
         orig_count = sum(1 for num in variant_indices if vj_map.get(num) is None)
-        iteration_roots = [
-            num_to_pos.get(vj_map[num], 0)
-            for num in variant_indices
-            if vj_map.get(num) is not None  # only emit an entry for each iteration
-        ]
+        iteration_nums = [num for num in variant_indices if vj_map.get(num) is not None]
+        iteration_roots = [num_to_pos.get(vj_map[num], 0) for num in iteration_nums]
+        # adapted_for parallel to iteration_roots — None for plain edits, color name for adapted variants
+        iteration_adapted_for = [vj_adapted.get(num) for num in iteration_nums]
     else:
         # Backward compat: no variants.json — assume all beyond variant_count are iterations
         # from root 0 (same as the old best-guess behaviour)
         orig_count = variant_count if variant_count > 0 else len(image_paths)
         iteration_roots = [0] * (len(image_paths) - orig_count)
+        iteration_adapted_for = [None] * len(iteration_roots)
 
     original_image_paths = image_paths[:orig_count]
 
@@ -562,6 +574,7 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
     session["original_images"] = list(images[:orig_count])
     session["original_image_paths"] = list(original_image_paths)
     session["iteration_roots"] = iteration_roots
+    session["iteration_adapted_for"] = iteration_adapted_for  # parallel to iteration_roots; None or shirt color name
     session["no_bg_variant_cache"] = {}
     session["selected_idx"] = 0
     session["concept_dir"] = concept_dir.relative_to(root.parent).as_posix()
