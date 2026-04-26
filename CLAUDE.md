@@ -62,8 +62,19 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - **Always plan before implementing** new functionality or major changes. Present the approach — files affected, key decisions, trade-offs — and wait for confirmation before writing code.
 - Minor fixes and small UI tweaks (single-file, low-risk) can proceed without a plan.
 
-## Session Continuity
+## Git Workflow
 
-- **Commit and push after every individual change** — each discrete edit gets its own commit and immediate `git push origin master`. Don't batch.
+We use **GitHub Flow**: all work happens on branches; `master` only receives changes via merged PRs.
+
+### Branch naming
+| Type | Pattern | Example |
+|---|---|---|
+| Feature | `feat/short-description` | `feat/contrast-assessment` |
+| Bug fix | `fix/short-description` | `fix/variant-upload-crash` |
+| Hotfix (critical) | `hotfix/short-description` | `hotfix/publish-500-error` |
+
+### Rules
+- **Never commit directly to `master`** — always branch, even for small bug fixes.
+- **Commit and push after every individual change** — each discrete edit gets its own commit and immediate `git push -u origin <branch>`. Don't batch.
 - **Use WIP prefixes** when committing incomplete work: `WIP: <description>`. This makes interrupted sessions easy to spot with `git log`.
 - The `/resume` slash command reconstructs context from git history and diffs when resuming after an interrupted session.
