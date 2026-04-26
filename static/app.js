@@ -2285,12 +2285,10 @@ function designer() {
                 || this.panelStyleTemplate !== this._loadedStyleTemplate;
         },
 
+        // Toggles the panel. Closing runs closePresetsPanel so unsaved-changes confirm fires.
         openPresetsPanel() {
-            if (this.showPresetsPanel) {
-                this.closePresetsPanel();
-            } else {
-                this.showPresetsPanel = true;
-            }
+            if (this.showPresetsPanel) this.closePresetsPanel();
+            else this.showPresetsPanel = true;
         },
 
         closePresetsPanel(skipConfirm = false) {
