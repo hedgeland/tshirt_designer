@@ -205,7 +205,7 @@ def get_session(session_id: str) -> dict:
         
         # Clamp num_variants from settings against the current hard max
         loaded_num_variants = user_settings.get("default_num_variants", NUM_VARIANTS)
-        clamped_num_variants = max(1, min(loaded_num_variants, MAX_VARIANTS))
+        clamped_num_variants = _clamp(loaded_num_variants, 1, MAX_VARIANTS)
         
         initial_col = init_column_state()
         initial_col["num_variants"] = clamped_num_variants
@@ -239,6 +239,10 @@ def get_column(session_id: str, column_id: int) -> dict:
 def sse(data: dict) -> str:
     """Format a dict as an SSE data line."""
     return f"data: {json.dumps(data)}\n\n"
+
+
+def _clamp(val: int, lo: int, hi: int) -> int:
+    return max(lo, min(val, hi))
 
 
 def _no_bg_path(path: str) -> str:
@@ -1674,7 +1678,7 @@ async def add_column(
         )
     new_col = init_column_state()
     if num_variants is not None:
-        new_col["num_variants"] = max(1, min(num_variants, MAX_VARIANTS))
+        new_col["num_variants"] = _clamp(num_variants, 1, MAX_VARIANTS)
     else:
         new_col["num_variants"] = sess.get("num_variants", NUM_VARIANTS)
     columns.append(new_col)
@@ -1759,7 +1763,7 @@ async def remove_column(session_id: str = Form(...), column_id: int = Form(...))
 async def set_max_columns(session_id: str = Form(...), max_columns: int = Form(...)):
     """Update the user's self-imposed column limit, clamped to the server-side MAX_COLUMNS cap."""
     sess = get_session(session_id)
-    clamped = max(1, min(max_columns, MAX_COLUMNS))
+    clamped = _clamp(max_columns, 1, MAX_COLUMNS)
     sess["max_columns"] = clamped
     # Persist as global default
     settings.save_settings({"default_max_columns": clamped})
@@ -1770,7 +1774,7 @@ async def set_max_columns(session_id: str = Form(...), max_columns: int = Form(.
 async def set_min_columns(session_id: str = Form(...), min_columns: int = Form(...)):
     """Update the user's minimum column floor, clamped to [1, current max_columns]."""
     sess = get_session(session_id)
-    clamped = max(1, min(min_columns, sess["max_columns"]))
+    clamped = _clamp(min_columns, 1, sess["max_columns"])
     sess["min_columns"] = clamped
     # Persist as global default
     settings.save_settings({"default_min_columns": clamped})
@@ -1781,7 +1785,7 @@ async def set_min_columns(session_id: str = Form(...), min_columns: int = Form(.
 async def set_num_variants(session_id: str = Form(...), num_variants: int = Form(...)):
     """Update the user's default number of variants for new columns, clamped to [1, MAX_VARIANTS]."""
     sess = get_session(session_id)
-    clamped = max(1, min(num_variants, MAX_VARIANTS))
+    clamped = _clamp(num_variants, 1, MAX_VARIANTS)
     sess["num_variants"] = clamped
     # Persist as global default
     settings.save_settings({"default_num_variants": clamped})
