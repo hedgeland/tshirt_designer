@@ -74,12 +74,17 @@ window.getPrintifyColorHex = function(colorName) {
     for (const [key, hex] of Object.entries(PRINTIFY_COLORS)) {
         if (normal.includes(key)) return hex;
     }
-    // Generic fallbacks
-    if (normal.includes('blue')) return '#3b82f6';
-    if (normal.includes('red')) return '#ef4444';
-    if (normal.includes('green')) return '#22c55e';
-    if (normal.includes('yellow')) return '#eab308';
-    if (normal.includes('grey') || normal.includes('gray') || normal.includes('silver')) return '#9ca3af';
+    // Generic keyword fallbacks — checked in priority order
+    const COLOR_KEYWORDS = [
+        [['blue'],                   '#3b82f6'],
+        [['red'],                    '#ef4444'],
+        [['green'],                  '#22c55e'],
+        [['yellow'],                 '#eab308'],
+        [['grey', 'gray', 'silver'], '#9ca3af'],
+    ];
+    for (const [keywords, hex] of COLOR_KEYWORDS) {
+        if (keywords.some(k => normal.includes(k))) return hex;
+    }
     
     return "#555555"; // default dot color
 };
