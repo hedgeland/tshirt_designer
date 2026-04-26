@@ -1621,7 +1621,7 @@ async def printify_publish(
     shop_id: str = Form(...),
     blueprint_id: int = Form(...),
     provider_id: int = Form(...),
-    variant_ids: str = Form(...),  # JSON array of ints
+    print_areas_json: str = Form(...),  # JSON: [{image_path: "original"|url, variant_ids: [int]}]
     title: str = Form(...),
     description: str = Form(""),
     price_cents: int = Form(...),
@@ -1682,22 +1682,52 @@ async def printify_publish(
                 return
 
         try:
-            ids: list[int] = json.loads(variant_ids)
+            raw_areas: list[dict] = json.loads(print_areas_json)
         except json.JSONDecodeError:
-            yield sse({"type": "error", "message": "Invalid variant selection."})
+            yield sse({"type": "error", "message": "Invalid print_areas_json."})
             return
 
-        if not ids:
+        if not raw_areas or not any(g.get("variant_ids") for g in raw_areas):
             yield sse({"type": "error", "message": "Select at least one color/size variant."})
             return
 
-        # Step 1: Upload image
-        yield sse({"type": "status", "message": "Uploading image to Printify..."})
+        # Resolve "original" image_path to the session's final image.
+        # Deduplicate uploads: two color groups using the same file share one Printify image ID.
+        def _resolve_path(image_path: str) -> str:
+            if image_path == "original":
+                return final_path
+            resolved = image_path.lstrip("/")
+            if not Path(resolved).is_file():
+                raise FileNotFoundError(f"Adapted image not found: {image_path}")
+            return resolved
+
+        # Step 1: Upload each unique image
+        yield sse({"type": "status", "message": "Uploading image(s) to Printify..."})
+        path_to_image_id: dict[str, str] = {}
         try:
-            image_id = await asyncio.to_thread(printify.upload_image, PRINTIFY_TOKEN, final_path)
+            for group in raw_areas:
+                disk_path = _resolve_path(group["image_path"])
+                if disk_path not in path_to_image_id:
+                    path_to_image_id[disk_path] = await asyncio.to_thread(
+                        printify.upload_image, PRINTIFY_TOKEN, disk_path
+                    )
+        except FileNotFoundError as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
         except Exception as e:
             yield sse({"type": "error", "message": f"Image upload failed: {e}"})
             return
+
+        # Build the print_areas list expected by create_product.
+        # _resolve_path is pure path logic — safe to call synchronously here.
+        resolved_areas = [
+            {
+                "image_id": path_to_image_id[_resolve_path(g["image_path"])],
+                "variant_ids": g["variant_ids"],
+            }
+            for g in raw_areas
+            if g.get("variant_ids")
+        ]
 
         # Step 2: Create product draft
         yield sse({"type": "status", "message": "Creating product..."})
@@ -1710,7 +1740,7 @@ async def printify_publish(
                 description.strip(),
                 blueprint_id,
                 provider_id,
-                [{"image_id": image_id, "variant_ids": ids}],
+                resolved_areas,
                 price_cents,
                 design_x,
                 design_y,

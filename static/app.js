@@ -306,8 +306,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         contrastResults: {},    // {colorName: {ok: bool, reason: str}} from Gemini assessment
         contrastBusy: false,
         contrastError: "",
-        adaptedDesigns: {},     // {colorName: url} adapted images generated per shirt color
-        adaptingColors: [],     // color names currently being adapted (in-flight)
+        adaptedDesigns: {},          // {colorName: url} adapted images generated per shirt color
+        adaptingColors: [],          // color names currently being adapted (in-flight)
+        colorDesignAssignment: {},   // {colorName: "original" | "adapted"} — which image to print per color
         pVariantLoading: false, // true while fetching catalog/providers/variants; separate from publish status
 
         pShops: [],
@@ -1232,6 +1233,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.contrastError = "";
             this.adaptedDesigns = {};
             this.adaptingColors = [];
+            this.colorDesignAssignment = {};
             this.pBlueprint = null;
             this.pProviders = [];
             this.pProviderId = "";
@@ -1643,13 +1645,24 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             if (this.selectedVariantCount === 0) { this.printifyError = "Select at least one color and size."; return; }
             if (!this.pTitle.trim()) { this.printifyError = "Enter a product title."; return; }
 
-            // Gather the variant IDs matching the selected color+size combinations
-            const variantIds = this.pAllVariants
-                .filter(v =>
-                    this.pSelectedColors.includes(v.options?.color ?? "") &&
-                    this.pSelectedSizes.includes(v.options?.size ?? "")
-                )
-                .map(v => v.id);
+            // Group variant IDs by assigned design (original or adapted per color).
+            // Variants with no adaptation default to "original".
+            const groupsByImage = {};
+            for (const color of this.pSelectedColors) {
+                const useAdapted = this.colorDesignAssignment[color] === "adapted" && this.adaptedDesigns[color];
+                const imageKey = useAdapted ? this.adaptedDesigns[color] : "original";
+                if (!groupsByImage[imageKey]) groupsByImage[imageKey] = [];
+                const colorVids = this.pAllVariants
+                    .filter(v => v.options?.color === color && this.pSelectedSizes.includes(v.options?.size ?? ""))
+                    .map(v => v.id);
+                groupsByImage[imageKey].push(...colorVids);
+            }
+            const printAreas = Object.entries(groupsByImage).map(([imagePath, vids]) => ({
+                image_path: imagePath,
+                variant_ids: vids,
+            }));
+            // Keep a flat list for the existing variant count validation
+            const variantIds = printAreas.flatMap(g => g.variant_ids);
 
             const priceCents = Math.round(parseFloat(this.pPrice) * 100);
             if (!priceCents || priceCents < 1) { this.printifyError = "Enter a valid price."; return; }
@@ -1669,7 +1682,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             fd.append("shop_id", shopId);
             fd.append("blueprint_id", this.pBlueprint.id);
             fd.append("provider_id", this.pProviderId);
-            fd.append("variant_ids", JSON.stringify(variantIds));
+            fd.append("print_areas_json", JSON.stringify(printAreas));
             fd.append("title", this.pTitle.trim());
             fd.append("description", this.pDescription.trim());
             fd.append("price_cents", priceCents);
