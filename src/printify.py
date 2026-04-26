@@ -179,8 +179,7 @@ def create_product(
     description: str,
     blueprint_id: int,
     provider_id: int,
-    image_id: str,
-    variant_ids: list[int],
+    print_areas: list[dict],
     price_cents: int,
     design_x: float = 0.5,
     design_y: float = 0.5,
@@ -189,10 +188,13 @@ def create_product(
 ) -> str:
     """Create a Printify product draft and return its product ID.
 
+    print_areas is a list of {"image_id": str, "variant_ids": list[int]} dicts —
+    one entry per color group so each group can carry a contrast-adapted design.
     design_x/y are the image center as fractions (0–1) of the print area.
     design_scale is the fraction of the print area width the image occupies.
     design_angle is clockwise rotation in degrees (0 = no rotation).
     """
+    all_variant_ids = [vid for group in print_areas for vid in group["variant_ids"]]
     payload = {
         "title": title,
         "description": description,
@@ -200,18 +202,17 @@ def create_product(
         "print_provider_id": provider_id,
         "variants": [
             {"id": vid, "price": price_cents, "is_enabled": True}
-            for vid in variant_ids
+            for vid in all_variant_ids
         ],
-        # Single print area covering all variants — design on the front.
         "print_areas": [
             {
-                "variant_ids": variant_ids,
+                "variant_ids": group["variant_ids"],
                 "placeholders": [
                     {
                         "position": "front",
                         "images": [
                             {
-                                "id": image_id,
+                                "id": group["image_id"],
                                 "x": design_x,
                                 "y": design_y,
                                 "scale": design_scale,
@@ -221,6 +222,7 @@ def create_product(
                     }
                 ],
             }
+            for group in print_areas
         ],
     }
     def _call():
