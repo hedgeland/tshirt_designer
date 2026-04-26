@@ -1857,6 +1857,45 @@ function designer() {
             Alpine.store('columnCount', this.columns.length);
         },
 
+        // POST /session/remove-column for a given column index; returns the fetch Response.
+        _removeColumnById(colIdx) {
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", colIdx);
+            return fetch("/session/remove-column", { method: "POST", body: fd });
+        },
+
+        // Close rightmost columns until this.columns.length === targetCount.
+        // Warns once if any of the affected columns have unsubmitted text.
+        // label is "max" or "min" (used in the confirm message).
+        // Returns false if the user cancels, true otherwise.
+        async _closeColumnsDownTo(targetCount, label) {
+            const excess = this.columns.length - targetCount;
+            if (excess <= 0) return true;
+
+            const hasWip = Array.from({ length: excess }, (_, i) => {
+                const colIdx = this.columns.length - excess + i;
+                const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
+                return el?._x_dataStack?.[0]?.hasUnsubmittedText;
+            }).some(Boolean);
+
+            if (hasWip && !confirm(`Lowering the ${label} will close ${excess} column${excess > 1 ? 's' : ''} with unsubmitted text. Continue?`)) {
+                return false;
+            }
+
+            while (this.columns.length > targetCount) {
+                const targetIdx = this.columns.length - 1;
+                const res = await this._removeColumnById(targetIdx);
+                if (!res.ok) {
+                    console.error(`Failed to remove column ${targetIdx}: ${res.status}`);
+                    break;
+                }
+                this.columns.pop();
+                Alpine.store('columnCount', this.columns.length);
+            }
+            return true;
+        },
+
         // Remove a column — blocked while the column is loading or it's the last one.
         // Mutates the local columns array by splicing out the removed index. The DOM
         // elements bound via x-for will stay in place, and their x-effect="colIdx = index"
@@ -1869,10 +1908,7 @@ function designer() {
             const hasWork = colData?.hasUnsubmittedText;
             const label = `Design ${colIdx + 1}`;
             if (hasWork && !confirm(`Close ${label}? Unsubmitted text will be lost.`)) return;
-            const fd = new FormData();
-            fd.append("session_id", this.sessionId);
-            fd.append("column_id", colIdx);
-            const res = await fetch("/session/remove-column", { method: "POST", body: fd });
+            const res = await this._removeColumnById(colIdx);
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
                 alert(`Failed to close column: ${errData.error || res.statusText}\nTry refreshing the page to resync your session.`);
@@ -1916,36 +1952,12 @@ function designer() {
                 fetch("/session/min-columns", { method: "POST", body: fdMin });
             }
 
-            // Identify columns that need to be removed (rightmost first)
-            const excess = this.columns.length - this.maxColumns;
-            if (excess > 0) {
-                // Warn once if any of the columns being removed have work in progress
-                const hasWip = Array.from({ length: excess }, (_, i) => {
-                    const colIdx = this.columns.length - excess + i;
-                    const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
-                    const d = el?._x_dataStack?.[0];
-                    return d?.hasUnsubmittedText;
-                }).some(Boolean);
-                
-                if (hasWip && !confirm(`Lowering the max will close ${excess} column${excess > 1 ? 's' : ''} with unsubmitted text. Continue?`)) {
-                    // Revert the input to the current actual column count
+            // Close any columns that now exceed the new max
+            if (this.columns.length > this.maxColumns) {
+                const proceeded = await this._closeColumnsDownTo(this.maxColumns, "max");
+                if (!proceeded) {
                     this.maxColumns = this.columns.length;
                     return;
-                }
-                
-                // Close excess columns from the right, one at a time
-                while (this.columns.length > this.maxColumns) {
-                    const fd = new FormData();
-                    const targetIdx = this.columns.length - 1;
-                    fd.append("session_id", this.sessionId);
-                    fd.append("column_id", targetIdx);
-                    const res = await fetch("/session/remove-column", { method: "POST", body: fd });
-                    if (!res.ok) {
-                        console.error(`Failed to remove column ${targetIdx}: ${res.status}`);
-                        break;
-                    }
-                    this.columns.pop();
-                    Alpine.store('columnCount', this.columns.length);
                 }
             }
 
@@ -1984,35 +1996,11 @@ function designer() {
             }
 
             // If lowering min below the current column count, remove columns to match
-            const excess = this.columns.length - this.minColumns;
-            if (excess > 0) {
-                // Warn once if any of the columns being removed have work in progress
-                const hasWip = Array.from({ length: excess }, (_, i) => {
-                    const colIdx = this.columns.length - excess + i;
-                    const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
-                    const d = el?._x_dataStack?.[0];
-                    return d?.hasUnsubmittedText;
-                }).some(Boolean);
-                
-                if (hasWip && !confirm(`Lowering the min will close ${excess} column${excess > 1 ? 's' : ''} with unsubmitted text. Continue?`)) {
-                    // Revert the input to the current actual column count
+            if (this.columns.length > this.minColumns) {
+                const proceeded = await this._closeColumnsDownTo(this.minColumns, "min");
+                if (!proceeded) {
                     this.minColumns = this.columns.length;
                     return;
-                }
-                
-                // Close excess columns from the right, one at a time
-                while (this.columns.length > this.minColumns) {
-                    const fd = new FormData();
-                    const targetIdx = this.columns.length - 1;
-                    fd.append("session_id", this.sessionId);
-                    fd.append("column_id", targetIdx);
-                    const res = await fetch("/session/remove-column", { method: "POST", body: fd });
-                    if (!res.ok) {
-                        console.error(`Failed to remove column ${targetIdx}: ${res.status}`);
-                        break;
-                    }
-                    this.columns.pop();
-                    Alpine.store('columnCount', this.columns.length);
                 }
             }
 
