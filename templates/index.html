@@ -1556,25 +1556,45 @@
                                                     <span x-show="contrastBusy">Checking…</span>
                                                 </button>
                                             </div>
-                                            <div class="flex flex-wrap gap-1.5">
+                                            <div class="space-y-2">
                                                 <template x-for="color in pSelectedColors" :key="color">
-                                                    <div class="relative group">
-                                                        <span class="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border bg-slate-800 text-slate-200 transition-colors"
-                                                              :class="contrastResults[color] === undefined ? 'border-slate-600' :
-                                                                      contrastResults[color].ok ? 'border-emerald-500 text-emerald-200' :
-                                                                      'border-red-500 text-red-200'">
-                                                            <span class="w-3 h-3 rounded-full border border-slate-500/50 flex-shrink-0 shadow-inner"
-                                                                  :style="{ backgroundColor: window.getPrintifyColorHex(color) }"></span>
-                                                            <span x-text="color"></span>
-                                                            <span x-show="contrastResults[color] !== undefined"
-                                                                  x-text="contrastResults[color]?.ok ? '✓' : '✗'"
-                                                                  class="font-bold"></span>
-                                                        </span>
-                                                        <!-- Reason tooltip on hover -->
-                                                        <div x-show="contrastResults[color] !== undefined"
-                                                             class="absolute bottom-full left-0 mb-1.5 w-52 z-10 hidden group-hover:block">
-                                                            <div class="bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-2 text-xs text-slate-300 shadow-lg"
-                                                                 x-text="contrastResults[color]?.reason"></div>
+                                                    <div>
+                                                        <!-- Color chip row -->
+                                                        <div class="flex items-center gap-2">
+                                                            <div class="relative group flex-shrink-0">
+                                                                <span class="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border bg-slate-800 text-slate-200 transition-colors"
+                                                                      :class="contrastResults[color] === undefined ? 'border-slate-600' :
+                                                                              contrastResults[color].ok ? 'border-emerald-500 text-emerald-200' :
+                                                                              'border-red-500 text-red-200'">
+                                                                    <span class="w-3 h-3 rounded-full border border-slate-500/50 flex-shrink-0 shadow-inner"
+                                                                          :style="{ backgroundColor: window.getPrintifyColorHex(color) }"></span>
+                                                                    <span x-text="color"></span>
+                                                                    <span x-show="contrastResults[color] !== undefined"
+                                                                          x-text="contrastResults[color]?.ok ? '✓' : '✗'"
+                                                                          class="font-bold"></span>
+                                                                </span>
+                                                                <!-- Reason tooltip on hover -->
+                                                                <div x-show="contrastResults[color] !== undefined"
+                                                                     class="absolute bottom-full left-0 mb-1.5 w-52 z-10 hidden group-hover:block">
+                                                                    <div class="bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-2 text-xs text-slate-300 shadow-lg"
+                                                                         x-text="contrastResults[color]?.reason"></div>
+                                                                </div>
+                                                            </div>
+                                                            <!-- Adapt button — shown only for flagged colors that haven't been adapted yet -->
+                                                            <button x-show="contrastResults[color] !== undefined && !contrastResults[color].ok && !adaptedDesigns[color]"
+                                                                    @click="runAdaptForShirt(color)"
+                                                                    :disabled="adaptingColors.includes(color)"
+                                                                    class="text-xs px-2 py-0.5 rounded border border-amber-600 bg-slate-800 text-amber-300 hover:border-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                                                <span x-show="!adaptingColors.includes(color)">Generate adapted version</span>
+                                                                <span x-show="adaptingColors.includes(color)">Adapting…</span>
+                                                            </button>
+                                                        </div>
+                                                        <!-- Adapted design thumbnail -->
+                                                        <div x-show="adaptedDesigns[color]" class="mt-1.5 ml-1">
+                                                            <img :src="adaptedDesigns[color]"
+                                                                 class="h-16 w-16 object-contain rounded border border-slate-600 bg-slate-900"
+                                                                 :alt="'Adapted for ' + color">
+                                                            <p class="text-xs text-slate-500 mt-0.5" x-text="'Adapted for ' + color"></p>
                                                         </div>
                                                     </div>
                                                 </template>

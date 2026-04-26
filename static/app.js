@@ -306,6 +306,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         contrastResults: {},    // {colorName: {ok: bool, reason: str}} from Gemini assessment
         contrastBusy: false,
         contrastError: "",
+        adaptedDesigns: {},     // {colorName: url} adapted images generated per shirt color
+        adaptingColors: [],     // color names currently being adapted (in-flight)
         pVariantLoading: false, // true while fetching catalog/providers/variants; separate from publish status
 
         pShops: [],
@@ -1202,6 +1204,25 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             }
         },
 
+        async runAdaptForShirt(shirtColor) {
+            if (this.adaptingColors.includes(shirtColor)) return;
+            this.adaptingColors = [...this.adaptingColors, shirtColor];
+            const fd = new FormData();
+            fd.append("session_id", cfg.sessionId);
+            fd.append("column_id", cfg.columnId);
+            fd.append("shirt_color", shirtColor);
+            fd.append("final_url", this.activeComboUrl ?? "");
+            try {
+                await streamSSE("/contrast/adapt", fd, (e) => {
+                    if (e.type === "done") {
+                        this.adaptedDesigns = { ...this.adaptedDesigns, [shirtColor]: e.url };
+                    }
+                });
+            } finally {
+                this.adaptingColors = this.adaptingColors.filter(c => c !== shirtColor);
+            }
+        },
+
         async openPrintify() {
             // Reset publish result each time the modal opens
             this.printifyError = "";
@@ -1209,6 +1230,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.printifyDone = null;
             this.contrastResults = {};
             this.contrastError = "";
+            this.adaptedDesigns = {};
+            this.adaptingColors = [];
             this.pBlueprint = null;
             this.pProviders = [];
             this.pProviderId = "";

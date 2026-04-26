@@ -55,7 +55,7 @@ from config import (
 from src import contrast, presets, printify, settings
 from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
-from src.image import REFERENCE_INSTRUCTIONS, finalize_image as finalize_design
+from src.image import REFERENCE_INSTRUCTIONS, adapt_for_shirt, finalize_image as finalize_design
 from src.image import generate_image
 from src.output import (
     archive_design_session,
@@ -1563,6 +1563,55 @@ async def contrast_assess(
         return JSONResponse(result)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/contrast/adapt")
+async def contrast_adapt(
+    session_id: str = Form(...),
+    column_id: int = Form(0),
+    shirt_color: str = Form(...),
+    final_url: str = Form(""),
+    size: str = Form(BRAINSTORM_SIZE),
+    aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
+):
+    """Regenerate the design adapted for visibility on the given shirt color. Streams SSE progress."""
+
+    async def stream():
+        if not GOOGLE_API_KEY:
+            yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
+            return
+
+        session = get_column(session_id, column_id)
+        final_path = session.get("final_path")
+        if not final_path and final_url:
+            recovered = final_url.lstrip("/")
+            if Path(recovered).is_file():
+                final_path = recovered
+
+        if not final_path:
+            yield sse({"type": "error", "message": "No design available for adaptation."})
+            return
+
+        yield sse({"type": "status", "message": f"Adapting design for {shirt_color}…"})
+
+        try:
+            ref_img = await asyncio.to_thread(lambda: Image.open(str(final_path)).copy())
+            adapted = await asyncio.to_thread(
+                adapt_for_shirt, ref_img, shirt_color, GOOGLE_API_KEY, size, aspect_ratio
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": f"Adaptation failed: {e}"})
+            return
+
+        # Save alongside the source image; color name normalized for a safe filename.
+        color_safe = shirt_color.lower().replace(" ", "_").replace("/", "_")
+        save_dir = Path(final_path).parent
+        save_path = save_dir / f"adapted_{color_safe}.png"
+        await asyncio.to_thread(adapted.save, str(save_path))
+
+        yield sse({"type": "done", "url": "/" + str(save_path), "shirt_color": shirt_color})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 @app.post("/printify/publish")

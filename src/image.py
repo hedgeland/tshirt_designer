@@ -132,3 +132,43 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
         )
 
     return _extract_image(with_retry(_call))
+
+
+def adapt_for_shirt(
+    reference: Image.Image,
+    shirt_color: str,
+    api_key: str,
+    size: str = BRAINSTORM_SIZE,
+    aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+) -> Image.Image:
+    """Regenerate the design adapted for visibility on a specific shirt color.
+
+    The shirt color fills the negative space, so elements that match or are
+    close to that color need to be shifted or outlined to remain legible.
+    """
+    client = get_client(api_key)
+
+    buf = io.BytesIO()
+    flatten_transparency(reference).save(buf, format="PNG")
+
+    def _call():
+        return client.models.generate_content(
+            model=MODEL,
+            contents=[
+                types.Part(inline_data=types.Blob(data=buf.getvalue(), mime_type="image/png")),
+                types.Part(text=(
+                    f"This t-shirt print design will be printed on a {shirt_color} shirt. "
+                    f"The transparent areas of the original represent where the {shirt_color} shirt shows through. "
+                    f"Redesign this so every element is clearly visible on a {shirt_color} shirt. "
+                    f"Preserve the original composition, subject, and graphic style exactly — "
+                    f"only adjust colors, add outlines, glows, or contrast details as needed for visibility. "
+                    f"Output the adapted design at {size} resolution."
+                )),
+            ],
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(image_size=size, aspect_ratio=aspect_ratio),
+            ),
+        )
+
+    return _extract_image(with_retry(_call))
