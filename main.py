@@ -52,7 +52,7 @@ from config import (
     SESSION_TTL_SECONDS,
     SIZE_PX,
 )
-from src import presets, printify, settings
+from src import contrast, presets, printify, settings
 from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
 from src.image import REFERENCE_INSTRUCTIONS, finalize_image as finalize_design
@@ -1526,6 +1526,43 @@ async def printify_print_details(blueprint_id: int, provider_id: int):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=502)
     return details
+
+
+@app.post("/contrast/assess")
+async def contrast_assess(
+    session_id: str = Form(...),
+    column_id: int = Form(0),
+    shirt_colors: str = Form(...),  # JSON array of color name strings
+    final_url: str = Form(""),
+):
+    """Ask Gemini whether the active design will be visible on each selected shirt color."""
+    if not GOOGLE_API_KEY:
+        return JSONResponse({"error": "GOOGLE_API_KEY is not set."}, status_code=500)
+
+    try:
+        colors: list[str] = json.loads(shirt_colors)
+    except json.JSONDecodeError:
+        return JSONResponse({"error": "Invalid shirt_colors format."}, status_code=400)
+
+    if not colors:
+        return JSONResponse({})
+
+    session = get_column(session_id, column_id)
+    final_path = session.get("final_path")
+    if not final_path and final_url:
+        recovered = final_url.lstrip("/")
+        if Path(recovered).is_file():
+            final_path = recovered
+
+    if not final_path:
+        return JSONResponse({"error": "No design available for assessment."}, status_code=400)
+
+    try:
+        img = await asyncio.to_thread(Image.open, final_path)
+        result = await asyncio.to_thread(contrast.assess_contrast, img, colors, GOOGLE_API_KEY)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.post("/printify/publish")

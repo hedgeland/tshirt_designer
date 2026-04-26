@@ -303,6 +303,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         printifyStatus: "",   // publish-only status messages (upload, create, etc.)
         printifyError: "",
         printifyDone: null,
+        contrastResults: {},    // {colorName: {ok: bool, reason: str}} from Gemini assessment
+        contrastBusy: false,
+        contrastError: "",
         pVariantLoading: false, // true while fetching catalog/providers/variants; separate from publish status
 
         pShops: [],
@@ -1177,11 +1180,35 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         // ── Printify actions ───────────────────────────────────────────────
 
+        async runContrastAssess() {
+            if (this.contrastBusy || !this.pSelectedColors.length) return;
+            this.contrastBusy = true;
+            this.contrastError = "";
+            this.contrastResults = {};
+            const fd = new FormData();
+            fd.append("session_id", cfg.sessionId);
+            fd.append("column_id", cfg.columnId);
+            fd.append("shirt_colors", JSON.stringify(this.pSelectedColors));
+            fd.append("final_url", this.activeComboUrl ?? "");
+            try {
+                const res = await fetch("/contrast/assess", { method: "POST", body: fd });
+                const data = await res.json();
+                if (data.error) { this.contrastError = data.error; }
+                else { this.contrastResults = data; }
+            } catch (e) {
+                this.contrastError = "Assessment failed: " + e.message;
+            } finally {
+                this.contrastBusy = false;
+            }
+        },
+
         async openPrintify() {
             // Reset publish result each time the modal opens
             this.printifyError = "";
             this.printifyStatus = "";
             this.printifyDone = null;
+            this.contrastResults = {};
+            this.contrastError = "";
             this.pBlueprint = null;
             this.pProviders = [];
             this.pProviderId = "";
