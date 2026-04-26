@@ -247,7 +247,7 @@ def _clamp(val: int, lo: int, hi: int) -> int:
 
 def _no_bg_path(path: str) -> str:
     """Derive the no-background output path from a source image path."""
-    return path.replace(".png", "_no_bg.png") if path else ""
+    return path.replace(".png", "_no_bg.png")
 
 
 def _zip_response(data: bytes, filename: str) -> Response:
