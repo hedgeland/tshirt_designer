@@ -1189,8 +1189,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.contrastError = "";
             this.contrastResults = {};
             const fd = new FormData();
-            fd.append("session_id", cfg.sessionId);
-            fd.append("column_id", cfg.columnId);
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
             fd.append("shirt_colors", JSON.stringify(this.pSelectedColors));
             fd.append("final_url", this.activeComboUrl ?? "");
             try {
@@ -1209,8 +1209,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             if (this.adaptingColors.includes(shirtColor)) return;
             this.adaptingColors = [...this.adaptingColors, shirtColor];
             const fd = new FormData();
-            fd.append("session_id", cfg.sessionId);
-            fd.append("column_id", cfg.columnId);
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
             fd.append("shirt_color", shirtColor);
             fd.append("final_url", this.activeComboUrl ?? "");
             try {
