@@ -1788,27 +1788,29 @@ async def set_num_variants(session_id: str = Form(...), num_variants: int = Form
     return {"num_variants": clamped}
 
 
+def _toggle_favorites(settings_key: str, item_value, action: str) -> list:
+    """Add or remove item_value from the list stored in user settings under settings_key."""
+    user_settings = settings.load_settings()
+    favorites = user_settings.get(settings_key, [])
+    if action == "add":
+        if item_value not in favorites:
+            favorites.append(item_value)
+    else:
+        if item_value in favorites:
+            favorites.remove(item_value)
+    settings.save_settings({settings_key: favorites})
+    return favorites
+
+
 @app.post("/settings/printify-favorites")
 async def toggle_printify_favorite(request: Request):
     """Add or remove a Printify blueprint ID from the global favorites list."""
     data = await request.json()
     blueprint_id = data.get("blueprint_id")
     action = data.get("action")  # "add" or "remove"
-
     if blueprint_id is None or action not in ("add", "remove"):
         return JSONResponse({"error": "Invalid request"}, status_code=400)
-
-    user_settings = settings.load_settings()
-    favorites = user_settings.get("printify_favorites", [])
-
-    if action == "add":
-        if blueprint_id not in favorites:
-            favorites.append(blueprint_id)
-    else:
-        if blueprint_id in favorites:
-            favorites.remove(blueprint_id)
-
-    settings.save_settings({"printify_favorites": favorites})
+    favorites = _toggle_favorites("printify_favorites", blueprint_id, action)
     return {"printify_favorites": favorites}
 
 
@@ -1818,21 +1820,9 @@ async def toggle_printify_color_favorite(request: Request):
     data = await request.json()
     color_name = data.get("color_name")
     action = data.get("action")  # "add" or "remove"
-
     if not color_name or action not in ("add", "remove"):
         return JSONResponse({"error": "Invalid request"}, status_code=400)
-
-    user_settings = settings.load_settings()
-    favorites = user_settings.get("printify_color_favorites", [])
-
-    if action == "add":
-        if color_name not in favorites:
-            favorites.append(color_name)
-    else:
-        if color_name in favorites:
-            favorites.remove(color_name)
-
-    settings.save_settings({"printify_color_favorites": favorites})
+    favorites = _toggle_favorites("printify_color_favorites", color_name, action)
     return {"printify_color_favorites": favorites}
 
 
