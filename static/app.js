@@ -588,9 +588,17 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             return this.pColors.filter(c => favs.includes(c));
         },
 
+        get selectedNonFavoriteColors() {
+            const favs = Alpine.store('printifyColorFavorites') || [];
+            // Selected colors that aren't favorites — surface them above the collapsed list
+            // so the user can see what they've chosen without expanding
+            return this.pSelectedColors.filter(c => !favs.includes(c));
+        },
+
         get nonFavoriteColors() {
             const favs = Alpine.store('printifyColorFavorites') || [];
-            return this.pColors.filter(c => !favs.includes(c)).sort((a, b) => a.localeCompare(b));
+            // Exclude favorites AND already-selected colors; selected non-favs have their own section
+            return this.pColors.filter(c => !favs.includes(c) && !this.pSelectedColors.includes(c)).sort((a, b) => a.localeCompare(b));
         },
 
         get selectedVariantCount() {
