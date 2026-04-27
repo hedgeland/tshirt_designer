@@ -42,6 +42,6 @@ def save_settings(settings: dict) -> None:
     for key in _DEFAULT_SETTINGS:
         if key in settings:
             current[key] = settings[key]
-    
+
     with open(_SETTINGS_PATH, "w") as f:
         json.dump(current, f, indent=2)

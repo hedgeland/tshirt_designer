@@ -29,7 +29,9 @@ def _write_variants_json(concept_dir: Path, entries: list[dict]) -> None:
     p.write_text(json.dumps(entries, indent=2))
 
 
-def record_iteration_variant(concept_dir: Path, variant_num: int, root_variant_num: int | None) -> None:
+def record_iteration_variant(
+    concept_dir: Path, variant_num: int, root_variant_num: int | None
+) -> None:
     """Append an iteration entry to variants.json, recording its root ancestor variant number.
 
     root_variant_num is the variant number of the original (non-iteration) ancestor, not the
@@ -87,11 +89,15 @@ def scan_output() -> list[dict]:
         return []
 
     def _url(p: Path) -> str:
+        # Prepend slash to ensure it's a valid absolute-style URL for the browser
         return "/" + p.as_posix()
 
     def _dims(p: Path) -> tuple[int, int]:
-        with Image.open(p) as im:
-            return im.size
+        try:
+            with Image.open(p) as im:
+                return im.size
+        except Exception:
+            return 0, 0
 
     def _opt_stat(p: Path) -> tuple[int, str | None]:
         try:
@@ -107,8 +113,7 @@ def scan_output() -> list[dict]:
         session_bytes = 0
         finals = []
         finals_with_stat = [
-            (f, f.stat()) for f in session_dir.glob("final_*.png")
-            if "_no_bg" not in f.name
+            (f, f.stat()) for f in session_dir.glob("final_*.png") if "_no_bg" not in f.name
         ]
         for f, f_stat in sorted(finals_with_stat, key=lambda x: x[1].st_mtime, reverse=True):
             md = f.with_suffix(".md")
@@ -119,23 +124,25 @@ def scan_output() -> list[dict]:
             md_size, md_url = _opt_stat(md)
             session_bytes += size + no_bg_size + md_size
             w, h = _dims(f)
-            finals.append({
-                "png_url": _url(f),
-                "png_size": size,
-                "md_url": md_url,
-                "no_bg_url": no_bg_url,
-                "no_bg_size": no_bg_size,
-                "ts": ts,
-                "width": w,
-                "height": h,
-            })
+            finals.append(
+                {
+                    "png_url": _url(f),
+                    "png_size": size,
+                    "md_url": md_url,
+                    "no_bg_url": no_bg_url,
+                    "no_bg_size": no_bg_size,
+                    "ts": ts,
+                    "width": w,
+                    "height": h,
+                }
+            )
 
         concepts = []
         # Find all concept_N directories
         concept_dirs = sorted(
             [d for d in session_dir.iterdir() if d.is_dir() and d.name.startswith("concept_")],
             key=lambda d: d.stat().st_mtime,
-            reverse=True
+            reverse=True,
         )
 
         for concept_dir in concept_dirs:
@@ -146,9 +153,9 @@ def scan_output() -> list[dict]:
             vj_entries = _read_variants_json(concept_dir)
             iteration_counts: dict[int, int] = {}
             for entry in vj_entries:
-                root = entry.get("root")
-                if root is not None:
-                    iteration_counts[root] = iteration_counts.get(root, 0) + 1
+                root_v = entry.get("root")
+                if root_v is not None:
+                    iteration_counts[root_v] = iteration_counts.get(root_v, 0) + 1
 
             # Group variants in this concept
             _AR_ORDER = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
@@ -169,11 +176,12 @@ def scan_output() -> list[dict]:
             ):
                 # Sort renders by resolution (highest first) then aspect ratio (dropdown order)
                 renders_sorted = sorted(
-                    renders, 
+                    renders,
                     key=lambda r: (
                         -SIZE_PX.get(r[3], 0),
-                        _AR_ORDER.get(r[2].replace("x", ":"), 99)
-                    )                )
+                        _AR_ORDER.get(r[2].replace("x", ":"), 99),
+                    ),
+                )
                 render_list = []
                 for v, v_stat, ar_safe, res in renders_sorted:
                     no_bg = v.with_name(v.stem + "_no_bg.png")
@@ -181,39 +189,49 @@ def scan_output() -> list[dict]:
                     no_bg_size, no_bg_url = _opt_stat(no_bg)
                     session_bytes += size + no_bg_size
                     vw, vh = _dims(v)
-                    render_list.append({
-                        "url": _url(v),
-                        "size": size,
-                        "no_bg_url": no_bg_url,
-                        "no_bg_size": no_bg_size,
-                        "ar": ar_safe.replace("x", ":"),
-                        "res": res,
-                        "width": vw,
-                        "height": vh,
-                    })
+                    render_list.append(
+                        {
+                            "url": _url(v),
+                            "size": size,
+                            "no_bg_url": no_bg_url,
+                            "no_bg_size": no_bg_size,
+                            "ar": ar_safe.replace("x", ":"),
+                            "res": res,
+                            "width": vw,
+                            "height": vh,
+                        }
+                    )
 
                 rep = render_list[0]
-                ts = datetime.fromtimestamp(renders_sorted[0][1].st_mtime).strftime("%Y-%m-%d %H:%M")
-                concept_images.append({
-                    "url": rep["url"],
-                    "size": rep["size"],
-                    "no_bg_url": rep["no_bg_url"],
-                    "no_bg_size": rep["no_bg_size"],
-                    "ts": ts,
-                    "width": rep["width"],
-                    "height": rep["height"],
-                    "renders": render_list,
-                    "variant_num": _n,                      # raw variant number; needed by delete_variant
-                    "iteration_count": iteration_counts.get(_n, 0),  # how many iterations will also be removed
-                })
+                ts = datetime.fromtimestamp(renders_sorted[0][1].st_mtime).strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+                concept_images.append(
+                    {
+                        "url": rep["url"],
+                        "size": rep["size"],
+                        "no_bg_url": rep["no_bg_url"],
+                        "no_bg_size": rep["no_bg_size"],
+                        "ts": ts,
+                        "width": rep["width"],
+                        "height": rep["height"],
+                        "renders": render_list,
+                        "variant_num": _n,  # raw variant number; needed by delete_variant
+                        "iteration_count": iteration_counts.get(
+                            _n, 0
+                        ),  # how many iterations will also be removed
+                    }
+                )
 
             if concept_images:
-                concepts.append({
-                    "name": concept_dir.name,
-                    "display_session": display_session,
-                    "concept_text": concept_text,
-                    "images": concept_images,
-                })
+                concepts.append(
+                    {
+                        "name": concept_dir.name,
+                        "display_session": display_session,
+                        "concept_text": concept_text,
+                        "images": concept_images,
+                    }
+                )
 
         if finals or concepts:
             parts = session_dir.name.rsplit("_", 2)
@@ -232,14 +250,16 @@ def scan_output() -> list[dict]:
             for c in concepts:
                 all_images.extend(c["images"])
 
-            design_sessions.append({
-                "design_session": display_name,
-                "dir_name": session_dir.name,
-                "session_size_bytes": session_bytes,
-                "finals": finals,
-                "concepts": concepts,
-                "images": all_images,
-            })
+            design_sessions.append(
+                {
+                    "design_session": display_name,
+                    "dir_name": session_dir.name,
+                    "session_size_bytes": session_bytes,
+                    "finals": finals,
+                    "concepts": concepts,
+                    "images": all_images,
+                }
+            )
 
     return design_sessions
 
@@ -304,6 +324,8 @@ def delete_files(paths: list[str]) -> dict:
     # Prune empty directories bottom-up.
     # Collect first, then remove — modifying a directory while iterating it is
     # undefined behaviour on some filesystems and can raise StopIteration early.
+    import contextlib
+
     empty_concept_dirs = []
     for session_dir in Path(OUTPUT_DIR).iterdir():
         if not session_dir.is_dir():
@@ -312,18 +334,14 @@ def delete_files(paths: list[str]) -> dict:
             if concept_dir.is_dir() and not any(concept_dir.iterdir()):
                 empty_concept_dirs.append(concept_dir)
     for concept_dir in empty_concept_dirs:
-        try:
+        with contextlib.suppress(OSError):
             concept_dir.rmdir()
-        except OSError:
-            pass  # already gone or not empty; safe to skip
 
     # Re-scan theme dirs after child removal
     for session_dir in Path(OUTPUT_DIR).iterdir():
         if session_dir.is_dir() and not any(session_dir.iterdir()):
-            try:
+            with contextlib.suppress(OSError):
                 session_dir.rmdir()
-            except OSError:
-                pass
 
     return {"deleted": deleted, "freed_bytes": freed, "errors": errors}
 
@@ -459,6 +477,27 @@ def load_image_to_session(session: dict, image_url: str, display_session: str) -
     return {"url": image_url, "width": w, "height": h}
 
 
+def _parse_variant_prompts(prompts_md: Path) -> dict[int, str]:
+    """Parse variant prompts from prompts.md; return {variant_num: prompt}."""
+    if not prompts_md.exists():
+        return {}
+    content = prompts_md.read_text()
+    prompts = {}
+    # Split by variant headers: ## Variant 1, ## Variant 2, etc.
+    sections = re.split(r"## Variant (\d+)", content)
+    # sections[0] is the sidecar header; subsequent pairs are (num_str, body_text)
+    for i in range(1, len(sections), 2):
+        try:
+            num = int(sections[i])
+            body = sections[i + 1]
+            m = re.search(r"```\n?(.*?)\n?```", body, re.DOTALL)
+            if m:
+                prompts[num] = m.group(1).strip()
+        except (ValueError, IndexError):
+            continue
+    return prompts
+
+
 def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_name: str) -> dict:
     """Load an entire concept directory into a session.
 
@@ -472,6 +511,7 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
         raise ValueError(f"Concept directory not found: {concept_dir_name}")
 
     display_session, concept_text, variant_count = parse_concept_from_prompts(concept_dir)
+    variant_prompts_map = _parse_variant_prompts(concept_dir / "prompts.md")
 
     # Group variants
     groups: dict[int, list[Path]] = {}
@@ -488,11 +528,12 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
 
     # Sort groups and identify "original" variants vs iterations
     _AR_ORDER = {ar: i for i, ar in enumerate(ASPECT_RATIOS)}
-    
+
     variant_indices = sorted(groups.keys())
     image_paths = []
     combo_lists = []
-    
+    session_prompts = []
+
     for idx in variant_indices:
         renders = groups[idx]
         # Sort renders by resolution (highest first) then aspect ratio (dropdown order)
@@ -500,29 +541,38 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
             renders,
             key=lambda p: (
                 -SIZE_PX.get(p.stem.split("_")[-1], 0),
-                _AR_ORDER.get(p.stem.split("_")[2].replace("x", ":"), 99)
-            )
+                _AR_ORDER.get(p.stem.split("_")[2].replace("x", ":"), 99),
+            ),
         )
-        
+
         # The first render is our "primary" one for this variant slot
         primary = renders_sorted[0]
         # Store paths relative to project root (e.g. "output/theme/concept/...")
         image_paths.append(primary.relative_to(root.parent).as_posix())
-        
+
         # Build the combo list for this variant
         combos = []
         for r in renders_sorted:
             m = re.match(r"variant_(\d+)_(.+)_([^_]+)$", r.stem)
+            if not m:
+                continue
             ar = m.group(2).replace("x", ":")
             res = m.group(3)
             no_bg = r.with_name(r.stem + "_no_bg.png")
-            combos.append({
-                "url": "/" + r.relative_to(root.parent).as_posix(),
-                "size": res,
-                "aspectRatio": ar,
-                "noBgUrl": "/" + no_bg.relative_to(root.parent).as_posix() if no_bg.exists() else None
-            })
+            combos.append(
+                {
+                    "url": "/" + r.relative_to(root.parent).as_posix(),
+                    "size": res,
+                    "aspectRatio": ar,
+                    "noBgUrl": "/" + no_bg.relative_to(root.parent).as_posix()
+                    if no_bg.exists()
+                    else None,
+                }
+            )
         combo_lists.append(combos)
+
+        # Restore prompt for this variant (original or iteration edit prompt)
+        session_prompts.append(variant_prompts_map.get(idx, ""))
 
     # Load PIL images for the primary variants
     images = []
@@ -532,46 +582,47 @@ def load_concept_to_session(session: dict, session_dir_name: str, concept_dir_na
         images.append(img)
 
     # Differentiate originals vs iterations using variants.json when available.
-    # Fall back to prompts.md variant_count for sessions created before variants.json existed.
     vj_entries = _read_variants_json(concept_dir)
     if vj_entries:
-        # Build variant_num → root_variant_num from the JSON
         vj_map: dict[int, int | None] = {e["variant"]: e.get("root") for e in vj_entries}
-        # Build variant_num → index-in-image_paths so we can convert root nums to rootIdx values
         num_to_pos = {num: pos for pos, num in enumerate(variant_indices)}
         orig_count = sum(1 for num in variant_indices if vj_map.get(num) is None)
         iteration_roots = [
-            num_to_pos.get(vj_map[num], 0)
-            for num in variant_indices
-            if vj_map.get(num) is not None  # only emit an entry for each iteration
+            num_to_pos.get(vj_map[num], 0) for num in variant_indices if vj_map.get(num) is not None
         ]
     else:
-        # Backward compat: no variants.json — assume all beyond variant_count are iterations
-        # from root 0 (same as the old best-guess behaviour)
         orig_count = variant_count if variant_count > 0 else len(image_paths)
         iteration_roots = [0] * (len(image_paths) - orig_count)
 
-    original_image_paths = image_paths[:orig_count]
-
     # Reset and populate session
     session["theme"] = display_session or session_dir_name
-    session["concepts"] = [concept_text] if concept_text else []
-    session["prompts"] = [] # We don't store prompts in session usually, they are built on the fly
+    # Populate concepts as a list of dicts expected by the frontend
+    session["concepts"] = [{"id": 0, "text": concept_text}] if concept_text else []
+    session["prompts"] = session_prompts
     session["images"] = images
     session["image_paths"] = image_paths
     session["original_images"] = list(images[:orig_count])
-    session["original_image_paths"] = list(original_image_paths)
+    session["original_image_paths"] = list(image_paths[:orig_count])
     session["iteration_roots"] = iteration_roots
     session["no_bg_variant_cache"] = {}
     session["selected_idx"] = 0
     session["concept_dir"] = concept_dir.relative_to(root.parent).as_posix()
     session["combo_lists"] = combo_lists
-    
-    # Extract variant size and aspect ratio from the first primary variant
-    m = re.match(r"variant_(\d+)_(.+)_([^_]+)$", Path(image_paths[0]).stem)
-    if m:
-        session["variant_aspect_ratio"] = m.group(2).replace("x", ":")
-        session["variant_size"] = m.group(3)
+
+    # Determine variant size and aspect ratio from the highest resolution across all variants
+    max_res_px = -1
+    best_ar = ASPECT_RATIOS[0]
+    best_size = "512"
+    for combos in combo_lists:
+        for c in combos:
+            px = SIZE_PX.get(c["size"], 0)
+            if px > max_res_px:
+                max_res_px = px
+                best_size = c["size"]
+                best_ar = c["aspectRatio"]
+
+    session["variant_aspect_ratio"] = best_ar
+    session["variant_size"] = best_size
 
     return {"theme": session["theme"], "concept": concept_text}
 
@@ -583,8 +634,7 @@ def safe_design_session_name(theme: str) -> str:
     first 3 meaningful words for display.  Non-alphanumeric chars become underscores.
     """
     sanitized = "".join(
-        c if c.isalnum() or c in ("-", "_") else "_"
-        for c in theme.strip().replace(" ", "_")
+        c if c.isalnum() or c in ("-", "_") else "_" for c in theme.strip().replace(" ", "_")
     )
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"{sanitized}_{ts}"

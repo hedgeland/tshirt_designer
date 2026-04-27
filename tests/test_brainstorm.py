@@ -66,6 +66,7 @@ def test_empty_response_returns_empty_list():
 def test_short_response_logs_warning(caplog):
     """When the model returns fewer concepts than requested a warning is logged."""
     import logging
+
     text = '["Only one"]'
     with patch("src.brainstorm.get_client", return_value=_patched_client(text)):
         with caplog.at_level(logging.WARNING, logger="src.brainstorm"):

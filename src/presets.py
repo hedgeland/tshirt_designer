@@ -72,7 +72,9 @@ def save_preset(name: str, concepts: str, variants: str, style: str) -> None:
     user_presets = load_user_presets()
     # Overwriting an existing preset is always allowed; only new entries count.
     if name not in user_presets and len(user_presets) >= MAX_PRESETS:
-        raise ValueError(f"Preset limit reached ({MAX_PRESETS}). Delete one before saving a new preset.")
+        raise ValueError(
+            f"Preset limit reached ({MAX_PRESETS}). Delete one before saving a new preset."
+        )
     user_presets[name] = {
         "concepts_prompt": concepts,
         "variants_prompt": variants,

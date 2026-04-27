@@ -10,6 +10,7 @@ from src.output import safe_design_session_name, save_variants
 # ── safe_design_session_name ───────────────────────────────────────────────────────────
 # The function appends _YYYYMMDD_HHMMSS, so tests check the sanitized prefix only.
 
+
 def _prefix(name: str) -> str:
     """Strip the trailing _YYYYMMDD_HHMMSS timestamp from a safe_design_session_name result."""
     return re.sub(r"_\d{8}_\d{6}$", "", name)
@@ -43,6 +44,7 @@ def test_safe_design_session_name_includes_timestamp():
 
 # ── save_variants ─────────────────────────────────────────────────────────────
 
+
 def test_save_variants_creates_files(tmp_path, monkeypatch):
     monkeypatch.setattr("src.output.OUTPUT_DIR", str(tmp_path))
 
@@ -62,7 +64,7 @@ def test_save_variants_directory_structure(tmp_path, monkeypatch):
     paths, concept_dir = save_variants("my theme", 1, [img], "1:1", "512")
 
     assert "my_theme" in paths[0]
-    assert "concept_2" in paths[0]   # concept_idx=1 → concept_2
+    assert "concept_2" in paths[0]  # concept_idx=1 → concept_2
     assert "variant_1_" in paths[0]
     assert paths[0].endswith(".png")
 

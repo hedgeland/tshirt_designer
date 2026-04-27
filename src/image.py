@@ -100,7 +100,13 @@ def generate_image(
     return _extract_image(with_retry(_call))
 
 
-def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str = FINAL_SIZE, aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> Image.Image:
+def finalize_image(
+    prompt: str,
+    reference: Image.Image,
+    api_key: str,
+    size: str = FINAL_SIZE,
+    aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+) -> Image.Image:
     """Re-generate the approved variant at full resolution using the image as a visual anchor.
 
     Sending the reference alongside the prompt keeps the model from drifting to a new
@@ -118,14 +124,16 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
             model=MODEL,
             contents=[
                 types.Part(inline_data=types.Blob(data=image_bytes, mime_type="image/png")),
-                types.Part(text=(
-                    f"Recreate this exact design at {size} resolution. "
-                    f"Preserve the composition, color palette, style, and every visual element exactly. "
-                    f"The background MUST be a perfectly flat, solid, uniform color — "
-                    f"absolutely no texture, grunge, grain, noise, pattern, or color variation in the background whatsoever. "
-                    f"Pure solid fill only. "
-                    f"Original prompt for reference: {prompt}"
-                )),
+                types.Part(
+                    text=(
+                        f"Recreate this exact design at {size} resolution. "
+                        f"Preserve the composition, color palette, style, and every visual element exactly. "
+                        f"The background MUST be a perfectly flat, solid, uniform color — "
+                        f"absolutely no texture, grunge, grain, noise, pattern, or color variation in the background whatsoever. "
+                        f"Pure solid fill only. "
+                        f"Original prompt for reference: {prompt}"
+                    )
+                ),
             ],
             config=types.GenerateContentConfig(
                 response_modalities=["IMAGE"],

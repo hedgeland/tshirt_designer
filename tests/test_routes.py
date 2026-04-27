@@ -35,6 +35,7 @@ def test_get_builtin_preset():
     import urllib.parse
 
     from src.presets import BUILTIN_NAME
+
     response = client.get(f"/presets/{urllib.parse.quote(BUILTIN_NAME)}")
     assert response.status_code == 200
     data = response.json()
@@ -55,15 +56,19 @@ _S = "Use {bg_color} background with max {max_colors} colors."
 
 def test_save_and_delete_preset(tmp_path, monkeypatch):
     import src.presets as presets_module
+
     monkeypatch.setattr(presets_module, "_PRESETS_PATH", tmp_path / "presets.json")
 
     # Save
-    response = client.post("/presets", data={
-        "name": "Test Preset",
-        "concepts": _C,
-        "variants": _V,
-        "style": _S,
-    })
+    response = client.post(
+        "/presets",
+        data={
+            "name": "Test Preset",
+            "concepts": _C,
+            "variants": _V,
+            "style": _S,
+        },
+    )
     assert response.status_code == 200
     assert "Test Preset" in response.json()["names"]
 
@@ -75,12 +80,16 @@ def test_save_and_delete_preset(tmp_path, monkeypatch):
 
 def test_save_preset_rejects_builtin_name():
     from src.presets import BUILTIN_NAME
-    response = client.post("/presets", data={
-        "name": BUILTIN_NAME,
-        "concepts": _C,
-        "variants": _V,
-        "style": _S,
-    })
+
+    response = client.post(
+        "/presets",
+        data={
+            "name": BUILTIN_NAME,
+            "concepts": _C,
+            "variants": _V,
+            "style": _S,
+        },
+    )
     assert response.status_code == 200
     assert "error" in response.json()
 
@@ -147,11 +156,14 @@ def test_columns_in_same_session_are_isolated():
     client.post("/columns", data={"session_id": sid})
 
     # Write selected_idx to column 0
-    client.post("/session/select-variant", data={
-        "session_id": sid,
-        "column_id": 0,
-        "selected_idx": 7,
-    })
+    client.post(
+        "/session/select-variant",
+        data={
+            "session_id": sid,
+            "column_id": 0,
+            "selected_idx": 7,
+        },
+    )
 
     # Column 1 must have its own independent selected_idx (None / unset)
     r = client.get("/session/columns", params={"session_id": sid})
@@ -165,10 +177,13 @@ def test_session_num_variants_persistence():
     sid = "test-session-num-variants"
 
     # Set default num_variants to 3
-    r = client.post("/session/num-variants", data={
-        "session_id": sid,
-        "num_variants": 3,
-    })
+    r = client.post(
+        "/session/num-variants",
+        data={
+            "session_id": sid,
+            "num_variants": 3,
+        },
+    )
     assert r.status_code == 200
     assert r.json()["num_variants"] == 3
 

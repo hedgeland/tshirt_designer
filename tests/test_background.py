@@ -34,8 +34,8 @@ def test_solid_background_fully_removed():
 
 def test_background_removed_design_preserved():
     """Background pixels should be transparent; interior design pixels should remain opaque."""
-    bg = (255, 0, 255, 255)   # magenta background
-    fg = (0, 0, 255, 255)     # blue design
+    bg = (255, 0, 255, 255)  # magenta background
+    fg = (0, 0, 255, 255)  # blue design
     img = _image_with_design(bg, fg, size=64)
 
     result = remove_background_color(img, "#FF00FF", tolerance=10, erode_px=0, decontaminate=0)
@@ -79,7 +79,11 @@ def test_tolerance_zero_removes_exact_matches_only():
 
 
 def test_different_background_colors():
-    for hex_color, rgb in [("#FF0000", (255, 0, 0)), ("#00FF00", (0, 255, 0)), ("#0000FF", (0, 0, 255))]:
+    for hex_color, rgb in [
+        ("#FF0000", (255, 0, 0)),
+        ("#00FF00", (0, 255, 0)),
+        ("#0000FF", (0, 0, 255)),
+    ]:
         img = _solid_image((*rgb, 255))
         result = remove_background_color(img, hex_color, tolerance=5)
         arr = np.array(result)

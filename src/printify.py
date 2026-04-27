@@ -31,6 +31,7 @@ def _h(token: str) -> dict[str, str]:
 
 # ── Disk cache helpers ─────────────────────────────────────────────────────────
 
+
 def _cache_path(*parts: object) -> Path:
     """Build an absolute path inside PRINTIFY_CACHE_DIR for the given key parts."""
     # Join parts with underscores so callers don't have to manage subdirs.
@@ -67,6 +68,7 @@ def _cache_save(path: Path, data) -> None:
 
 # ── Catalog ────────────────────────────────────────────────────────────────────
 
+
 @functools.lru_cache(maxsize=1)
 def list_shops(token: str) -> list[dict]:
     """Return all shops connected to this Printify account.
@@ -75,10 +77,12 @@ def list_shops(token: str) -> list[dict]:
     (small payload, changes when the user connects/disconnects a store).
     The lru_cache is enough to avoid repeat calls within a single process.
     """
+
     def _call():
         r = httpx.get(f"{_BASE}/shops.json", headers=_h(token), timeout=_TIMEOUT)
         r.raise_for_status()
         return r.json()
+
     return with_retry(_call)
 
 
@@ -88,11 +92,13 @@ def _cached_get(token: str, url: str, cache_key: tuple, transform=None) -> Any:
     cached = _cache_load(path)
     if cached is not None:
         return cached
+
     def _call():
         r = httpx.get(url, headers=_h(token), timeout=_TIMEOUT)
         r.raise_for_status()
         data = r.json()
         return transform(data) if transform else data
+
     result = with_retry(_call)
     _cache_save(path, result)
     return result
@@ -156,10 +162,12 @@ def get_print_details(token: str, blueprint_id: int, provider_id: int) -> Any:
 
 # ── Publishing ─────────────────────────────────────────────────────────────────
 
+
 def upload_image(token: str, image_path: str) -> str:
     """Upload a PNG file to Printify's image library. Returns the image ID."""
     path = Path(image_path)
     encoded = base64.b64encode(path.read_bytes()).decode()
+
     def _call():
         r = httpx.post(
             f"{_BASE}/uploads/images.json",
@@ -169,6 +177,7 @@ def upload_image(token: str, image_path: str) -> str:
         )
         r.raise_for_status()
         return r.json()["id"]
+
     return with_retry(_call)
 
 
@@ -198,10 +207,7 @@ def create_product(
         "description": description,
         "blueprint_id": blueprint_id,
         "print_provider_id": provider_id,
-        "variants": [
-            {"id": vid, "price": price_cents, "is_enabled": True}
-            for vid in variant_ids
-        ],
+        "variants": [{"id": vid, "price": price_cents, "is_enabled": True} for vid in variant_ids],
         # Single print area covering all variants — design on the front.
         "print_areas": [
             {
@@ -223,6 +229,7 @@ def create_product(
             }
         ],
     }
+
     def _call():
         r = httpx.post(
             f"{_BASE}/shops/{shop_id}/products.json",
@@ -232,18 +239,27 @@ def create_product(
         )
         r.raise_for_status()
         return r.json()["id"]
+
     return with_retry(_call)
 
 
 def publish_product(token: str, shop_id: str, product_id: str) -> None:
     """Publish a draft product to the connected store."""
+
     def _call():
         r = httpx.post(
             f"{_BASE}/shops/{shop_id}/products/{product_id}/publish.json",
             headers=_h(token),
             # Tell Printify which fields to sync to the connected store.
-            json={"title": True, "description": True, "images": True, "variants": True, "tags": True},
+            json={
+                "title": True,
+                "description": True,
+                "images": True,
+                "variants": True,
+                "tags": True,
+            },
             timeout=_TIMEOUT,
         )
         r.raise_for_status()
+
     with_retry(_call)

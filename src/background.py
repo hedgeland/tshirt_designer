@@ -27,12 +27,15 @@ def _sample_background_color(arr: np.ndarray) -> tuple[tuple[int, int, int], int
     h, w = arr.shape[:2]
 
     # Corner-based initial estimate — fast and reliable for the center hue.
-    corners = np.array([
-        arr[0, 0, :3],
-        arr[0, w - 1, :3],
-        arr[h - 1, 0, :3],
-        arr[h - 1, w - 1, :3],
-    ], dtype=np.float32)
+    corners = np.array(
+        [
+            arr[0, 0, :3],
+            arr[0, w - 1, :3],
+            arr[h - 1, 0, :3],
+            arr[h - 1, w - 1, :3],
+        ],
+        dtype=np.float32,
+    )
     avg = np.mean(corners, axis=0)
     center = (int(round(float(avg[0]))), int(round(float(avg[1]))), int(round(float(avg[2]))))
 
@@ -51,9 +54,9 @@ def _sample_background_color(arr: np.ndarray) -> tuple[tuple[int, int, int], int
     # Keep only pixels plausibly in the background hue family (within a loose 80-unit
     # threshold per channel); design elements touching the border would differ further.
     close = (
-        (np.abs(border_pixels[:, 0] - cr) <= 80) &
-        (np.abs(border_pixels[:, 1] - cg) <= 80) &
-        (np.abs(border_pixels[:, 2] - cb) <= 80)
+        (np.abs(border_pixels[:, 0] - cr) <= 80)
+        & (np.abs(border_pixels[:, 1] - cg) <= 80)
+        & (np.abs(border_pixels[:, 2] - cb) <= 80)
     )
     bg_pixels = border_pixels[close]
 
@@ -84,9 +87,9 @@ def _color_mask(
     """
     r, g, b = target
     mask = (
-        (np.abs(arr[:, :, 0].astype(np.int32) - r) <= tolerance) &
-        (np.abs(arr[:, :, 1].astype(np.int32) - g) <= tolerance) &
-        (np.abs(arr[:, :, 2].astype(np.int32) - b) <= tolerance)
+        (np.abs(arr[:, :, 0].astype(np.int32) - r) <= tolerance)
+        & (np.abs(arr[:, :, 1].astype(np.int32) - g) <= tolerance)
+        & (np.abs(arr[:, :, 2].astype(np.int32) - b) <= tolerance)
     )
     if require_opaque:
         mask = mask & (arr[:, :, 3] > 0)
@@ -163,9 +166,7 @@ def _normalize_background(
     return result
 
 
-def _flood_fill_remove(
-    arr: np.ndarray, target: tuple[int, int, int], tolerance: int
-) -> np.ndarray:
+def _flood_fill_remove(arr: np.ndarray, target: tuple[int, int, int], tolerance: int) -> np.ndarray:
     """BFS flood fill from image edges to remove connected background pixels.
 
     Seeds from every edge pixel and expands inward through neighbors that match the
@@ -211,7 +212,9 @@ def _flood_fill_remove(
     return result
 
 
-def _remove_interior_bg(arr: np.ndarray, target: tuple[int, int, int], tolerance: int = 0) -> np.ndarray:
+def _remove_interior_bg(
+    arr: np.ndarray, target: tuple[int, int, int], tolerance: int = 0
+) -> np.ndarray:
     """Transparent-ize isolated background-colored pockets not reachable from the edges.
 
     After flood fill removes edge-connected background, any remaining opaque pixel
@@ -245,7 +248,9 @@ def _decontaminate_edges(
 
     # Dilate the transparent region outward to find nearby opaque edge pixels.
     transparent_mask = Image.fromarray((alpha < 1).astype(np.uint8) * 255, "L")
-    dilated = np.array(transparent_mask.filter(ImageFilter.MaxFilter(radius * 2 + 1)), dtype=np.float32)
+    dilated = np.array(
+        transparent_mask.filter(ImageFilter.MaxFilter(radius * 2 + 1)), dtype=np.float32
+    )
     edge = (dilated > 0) & (alpha > 0)
 
     for c, bg_val in enumerate(bg_rgb):
@@ -268,12 +273,12 @@ def content_bounds(image: Image.Image) -> tuple[float, float]:
     arr = np.array(image.convert("RGBA"))
     alpha = arr[:, :, 3]
 
-    if alpha.min() == 255:          # no transparency — content fills the image
+    if alpha.min() == 255:  # no transparency — content fills the image
         return (0.0, 1.0)
 
     non_transparent = np.any(alpha > 0, axis=1)  # rows containing any visible pixel
 
-    if not non_transparent.any():   # fully transparent — shouldn't happen, but safe
+    if not non_transparent.any():  # fully transparent — shouldn't happen, but safe
         return (0.0, 1.0)
 
     h = arr.shape[0]

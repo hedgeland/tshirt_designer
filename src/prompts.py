@@ -40,4 +40,7 @@ def build_prompts(
         base_prompts = [concept] * num_variants
 
     # Append shared style constraints so the model targets POD-friendly output.
-    return [f"{p}, {style_suffix(style_template, bg_color, max_colors)}" for p in base_prompts[:num_variants]]
+    return [
+        f"{p}, {style_suffix(style_template, bg_color, max_colors)}"
+        for p in base_prompts[:num_variants]
+    ]

@@ -116,6 +116,7 @@ class OriginCheckMiddleware(BaseHTTPMiddleware):
     mitigates most CSRF risk in local-dev mode, but origin validation closes the remaining
     gap for authenticated deployments without adding token round-trips.
     """
+
     async def dispatch(self, request: Request, call_next):
         # Only enforce in auth mode; GET/HEAD/OPTIONS are safe methods.
         if not GOOGLE_CLIENT_ID or request.method in ("GET", "HEAD", "OPTIONS"):
@@ -170,7 +171,7 @@ _SERIALIZABLE_COLUMN_KEYS = {
     "variant_aspect_ratio",  # aspect ratio used when variants were generated; needed to restore gallery label
     "image_paths",
     "original_image_paths",  # N original variants; anything beyond this in image_paths is an iteration
-    "iteration_roots",       # rootIdx for each iteration in order; parallel to image_paths[len(original_image_paths):]
+    "iteration_roots",  # rootIdx for each iteration in order; parallel to image_paths[len(original_image_paths):]
     "selected_idx",
     "final_path",
     "num_variants",
@@ -204,14 +205,14 @@ def get_session(session_id: str) -> dict:
     """
     if session_id not in sessions:
         user_settings = settings.load_settings()
-        
+
         # Clamp num_variants from settings against the current hard max
         loaded_num_variants = user_settings.get("default_num_variants", NUM_VARIANTS)
         clamped_num_variants = _clamp(loaded_num_variants, 1, MAX_VARIANTS)
-        
+
         initial_col = init_column_state()
         initial_col["num_variants"] = clamped_num_variants
-        
+
         sessions[session_id] = {
             "columns": [initial_col],  # start with one column
             "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
@@ -282,11 +283,13 @@ def _scan_combo_files(directory: Path, glob_pattern: str) -> list[dict]:
         if len(parts) != 4:
             continue
         ar_safe, size = parts[2], parts[3]
-        results.append({
-            "size": size,
-            "aspectRatio": ar_safe.replace("x", ":"),
-            "url": f"/{p}",
-        })
+        results.append(
+            {
+                "size": size,
+                "aspectRatio": ar_safe.replace("x", ":"),
+                "url": f"/{p}",
+            }
+        )
     results.sort(key=lambda r: (-SIZE_PX.get(r["size"], 0), ar_order.get(r["aspectRatio"], 99)))
     return results
 
@@ -306,6 +309,7 @@ def _scan_variant_combos(concept_dir: Path, variant_num: int) -> list[dict]:
 
 # ── Session cleanup ───────────────────────────────────────────────────────────
 
+
 @app.on_event("startup")
 async def start_session_cleanup():
     """Launch the background task that evicts idle sessions."""
@@ -318,10 +322,7 @@ async def _session_cleanup_loop():
     while True:
         await asyncio.sleep(SESSION_CLEANUP_INTERVAL)
         cutoff = time.time() - SESSION_TTL_SECONDS
-        stale = [
-            sid for sid, sess in sessions.items()
-            if sess.get("_last_accessed", 0) < cutoff
-        ]
+        stale = [sid for sid, sess in sessions.items() if sess.get("_last_accessed", 0) < cutoff]
         for sid in stale:
             sessions.pop(sid, None)
         if stale:
@@ -329,6 +330,7 @@ async def _session_cleanup_loop():
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
+
 
 def _validate_bg_params(bg_tolerance: int, edge_erode: int, decontaminate: int) -> str | None:
     """Return an error message if background-removal parameters are out of range, else None."""
@@ -437,7 +439,7 @@ async def index(request: Request):
             "final_sizes": FINAL_SIZES,
             "final_size": FINAL_SIZE,
             "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
-            "max_columns_hard_cap": MAX_COLUMNS,   # server-side ceiling; never changes at runtime
+            "max_columns_hard_cap": MAX_COLUMNS,  # server-side ceiling; never changes at runtime
             "min_columns": user_settings.get("default_min_columns", 1),
             "printify_favorites": user_settings.get("printify_favorites", []),
             "printify_color_favorites": user_settings.get("printify_color_favorites", []),
@@ -465,7 +467,14 @@ async def brainstorm(
         yield sse({"type": "status", "message": "Generating concepts..."})
 
         # Emit the full formatted prompt so the debug panel can show exactly what was sent.
-        yield sse({"type": "prompt_debug", "step": "brainstorm", "label": "Concepts prompt", "text": concepts_prompt(concepts_template, theme.strip(), NUM_CONCEPTS)})
+        yield sse(
+            {
+                "type": "prompt_debug",
+                "step": "brainstorm",
+                "label": "Concepts prompt",
+                "text": concepts_prompt(concepts_template, theme.strip(), NUM_CONCEPTS),
+            }
+        )
 
         try:
             concepts = await asyncio.to_thread(
@@ -509,7 +518,9 @@ async def generate(
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
     reference_mode: str = Form("style"),
     direct_mode: bool = Form(False),
-    theme_form: str = Form(""),  # sent by client; used to seed session theme when brainstorm was skipped
+    theme_form: str = Form(
+        ""
+    ),  # sent by client; used to seed session theme when brainstorm was skipped
 ):
     async def stream():
         if not GOOGLE_API_KEY:
@@ -543,7 +554,14 @@ async def generate(
         yield sse({"type": "status", "message": "Building prompts..."})
 
         # Emit the raw variants prompt before it goes to the model so the debug panel shows it.
-        yield sse({"type": "prompt_debug", "step": "variants_text", "label": "Variant descriptions prompt", "text": variants_prompt(variants_template, concept.strip(), num_variants)})
+        yield sse(
+            {
+                "type": "prompt_debug",
+                "step": "variants_text",
+                "label": "Variant descriptions prompt",
+                "text": variants_prompt(variants_template, concept.strip(), num_variants),
+            }
+        )
 
         try:
             prompts = await asyncio.to_thread(
@@ -579,8 +597,19 @@ async def generate(
                     }
                 )
             # Prepend the reference instruction so the debug panel shows the exact text the model received.
-            instruction = REFERENCE_INSTRUCTIONS.get(reference_mode, REFERENCE_INSTRUCTIONS["style"]) if ref_image is not None else ""
-            yield sse({"type": "prompt_debug", "step": "image", "label": f"Image prompt {i + 1} of {num_variants}", "text": instruction + prompt})
+            instruction = (
+                REFERENCE_INSTRUCTIONS.get(reference_mode, REFERENCE_INSTRUCTIONS["style"])
+                if ref_image is not None
+                else ""
+            )
+            yield sse(
+                {
+                    "type": "prompt_debug",
+                    "step": "image",
+                    "label": f"Image prompt {i + 1} of {num_variants}",
+                    "text": instruction + prompt,
+                }
+            )
             try:
                 img = await asyncio.to_thread(
                     generate_image,
@@ -618,7 +647,9 @@ async def generate(
             # image is present, so the sidecar shows the exact text sent to the model.
             if ref_image is not None:
                 # Mirror the exact prefix generate_image prepends so the sidecar matches what the model received.
-                instruction = REFERENCE_INSTRUCTIONS.get(reference_mode, REFERENCE_INSTRUCTIONS["style"])
+                instruction = REFERENCE_INSTRUCTIONS.get(
+                    reference_mode, REFERENCE_INSTRUCTIONS["style"]
+                )
                 full_prompts = [instruction + p for p in prompts]
             else:
                 full_prompts = prompts
@@ -732,7 +763,13 @@ async def finalize(
             session["original_final"] = final_img
             session["original_final_path"] = str(final_path)
             session["no_bg_final_cache"] = None
-            yield sse({"type": "final", "url": f"/{final_path}", "existing_finals": _scan_existing_finals(session_dir, idx)})
+            yield sse(
+                {
+                    "type": "final",
+                    "url": f"/{final_path}",
+                    "existing_finals": _scan_existing_finals(session_dir, idx),
+                }
+            )
             return
 
         variant = images[idx]
@@ -789,7 +826,13 @@ async def finalize(
         session["original_final_path"] = str(final_path)
         session["no_bg_final_cache"] = None  # stale on each new finalize
 
-        yield sse({"type": "final", "url": final_url, "existing_finals": _scan_existing_finals(session_dir, idx)})
+        yield sse(
+            {
+                "type": "final",
+                "url": final_url,
+                "existing_finals": _scan_existing_finals(session_dir, idx),
+            }
+        )
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -838,7 +881,14 @@ async def render_combo(
         # Disk cache hit — no API call needed
         if target_path.exists():
             combos = _scan_variant_combos(concept_dir, variant_num)
-            yield sse({"type": "render", "url": f"/{target_path}", "combos": combos, "variant_idx": variant_idx})
+            yield sse(
+                {
+                    "type": "render",
+                    "url": f"/{target_path}",
+                    "combos": combos,
+                    "variant_idx": variant_idx,
+                }
+            )
             return
 
         # Find smallest existing render as reference to anchor the composition
@@ -864,7 +914,12 @@ async def render_combo(
         prompts = session.get("prompts", [])
         prompt = prompts[variant_idx] if variant_idx < len(prompts) else ""
 
-        yield sse({"type": "status", "message": f"Rendering variant {variant_num} at {size} ({aspect_ratio})..."})
+        yield sse(
+            {
+                "type": "status",
+                "message": f"Rendering variant {variant_num} at {size} ({aspect_ratio})...",
+            }
+        )
 
         try:
             if reference_img is not None:
@@ -893,7 +948,14 @@ async def render_combo(
         await asyncio.to_thread(rendered.save, str(target_path), "PNG")
 
         combos = _scan_variant_combos(concept_dir, variant_num)
-        yield sse({"type": "render", "url": f"/{target_path}", "combos": combos, "variant_idx": variant_idx})
+        yield sse(
+            {
+                "type": "render",
+                "url": f"/{target_path}",
+                "combos": combos,
+                "variant_idx": variant_idx,
+            }
+        )
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -902,11 +964,15 @@ async def render_combo(
 async def edit_variant(
     session_id: str = Form(...),
     column_id: int = Form(0),
-    source_url: str = Form(...),   # URL of the variant to edit, e.g. /output/theme/concept_0/variant_1_1x1_512.png
+    source_url: str = Form(
+        ...
+    ),  # URL of the variant to edit, e.g. /output/theme/concept_0/variant_1_1x1_512.png
     edit_prompt: str = Form(...),  # user-supplied change description
     size: str = Form(BRAINSTORM_SIZE),
     aspect_ratio: str = Form(DEFAULT_ASPECT_RATIO),
-    root_idx: int = Form(0),       # index of the non-iteration ancestor; persisted so reload can restore the chain
+    root_idx: int = Form(
+        0
+    ),  # index of the non-iteration ancestor; persisted so reload can restore the chain
 ):
     """Apply iterative edits to an existing variant and append the result as a new variant.
 
@@ -915,6 +981,7 @@ async def edit_variant(
     using the standard variant_N_ARxAR_SIZE.png convention so /render can treat it identically
     to any brainstorm variant.
     """
+
     async def stream():
         if not GOOGLE_API_KEY:
             yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
@@ -950,14 +1017,25 @@ async def edit_variant(
             for p in concept_dir.glob("variant_*.png")
             if (_m2 := re.match(r"variant_(\d+)_", p.name))
         ]
-        next_variant_num = max(_existing_nums) + 1 if _existing_nums else len(session.get("images", [])) + 1
+        next_variant_num = (
+            max(_existing_nums) + 1 if _existing_nums else len(session.get("images", [])) + 1
+        )
         ar_safe = aspect_ratio.replace(":", "x")
         save_path = concept_dir / f"variant_{next_variant_num}_{ar_safe}_{size}.png"
 
-        yield sse({"type": "status", "message": f"Generating iteration at {size} ({aspect_ratio})..."})
+        yield sse(
+            {"type": "status", "message": f"Generating iteration at {size} ({aspect_ratio})..."}
+        )
 
         # The model always receives the edit instruction prefix + the user's prompt; emit both for the debug panel.
-        yield sse({"type": "prompt_debug", "step": "iteration", "label": "Iteration edit prompt", "text": REFERENCE_INSTRUCTIONS["edit"] + edit_prompt.strip()})
+        yield sse(
+            {
+                "type": "prompt_debug",
+                "step": "iteration",
+                "label": "Iteration edit prompt",
+                "text": REFERENCE_INSTRUCTIONS["edit"] + edit_prompt.strip(),
+            }
+        )
 
         try:
             source_img = await asyncio.to_thread(lambda: Image.open(str(source_path)).copy())
@@ -984,7 +1062,9 @@ async def edit_variant(
             rm = re.match(r"variant_(\d+)_", Path(root_image_paths[root_idx]).name)
             if rm:
                 root_variant_num = int(rm.group(1))
-        await asyncio.to_thread(record_iteration_variant, concept_dir, next_variant_num, root_variant_num)
+        await asyncio.to_thread(
+            record_iteration_variant, concept_dir, next_variant_num, root_variant_num
+        )
 
         # Append to session so /render can index into images[] and prompts[] by variant_idx.
         # iteration_roots[j] mirrors the j-th appended iteration's rootIdx so the client
@@ -996,7 +1076,9 @@ async def edit_variant(
 
         new_idx = len(session["images"]) - 1
         combos = _scan_variant_combos(concept_dir, next_variant_num)
-        yield sse({"type": "edit_variant", "url": f"/{save_path}", "index": new_idx, "combos": combos})
+        yield sse(
+            {"type": "edit_variant", "url": f"/{save_path}", "index": new_idx, "combos": combos}
+        )
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -1039,7 +1121,9 @@ async def remove_variant_bg(
         else:
             yield sse({"type": "status", "message": "Removing background..."})
             try:
-                result = await _run_remove_bg(images[idx], bg_color, bg_tolerance, edge_erode, decontaminate)
+                result = await _run_remove_bg(
+                    images[idx], bg_color, bg_tolerance, edge_erode, decontaminate
+                )
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
                 return
@@ -1076,6 +1160,7 @@ async def remove_combo_bg(
     Combos are file-backed; the _no_bg file on disk acts as the cache — if it already
     exists we skip reprocessing and return it immediately.
     """
+
     async def stream():
         bg_err = _validate_bg_params(bg_tolerance, edge_erode, decontaminate)
         if bg_err:
@@ -1149,7 +1234,9 @@ async def remove_final_bg(
         else:
             yield sse({"type": "status", "message": "Removing background..."})
             try:
-                result = await _run_remove_bg(final_img, bg_color, bg_tolerance, edge_erode, decontaminate)
+                result = await _run_remove_bg(
+                    final_img, bg_color, bg_tolerance, edge_erode, decontaminate
+                )
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
                 return
@@ -1354,16 +1441,16 @@ async def session_reload(
     """Reload an entire concept directory into a session/column."""
     try:
         session = get_column(session_id, column_id)
-        result = await asyncio.to_thread(
-            load_concept_to_session, session, session_dir, concept_dir
-        )
-        
+        # Load from disk
+        await asyncio.to_thread(load_concept_to_session, session, session_dir, concept_dir)
+
         # Return serializable state for the frontend to rehydrate
         return {
             "theme": session["theme"],
             "concepts": session["concepts"],
             "image_paths": session["image_paths"],
             "original_image_paths": session["original_image_paths"],
+            "iteration_roots": session.get("iteration_roots", []),
             "selected_idx": session["selected_idx"],
             "variant_size": session.get("variant_size"),
             "variant_aspect_ratio": session.get("variant_aspect_ratio"),
@@ -1468,6 +1555,7 @@ async def delete_preset_route(name: str):
 # These routes are only useful when PRINTIFY_TOKEN is set. Callers should check
 # the `printify_enabled` flag from /config before hitting these.
 
+
 def _require_printify_token():
     """FastAPI dependency that aborts with 503 when PRINTIFY_TOKEN is not configured."""
     if not PRINTIFY_TOKEN:
@@ -1507,7 +1595,9 @@ async def printify_blueprints(q: str = ""):
     return filtered
 
 
-@app.get("/printify/blueprints/{blueprint_id}/providers", dependencies=[Depends(_require_printify_token)])
+@app.get(
+    "/printify/blueprints/{blueprint_id}/providers", dependencies=[Depends(_require_printify_token)]
+)
 async def printify_providers(blueprint_id: int):
     try:
         providers = await asyncio.to_thread(
@@ -1518,7 +1608,10 @@ async def printify_providers(blueprint_id: int):
     return providers
 
 
-@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/variants", dependencies=[Depends(_require_printify_token)])
+@app.get(
+    "/printify/blueprints/{blueprint_id}/providers/{provider_id}/variants",
+    dependencies=[Depends(_require_printify_token)],
+)
 async def printify_variants(blueprint_id: int, provider_id: int):
     try:
         variants = await asyncio.to_thread(
@@ -1529,8 +1622,10 @@ async def printify_variants(blueprint_id: int, provider_id: int):
     return variants
 
 
-
-@app.get("/printify/blueprints/{blueprint_id}/providers/{provider_id}/print_details", dependencies=[Depends(_require_printify_token)])
+@app.get(
+    "/printify/blueprints/{blueprint_id}/providers/{provider_id}/print_details",
+    dependencies=[Depends(_require_printify_token)],
+)
 async def printify_print_details(blueprint_id: int, provider_id: int):
     """Return authoritative print area profiles for a blueprint+provider pair."""
     try:
@@ -1571,7 +1666,9 @@ async def printify_publish(
             yield sse({"type": "error", "message": "price_cents must be at least 1."})
             return
         if not 0.0 <= design_x <= 1.0 or not 0.0 <= design_y <= 1.0:
-            yield sse({"type": "error", "message": "design_x and design_y must be between 0.0 and 1.0."})
+            yield sse(
+                {"type": "error", "message": "design_x and design_y must be between 0.0 and 1.0."}
+            )
             return
         if not 0.1 <= design_scale <= 2.0:
             yield sse({"type": "error", "message": "design_scale must be between 0.1 and 2.0."})
@@ -1678,10 +1775,7 @@ async def printify_publish(
 
 
 @app.post("/columns")
-async def add_column(
-    session_id: str = Form(...),
-    num_variants: int | None = Form(None)
-):
+async def add_column(session_id: str = Form(...), num_variants: int | None = Form(None)):
     """Append a new column to the session up to the session's max_columns limit."""
     sess = get_session(session_id)
     columns = sess["columns"]
@@ -1699,7 +1793,7 @@ async def add_column(
     return {
         "column_id": len(columns) - 1,
         "count": len(columns),
-        "column": _serialize_column(new_col)
+        "column": _serialize_column(new_col),
     }
 
 
@@ -1718,8 +1812,7 @@ def _serialize_column(col: dict) -> dict:
         if concept_dir.exists():
             # One entry per image_path (originals + iterations), 1-indexed to match filename convention
             state["combo_lists"] = [
-                _scan_variant_combos(concept_dir, i + 1)
-                for i in range(len(image_paths))
+                _scan_variant_combos(concept_dir, i + 1) for i in range(len(image_paths))
             ]
     return state
 
@@ -1900,14 +1993,14 @@ async def sync_column_state(
     value: str = Form(...),  # Value is sent as string; parsed as JSON if possible
 ):
     """Generic endpoint to persist serializable column fields.
-    
+
     Used for fire-and-forget updates of flags like hasUnsubmittedText or settings.
     """
     if field not in _SERIALIZABLE_COLUMN_KEYS:
         return JSONResponse({"error": f"Field '{field}' is not serializable."}, status_code=400)
-    
+
     session = get_column(session_id, column_id)
-    
+
     try:
         parsed_value = json.loads(value)
     except (json.JSONDecodeError, TypeError):

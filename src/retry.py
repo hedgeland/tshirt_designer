@@ -14,6 +14,7 @@ try:
         InternalServerError,
         ServiceUnavailable,
     )
+
     _GOOGLE_TRANSIENT: tuple = (ServiceUnavailable, DeadlineExceeded, InternalServerError)
 except ImportError:
     _GOOGLE_TRANSIENT = ()
@@ -21,6 +22,7 @@ except ImportError:
 # httpx network-level errors that indicate a transient connectivity issue
 try:
     import httpx as _httpx
+
     _HTTP_TRANSIENT: tuple = (_httpx.TimeoutException, _httpx.ConnectError)
 except ImportError:
     _HTTP_TRANSIENT = ()
@@ -53,6 +55,6 @@ def with_retry(fn, retries: int = 3, base_delay: float = 5.0):
             return fn()
         except Exception as e:
             if _is_transient(e) and attempt < retries - 1:
-                time.sleep(base_delay * (2 ** attempt))
+                time.sleep(base_delay * (2**attempt))
                 continue
             raise
