@@ -2341,6 +2341,22 @@ function designer() {
             if (!this.panelConceptsTemplate.trim() || !this.panelVariantsTemplate.trim() || !this.panelStyleTemplate.trim()) {
                 this.presetsStatus = "Prompt fields cannot be blank."; return;
             }
+
+            // Client-side placeholder validation — mirrors server logic so the user gets
+            // a targeted, actionable error before any network round-trip.
+            const placeholderRules = [
+                { label: "Brainstorm prompt",  text: this.panelConceptsTemplate, required: ["{theme}", "{num_concepts}"] },
+                { label: "Variants prompt",    text: this.panelVariantsTemplate, required: ["{concept}", "{num_variants}"] },
+                { label: "Style suffix",        text: this.panelStyleTemplate,    required: ["{bg_color}", "{max_colors}"] },
+            ];
+            for (const rule of placeholderRules) {
+                const missing = rule.required.filter(p => !rule.text.includes(p));
+                if (missing.length) {
+                    this.presetsStatus = `${rule.label} is missing required placeholder(s): ${missing.join(", ")}`;
+                    return;
+                }
+            }
+
             if (this.presetsNames.includes(name) && !confirm(`Overwrite preset "${name}"?`)) return;
 
             const fd = new FormData();

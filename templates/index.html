@@ -190,19 +190,29 @@
                                     loads on startup</span>
                             </label>
                         </div>
-                        <!-- Template editors -->
+                        <!-- Template editors — required placeholder badges remind the user which
+                             tokens must stay in each template; saving validates them. -->
                         <div>
-                            <label class="text-xs font-medium block mb-1">Brainstorm prompt</label>
+                            <div class="flex items-baseline justify-between mb-1">
+                                <label class="text-xs font-medium">Brainstorm prompt</label>
+                                <span class="text-[10px] text-slate-500 font-mono">{theme} &nbsp;{num_concepts}</span>
+                            </div>
                             <textarea x-model="panelConceptsTemplate" rows="20"
                                 class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-800 text-slate-100 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
                         </div>
                         <div>
-                            <label class="text-xs font-medium block mb-1">Variants prompt</label>
+                            <div class="flex items-baseline justify-between mb-1">
+                                <label class="text-xs font-medium">Variants prompt</label>
+                                <span class="text-[10px] text-slate-500 font-mono">{concept} &nbsp;{num_variants}</span>
+                            </div>
                             <textarea x-model="panelVariantsTemplate" rows="20"
                                 class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-800 text-slate-100 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
                         </div>
                         <div>
-                            <label class="text-xs font-medium block mb-1">Style suffix</label>
+                            <div class="flex items-baseline justify-between mb-1">
+                                <label class="text-xs font-medium">Style suffix</label>
+                                <span class="text-[10px] text-slate-500 font-mono">{bg_color} &nbsp;{max_colors}</span>
+                            </div>
                             <textarea x-model="panelStyleTemplate" rows="20"
                                 class="w-full text-xs font-mono border border-slate-500 rounded-md p-2 bg-slate-800 text-slate-100 resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
                         </div>
@@ -220,7 +230,9 @@
                         <p x-show="!panelConceptsTemplate.trim() || !panelVariantsTemplate.trim() || !panelStyleTemplate.trim()"
                             class="text-xs text-amber-400">Prompt fields cannot be blank.</p>
                         <p x-show="presetsStatus" x-text="presetsStatus" role="status" aria-live="polite"
-                            class="text-xs text-slate-300"></p>
+                            :class="presetsStatus.startsWith('Saved') || presetsStatus.startsWith('Applied')
+                                ? 'text-xs text-emerald-400'
+                                : 'text-xs text-amber-400'"></p>
                     </div>
 
                 </div><!-- /drawer panel -->
