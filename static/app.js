@@ -2388,10 +2388,10 @@ function designer() {
         },
 
         // Delete the currently selected preset (builtin is protected)
-        async deletePresetFromPanel() {
+        async deletePresetFromPanel(event) {
             const name = this.presetsActive;
             if (name === cfg.builtinName) { this.presetsStatus = "Cannot delete the built-in preset."; return; }
-            if (!confirm(`Delete preset "${name}"? This cannot be undone.`)) return;
+            if (!await this.showConfirm(event, `Delete preset "${name}"? This cannot be undone.`)) return;
 
             const res = await fetch(`/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
             const data = await res.json();
