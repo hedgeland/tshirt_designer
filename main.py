@@ -40,6 +40,7 @@ from config import (
     MAX_COLORS,
     MAX_COLUMNS,
     MAX_VARIANTS,
+    NUM_CONCEPTS,
     NUM_VARIANTS,
     OUTPUT_DIR,
     PRINTIFY_DEFAULT_SEARCH,
@@ -71,6 +72,7 @@ from src.output import (
     save_variants,
     scan_output,
 )
+from src.prompt_templates import concepts_prompt, variants_prompt
 from src.prompts import build_prompts
 
 app = FastAPI()
@@ -462,6 +464,9 @@ async def brainstorm(
 
         yield sse({"type": "status", "message": "Generating concepts..."})
 
+        # Emit the full formatted prompt so the debug panel can show exactly what was sent.
+        yield sse({"type": "prompt_debug", "step": "brainstorm", "label": "Concepts prompt", "text": concepts_prompt(concepts_template, theme.strip(), NUM_CONCEPTS)})
+
         try:
             concepts = await asyncio.to_thread(
                 generate_concepts, theme.strip(), GOOGLE_API_KEY, concepts_template
@@ -537,6 +542,9 @@ async def generate(
         ref_image = session.get("reference_image") if direct_mode else None
         yield sse({"type": "status", "message": "Building prompts..."})
 
+        # Emit the raw variants prompt before it goes to the model so the debug panel shows it.
+        yield sse({"type": "prompt_debug", "step": "variants_text", "label": "Variant descriptions prompt", "text": variants_prompt(variants_template, concept.strip(), num_variants)})
+
         try:
             prompts = await asyncio.to_thread(
                 build_prompts,
@@ -570,6 +578,9 @@ async def generate(
                         "message": f"Generating variant {i + 1} of {num_variants} at {variant_size} ({aspect_ratio}){ref_note}...",
                     }
                 )
+            # Prepend the reference instruction so the debug panel shows the exact text the model received.
+            instruction = REFERENCE_INSTRUCTIONS.get(reference_mode, REFERENCE_INSTRUCTIONS["style"]) if ref_image is not None else ""
+            yield sse({"type": "prompt_debug", "step": "image", "label": f"Image prompt {i + 1} of {num_variants}", "text": instruction + prompt})
             try:
                 img = await asyncio.to_thread(
                     generate_image,
@@ -944,6 +955,9 @@ async def edit_variant(
         save_path = concept_dir / f"variant_{next_variant_num}_{ar_safe}_{size}.png"
 
         yield sse({"type": "status", "message": f"Generating iteration at {size} ({aspect_ratio})..."})
+
+        # The model always receives the edit instruction prefix + the user's prompt; emit both for the debug panel.
+        yield sse({"type": "prompt_debug", "step": "iteration", "label": "Iteration edit prompt", "text": REFERENCE_INSTRUCTIONS["edit"] + edit_prompt.strip()})
 
         try:
             source_img = await asyncio.to_thread(lambda: Image.open(str(source_path)).copy())

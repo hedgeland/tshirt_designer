@@ -102,6 +102,8 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('printifyColorFavorites', []); // global list of favorite color names
     // Tracks which image URLs were downloaded this browser session; cleared on close.
     Alpine.store('downloadedUrls', {});
+    // Persisted toggle — when true, debug prompt disclosures appear under each generation step.
+    Alpine.store('promptDebug', JSON.parse(localStorage.getItem('promptDebug') || 'false'));
 });
 
 
@@ -239,6 +241,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         error: "",
         promptLog: "",
         showPromptLog: false,
+        // Each entry: {id, step, label, text} — populated by prompt_debug SSE events.
+        debugPrompts: [],
         showPresets: false,
         hasUnsubmittedText: initialState.hasUnsubmittedText ?? false,
 
@@ -891,6 +895,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.editModeActive = false;
             this.loadedImageRes = null;
             this.step = 1;
+            this.debugPrompts = [];
 
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
@@ -900,6 +905,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
             await streamSSE("/brainstorm", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
+                prompt_debug: (e) => { this.debugPrompts.push({ id: Date.now() + Math.random(), step: e.step, label: e.label, text: e.text }); },
                 concepts: (e) => {
                     this.concepts = e.concepts;
                     this.step = 2;
@@ -943,6 +949,8 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.activeComboUrl = null;
             this.activeComboSize = "";
             this.editModeActive = false;
+            // Retain brainstorm debug prompt but clear generate/iteration entries from a prior run.
+            this.debugPrompts = this.debugPrompts.filter(p => p.step === 'brainstorm');
             this.loadedImageRes = null;
             this.step = Math.max(this.step, 3);
 
@@ -964,6 +972,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
             await streamSSE("/generate", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
+                prompt_debug: (e) => { this.debugPrompts.push({ id: Date.now() + Math.random(), step: e.step, label: e.label, text: e.text }); },
                 prompts: (e) => {
                     this.prompts = e.prompts;
                     this.promptLog = e.prompts
@@ -1093,6 +1102,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
             await streamSSE("/stream/edit", fd, {
                 status: (e) => { this.loadingMsg = e.message; },
+                prompt_debug: (e) => { this.debugPrompts.push({ id: Date.now() + Math.random(), step: e.step, label: e.label, text: e.text }); },
                 edit_variant: (e) => {
                     const ts = Date.now();
                     // Append the new variant and auto-select it so the user can immediately
