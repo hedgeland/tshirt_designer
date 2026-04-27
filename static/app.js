@@ -289,8 +289,19 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         // ── Variant resolutions ──────────────────────────────────────────
         getVariantResolutions(idx, combosObj) {
-            // Returns sorted list of unique sizes for variant idx
-            const combos = (combosObj || this.variantCombos)[idx] || [];
+            // Returns sorted list of unique sizes for variant idx (and its iterations)
+            const combosMap = combosObj || this.variantCombos;
+            let combos = [...(combosMap[idx] || [])];
+            
+            // Bubble up resolutions from all iterations rooted at this variant
+            if (this.variants) {
+                this.variants.forEach((v, i) => {
+                    if (v.isIteration && v.rootIdx === idx) {
+                        combos = combos.concat(combosMap[i] || []);
+                    }
+                });
+            }
+
             const sizes = [...new Set(combos.map(c => c.size))];
             return sizes.sort((a, b) => (cfg.sizePx[b] || 0) - (cfg.sizePx[a] || 0));
         },
