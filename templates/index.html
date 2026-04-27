@@ -640,7 +640,7 @@
                                             <span class="text-xs font-semibold text-indigo-300" x-text="bgTolerance"></span>
                                         </div>
                                         <input type="range" :id="'slider-' + index + '-bgTolerance'" aria-label="BG removal tolerance" min="0" max="128" step="1" x-model.number="bgTolerance">
-                                        <p class="text-xs text-slate-300 mt-0.5">Higher = removes more color variation at edges.</p>
+                                        <p class="text-xs text-slate-300 mt-0.5">Sets a minimum — auto-detection may use a higher value for textured backgrounds.</p>
                                     </div>
                                     <!-- Color spill removal -->
                                     <div>
