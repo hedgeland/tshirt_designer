@@ -731,9 +731,13 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         },
 
         // Apply an image loaded from the output browser — resets workflow to variant-only step
-        async _applyLoadedImage({ url, width, height, displaySession }) {
+        async _applyLoadedImage({ url, width, height, displaySession, clientX, clientY }) {
             const hasWork = this.concepts.length || this.variants.length;
-            if (hasWork && !confirm("Load this image as a variant? Your current column session will be cleared.")) return;
+            // showConfirm lives on the parent designer() component; reach it via Alpine's official API.
+            if (hasWork && !await Alpine.$data(document.body).showConfirm(
+                { clientX, clientY },
+                "Load this image as a variant? Your current column session will be cleared."
+            )) return;
 
             const res = await fetch("/session/load-image", {
                 method: "POST",
@@ -795,9 +799,45 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         // Ask the parent designer() to close this column.
         // Guard here prevents the event from firing at all while loading — the button
         // should be disabled too, but this is a belt-and-suspenders check.
-        requestClose() {
+        requestClose(event) {
             if (this.isLoading) return;
-            window.dispatchEvent(new CustomEvent('designer-close-column', { detail: { colIdx: this.colIdx } }));
+            window.dispatchEvent(new CustomEvent('designer-close-column', {
+                detail: { colIdx: this.colIdx, clientX: event.clientX, clientY: event.clientY },
+            }));
+        },
+
+        // Reset the column to a blank state. Confirms via the custom popup if there is any
+        // user work (typed text, generated concepts, or loaded variants) to avoid silent data loss.
+        async clearColumn(event) {
+            if (this.isLoading) return;
+
+            const hasWork = this.theme || this.editedConcept || this.concepts.length || this.variants.length;
+            if (hasWork && !await Alpine.$data(document.body).showConfirm(
+                event, "Clear this column? All work will be lost."
+            )) return;
+
+            // Clear reference image on the server before resetting local state
+            if (this.refImageUrl) await this.clearReference();
+
+            // Reset server-side column state
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            await fetch("/session/clear-column", { method: "POST", body: fd });
+
+            // Reset all client-side column state
+            this.theme                    = "";
+            this.concepts                 = [];
+            this.variants                 = [];
+            this.variantCombos            = {};
+            this.editedConcept            = "";
+            this.selectedVariant          = null;
+            this.loadedImageRes           = null;
+            this.editModeActive           = false;
+            this.generatedVariantSize     = null;
+            this.generatedVariantAspectRatio = null;
+            this.hasUnsubmittedText       = false;
+            this.step                     = 1;
         },
 
         openMyBrowser() {
@@ -1694,6 +1734,15 @@ function designer() {
         browserLoading: false,
         manageMode: false,
         selectedFiles: {},      // url → size_bytes; object for Alpine reactivity
+
+        // ── Custom confirm popup ───────────────────────────────────────────
+        confirmPopup: {
+            visible: false,
+            x: 0,           // left CSS pixel position (clamped to viewport)
+            y: 0,           // top CSS pixel position (above cursor)
+            message: '',
+            resolve: null,  // resolves the Promise returned by showConfirm()
+        },
         storageStats: null,     // {totalBytes, sessionCount}
         renamingDir: "",        // dir_name of the theme currently being renamed
         renameValue: "",        // current value of the rename input
@@ -1724,7 +1773,7 @@ function designer() {
             // Route browser-open and presets-open requests dispatched by column components
             window.addEventListener('designer-open-browser', (e) => this.openBrowser(e.detail.colIdx));
             window.addEventListener('designer-open-browser-for-ref', (e) => this.openBrowserForReference(e.detail.colIdx));
-            window.addEventListener('designer-close-column', (e) => this.closeColumn(e.detail.colIdx));
+            window.addEventListener('designer-close-column', (e) => this.closeColumn(e.detail.colIdx, e.detail));
             window.addEventListener('designer-open-presets', () => this.openPresetsPanel());
 
             // Warn before unload if any column has started work — reloading clears
@@ -1876,14 +1925,14 @@ function designer() {
         // Mutates the local columns array by splicing out the removed index. The DOM
         // elements bound via x-for will stay in place, and their x-effect="colIdx = index"
         // will automatically update the inner columnDesigner's colIdx to match its new position.
-        async closeColumn(colIdx) {
+        async closeColumn(colIdx, cursorPos = {}) {
             if (this.columns.length <= 1) return; // guard — can't close the last column
             // Read live Alpine state from the column DOM to decide whether to confirm
             const el = document.querySelector(`[data-col-idx="${colIdx}"]`);
             const colData = el?._x_dataStack?.[0];
             const hasWork = colData?.hasUnsubmittedText;
             const label = `Design ${colIdx + 1}`;
-            if (hasWork && !confirm(`Close ${label}? Unsubmitted text will be lost.`)) return;
+            if (hasWork && !await this.showConfirm(cursorPos, `Close ${label}? Unsubmitted text will be lost.`)) return;
             const res = await this._removeColumnById(colIdx);
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
@@ -2165,11 +2214,53 @@ function designer() {
             return files.length > 0 && files.every(([url]) => this.selectedFiles[url] !== undefined);
         },
 
-        async deleteSelected() {
+        // Show a custom confirm popup anchored above the triggering cursor position.
+        // Returns a Promise<boolean> — true = confirmed, false = cancelled.
+        // pos can be a MouseEvent or a plain {clientX, clientY} object.
+        showConfirm(pos, message) {
+            const POPUP_WIDTH  = 260; // keep in sync with the w-64 class on the popup div
+            const POPUP_HEIGHT = 90;  // approximate rendered height; used for upward offset
+            const OFFSET_Y     = 14;  // gap between cursor tip and popup bottom edge
+            const MARGIN       = 8;   // min distance from any viewport edge
+
+            const rawX = pos.clientX;
+            const rawY = pos.clientY;
+
+            // Center horizontally on the cursor, clamp to viewport width
+            const x = Math.min(
+                Math.max(rawX - POPUP_WIDTH / 2, MARGIN),
+                window.innerWidth - POPUP_WIDTH - MARGIN
+            );
+            // Place bottom of popup above the cursor, clamp so top never goes off-screen
+            const y = Math.max(rawY - POPUP_HEIGHT - OFFSET_Y, MARGIN);
+
+            this.confirmPopup.message = message;
+            this.confirmPopup.x = x;
+            this.confirmPopup.y = y;
+            this.confirmPopup.visible = true;
+
+            return new Promise((resolve) => {
+                this.confirmPopup.resolve = resolve;
+            });
+        },
+
+        // Called by the popup's Confirm button.
+        _confirmPopupAccept() {
+            this.confirmPopup.visible = false;
+            if (this.confirmPopup.resolve) this.confirmPopup.resolve(true);
+        },
+
+        // Called by Cancel, Escape, or clicking the backdrop.
+        _confirmPopupCancel() {
+            this.confirmPopup.visible = false;
+            if (this.confirmPopup.resolve) this.confirmPopup.resolve(false);
+        },
+
+        async deleteSelected(event) {
             const paths = Object.keys(this.selectedFiles);
             if (!paths.length) return;
             const label = `${paths.length} file${paths.length > 1 ? 's' : ''} (${this._fmtBytes(this.selectedBytes)})`;
-            if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+            if (!await this.showConfirm(event, `Delete ${label}? This cannot be undone.`)) return;
             await fetch("/browse/files", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
@@ -2188,11 +2279,11 @@ function designer() {
 
         // Delete a variant and all its iterations (all renders across every size/AR combo).
         // variant_num is the raw integer from scan_output, which maps directly to filenames.
-        async deleteVariant(sessionDirName, conceptName, variantNum, iterationCount) {
+        async deleteVariant(event, sessionDirName, conceptName, variantNum, iterationCount) {
             const iterNote = iterationCount > 0
                 ? ` and ${iterationCount} iteration${iterationCount > 1 ? 's' : ''}`
                 : '';
-            if (!confirm(`Delete this variant${iterNote}? This cannot be undone.`)) return;
+            if (!await this.showConfirm(event, `Delete this variant${iterNote}? This cannot be undone.`)) return;
             await fetch("/browse/variant", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
@@ -2206,8 +2297,8 @@ function designer() {
         },
 
         // Delete an entire session directory (all concepts, finals, and renders).
-        async deleteSession(dirName, displayName) {
-            if (!confirm(`Delete session "${displayName}"? This cannot be undone.`)) return;
+        async deleteSession(event, dirName, displayName) {
+            if (!await this.showConfirm(event, `Delete session "${displayName}"? This cannot be undone.`)) return;
             await fetch(`/browse/session/${encodeURIComponent(dirName)}`, { method: "DELETE" });
             await this.reloadBrowser();
         },
@@ -2255,9 +2346,12 @@ function designer() {
         },
 
         // Dispatch a load-image event to the currently active column
-        loadToVariants(url, width, height, displaySession) {
+        loadToVariants(event, url, width, height, displaySession) {
             window.dispatchEvent(new CustomEvent('col-load-image', {
-                detail: { colIdx: Alpine.store('activeColIdx'), url, width, height, displaySession },
+                detail: {
+                    colIdx: Alpine.store('activeColIdx'), url, width, height, displaySession,
+                    clientX: event.clientX, clientY: event.clientY,
+                },
             }));
             this.closeBrowser();
         },

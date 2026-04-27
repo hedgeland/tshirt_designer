@@ -1732,6 +1732,18 @@ async def session_columns(session_id: str):
     }
 
 
+@app.post("/session/clear-column")
+async def clear_column(session_id: str = Form(...), column_id: int = Form(...)):
+    """Reset a column to blank initial state, preserving the user's num_variants preference."""
+    col = get_column(session_id, column_id)
+    num_variants = col.get("num_variants", NUM_VARIANTS)  # keep user's variant count setting
+    fresh = init_column_state()
+    fresh["num_variants"] = num_variants
+    col.clear()
+    col.update(fresh)
+    return {"ok": True}
+
+
 @app.post("/session/remove-column")
 async def remove_column(session_id: str = Form(...), column_id: int = Form(...)):
     """Remove a column from the session and compact the array.

@@ -363,9 +363,9 @@
                                     <button @click.stop="downloadSessionZip(session.dir_name)" title="Download ZIP"
                                         class="flex-shrink-0 text-xs text-slate-500 hover:text-slate-200 px-1 transition-colors">⬇
                                         ZIP</button>
-                                    <button @click.stop="deleteSession(session.dir_name, session.design_session)"
+                                    <button @click.stop="deleteSession($event, session.dir_name, session.design_session)"
                                         title="Delete entire session"
-                                        class="flex-shrink-0 text-xs text-slate-500 hover:text-red-400 px-1 transition-colors">🗑</button>
+                                        class="flex-shrink-0 text-xs bg-slate-700/80 text-red-400 hover:bg-red-600 px-1 py-0.5 rounded transition-colors">🗑</button>
                                 </div>
 
                                 <div x-show="session.expanded" class="px-4 pt-2 pb-3">
@@ -411,7 +411,7 @@
                                                                     class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 hover:bg-slate-600 transition-colors">⬇
                                                                     No BG</a>
                                                                 <button
-                                                                    @click.stop="loadToVariants(f.png_url, f.width, f.height, session.design_session)"
+                                                                    @click.stop="loadToVariants($event, f.png_url, f.width, f.height, session.design_session)"
                                                                     title="Load to active column"
                                                                     class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-800/80 text-emerald-300 hover:bg-emerald-700 transition-colors">↑
                                                                     Load</button>
@@ -469,14 +469,14 @@
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-emerald-400 hover:bg-emerald-600 transition-colors"
                                                                         :class="showDl && (v.renders||[]).length !== 1 ? 'bg-emerald-600 text-white' : (v.renders||[]).every(r => $store.downloadedUrls[r.url]) ? '!text-slate-600' : ''">↓</a>
                                                                     <button
-                                                                        @click.stop="loadToVariants(v.url, v.width, v.height, session.design_session)"
+                                                                        @click.stop="loadToVariants($event, v.url, v.width, v.height, session.design_session)"
                                                                         title="Load single image as variant"
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-emerald-400 hover:bg-emerald-600 transition-colors">↑</button>
                                                                     <button @click.stop="setReferenceFromBrowser(v.url)"
                                                                         title="Set as reference image"
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-orange-400 hover:bg-orange-600 transition-colors">🎯</button>
                                                                     <button
-                                                                        @click.stop="deleteVariant(session.dir_name, concept.name, v.variant_num, v.iteration_count)"
+                                                                        @click.stop="deleteVariant($event, session.dir_name, concept.name, v.variant_num, v.iteration_count)"
                                                                         title="Delete this variant and all its iterations"
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-red-400 hover:bg-red-600 transition-colors">🗑</button>
                                                                 </div>
@@ -522,7 +522,7 @@
                                 title="Download selected as ZIP"
                                 class="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs font-semibold rounded-lg transition-colors">⬇
                                 ZIP</button>
-                            <button @click="deleteSelected()" aria-label="Delete selected files"
+                            <button @click="deleteSelected($event)" aria-label="Delete selected files"
                                 title="Delete selected files (cannot be undone)"
                                 class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors">
                                 <span aria-hidden="true">🗑</span> Delete
@@ -568,9 +568,19 @@
                                 <span aria-hidden="true">🗂</span>
                             </button>
 
+                            <!-- Clear column button — resets all content back to blank state -->
+                            <button @click="clearColumn($event)" :disabled="isLoading"
+                                title="Clear all content in this column"
+                                class="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors"
+                                :class="isLoading
+                                    ? 'text-slate-600 cursor-not-allowed'
+                                    : 'text-slate-400 hover:text-amber-400 hover:bg-slate-600'">
+                                <span aria-hidden="true">↺</span> Clear
+                            </button>
+
                             <div class="flex-1"></div>
                             <!-- Close column button — disabled while loading or when it's the only column -->
-                            <button @click="requestClose()" :disabled="isLoading || $store.columnCount <= 1"
+                            <button @click="requestClose($event)" :disabled="isLoading || $store.columnCount <= 1"
                                 title="Close column"
                                 class="flex items-center justify-center w-6 h-6 text-sm rounded transition-colors"
                                 :class="(isLoading || $store.columnCount <= 1)
@@ -776,7 +786,7 @@
                                                     <input type="file" accept="image/*" class="hidden"
                                                         @change="setReferenceFromFile($event.target.files[0]); $event.target.value=''">
                                                 </label>
-                                                <button @click="openMyBrowserForRef()"
+                                                <button @click.stop="openMyBrowserForRef()"
                                                     title="Pick reference image from output browser"
                                                     class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
                                                     <span aria-hidden="true">📁</span> Pick
@@ -902,7 +912,7 @@
                                                         <input type="file" accept="image/*" class="hidden"
                                                             @change="setReferenceFromFile($event.target.files[0]); $event.target.value=''">
                                                     </label>
-                                                    <button @click="openMyBrowserForRef()"
+                                                    <button @click.stop="openMyBrowserForRef()"
                                                         title="Pick reference image from output browser"
                                                         class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 text-xs font-medium rounded-lg transition-colors">
                                                         <span aria-hidden="true">📁</span> Pick
@@ -1884,6 +1894,53 @@
         }
     </script>
     <script src="/static/app.js"></script>
+
+    <!-- ── Custom delete-confirm popup ──────────────────────────────────────
+         Positioned above the triggering cursor via inline style set by showConfirm().
+         The full-screen backdrop catches outside clicks to cancel without blocking
+         pointer events for the panel itself (pointer-events-none on backdrop,
+         pointer-events-auto on panel). Escape key cancels via @keydown.escape.window.
+    ──────────────────────────────────────────────────────────────────────── -->
+    <!-- Popup is inside <body x-data="designer()"> so it shares the component scope directly -->
+    <div x-show="confirmPopup.visible"
+         @keydown.escape.window="_confirmPopupCancel()"
+         style="display:none"
+         class="fixed inset-0 z-[9999] pointer-events-none">
+
+        <!-- Transparent backdrop — catches clicks outside the panel to cancel -->
+        <div class="absolute inset-0 pointer-events-auto"
+             @click="_confirmPopupCancel()"></div>
+
+        <!-- Popup panel — floats above cursor; pointer-events-auto restores click handling -->
+        <div class="absolute pointer-events-auto w-64 rounded-xl shadow-2xl
+                    bg-slate-800 border border-slate-600 p-4 flex flex-col gap-3"
+             :style="`left: ${confirmPopup.x}px; top: ${confirmPopup.y}px;`"
+             @click.stop>
+
+            <!-- Warning icon + message -->
+            <div class="flex items-start gap-2">
+                <span class="text-red-400 text-base leading-none mt-0.5" aria-hidden="true">⚠</span>
+                <p class="text-sm text-slate-200 leading-snug"
+                   x-text="confirmPopup.message"></p>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex justify-end gap-2">
+                <button @click="_confirmPopupCancel()"
+                        class="px-3 py-1 text-xs font-semibold rounded-lg
+                               bg-slate-700 hover:bg-slate-600 text-slate-300
+                               transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500">
+                    Cancel
+                </button>
+                <button @click="_confirmPopupAccept()"
+                        class="px-3 py-1 text-xs font-semibold rounded-lg
+                               bg-red-600 hover:bg-red-700 text-white
+                               transition-colors focus:outline-none focus:ring-2 focus:ring-red-500">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
 
 </body>
 
