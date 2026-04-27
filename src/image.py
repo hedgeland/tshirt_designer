@@ -121,6 +121,9 @@ def finalize_image(prompt: str, reference: Image.Image, api_key: str, size: str 
                 types.Part(text=(
                     f"Recreate this exact design at {size} resolution. "
                     f"Preserve the composition, color palette, style, and every visual element exactly. "
+                    f"The background MUST be a perfectly flat, solid, uniform color — "
+                    f"absolutely no texture, grunge, grain, noise, pattern, or color variation in the background whatsoever. "
+                    f"Pure solid fill only. "
                     f"Original prompt for reference: {prompt}"
                 )),
             ],

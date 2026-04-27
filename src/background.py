@@ -6,16 +6,27 @@ import numpy as np
 from PIL import Image, ImageFilter
 
 
-def _sample_background_color(arr: np.ndarray) -> tuple[int, int, int]:
-    """Estimate the background color by averaging the four corner pixels.
+_MAX_ADAPTIVE_TOLERANCE = 120  # cap so we don't eat design elements even on wild textures
 
-    AI image models often render the prompt's bg color slightly off (e.g. #FF00FF
-    becomes a hot pink with B≈150 instead of 255). Using the actual corner pixels
-    as the target means the flood fill seeds correctly regardless of color drift.
-    Corner pixels are safe proxies for background because the style prompt explicitly
-    floats design elements on a solid background, leaving corners clear.
+
+def _sample_background_color(arr: np.ndarray) -> tuple[tuple[int, int, int], int]:
+    """Estimate the background color and required flood-fill tolerance from the border strip.
+
+    Returns (color, adaptive_tolerance).
+
+    Corner pixels give a fast initial estimate. We then sample the full outer border
+    strip to measure how much the background actually varies — high-resolution AI outputs
+    often produce textured/grunge backgrounds where dark checker patches are 80+ units
+    away from the corner average, far beyond the flat-background default of 50.
+
+    The adaptive tolerance is the 95th-percentile max-channel deviation among border
+    pixels that are already close to the corner estimate, plus a 10-unit margin.
+    This self-corrects: flat backgrounds produce a small spread → small tolerance;
+    textured ones produce a large spread → larger tolerance, capped at _MAX_ADAPTIVE_TOLERANCE.
     """
     h, w = arr.shape[:2]
+
+    # Corner-based initial estimate — fast and reliable for the center hue.
     corners = np.array([
         arr[0, 0, :3],
         arr[0, w - 1, :3],
@@ -23,7 +34,41 @@ def _sample_background_color(arr: np.ndarray) -> tuple[int, int, int]:
         arr[h - 1, w - 1, :3],
     ], dtype=np.float32)
     avg = np.mean(corners, axis=0)
-    return (int(round(float(avg[0]))), int(round(float(avg[1]))), int(round(float(avg[2]))))
+    center = (int(round(float(avg[0]))), int(round(float(avg[1]))), int(round(float(avg[2]))))
+
+    # Sample the full outer border strip (outer 1% of each dimension, min 5px, max 20px).
+    # This captures the background variance that the 4-corner average masks.
+    strip = max(5, min(20, int(min(h, w) * 0.01)))
+    border_mask = np.zeros((h, w), dtype=bool)
+    border_mask[:strip, :] = True
+    border_mask[-strip:, :] = True
+    border_mask[:, :strip] = True
+    border_mask[:, -strip:] = True
+
+    border_pixels = arr[border_mask, :3].astype(np.float32)
+    cr, cg, cb = center
+
+    # Keep only pixels plausibly in the background hue family (within a loose 80-unit
+    # threshold per channel); design elements touching the border would differ further.
+    close = (
+        (np.abs(border_pixels[:, 0] - cr) <= 80) &
+        (np.abs(border_pixels[:, 1] - cg) <= 80) &
+        (np.abs(border_pixels[:, 2] - cb) <= 80)
+    )
+    bg_pixels = border_pixels[close]
+
+    if len(bg_pixels) < 10:
+        # Too few matching border pixels — fall back to corners with no adaptation.
+        return center, 50
+
+    # Spread = 95th percentile of the max per-channel deviation from the median.
+    # Adding 10 gives a margin so the flood fill doesn't stall on the extreme tail.
+    median = np.median(bg_pixels, axis=0)
+    deviations = np.abs(bg_pixels - median).max(axis=1)
+    spread = int(np.percentile(deviations, 95)) + 10
+
+    adaptive_tolerance = min(spread, _MAX_ADAPTIVE_TOLERANCE)
+    return center, adaptive_tolerance
 
 
 def _color_mask(
@@ -80,11 +125,14 @@ def remove_background_color(
     # Detect the actual background color from corner pixels rather than trusting
     # hex_color — the model often renders the prompt color slightly off, and a
     # mismatch in any channel beyond tolerance means the flood fill finds no seeds.
-    target = _sample_background_color(arr)
+    # The adaptive tolerance from border sampling handles textured 4K backgrounds
+    # (where dark checker patches can be 80+ units from the corner average).
+    target, adaptive_tolerance = _sample_background_color(arr)
+    effective_tolerance = max(tolerance, adaptive_tolerance)
 
-    arr = _normalize_background(arr, target, tolerance)
-    arr = _flood_fill_remove(arr, target, tolerance)
-    arr = _remove_interior_bg(arr, target, tolerance=tolerance // 2)
+    arr = _normalize_background(arr, target, effective_tolerance)
+    arr = _flood_fill_remove(arr, target, effective_tolerance)
+    arr = _remove_interior_bg(arr, target, tolerance=effective_tolerance // 2)
 
     img = Image.fromarray(arr, "RGBA")
 
