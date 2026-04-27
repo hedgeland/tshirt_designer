@@ -1694,6 +1694,15 @@ function designer() {
         browserLoading: false,
         manageMode: false,
         selectedFiles: {},      // url → size_bytes; object for Alpine reactivity
+
+        // ── Custom confirm popup ───────────────────────────────────────────
+        confirmPopup: {
+            visible: false,
+            x: 0,           // left CSS pixel position (clamped to viewport)
+            y: 0,           // top CSS pixel position (above cursor)
+            message: '',
+            resolve: null,  // resolves the Promise returned by showConfirm()
+        },
         storageStats: null,     // {totalBytes, sessionCount}
         renamingDir: "",        // dir_name of the theme currently being renamed
         renameValue: "",        // current value of the rename input
@@ -2165,11 +2174,53 @@ function designer() {
             return files.length > 0 && files.every(([url]) => this.selectedFiles[url] !== undefined);
         },
 
-        async deleteSelected() {
+        // Show a custom confirm popup anchored above the triggering cursor position.
+        // Returns a Promise<boolean> — true = confirmed, false = cancelled.
+        // event must be a MouseEvent so we can read clientX/clientY.
+        showConfirm(event, message) {
+            const POPUP_WIDTH  = 260; // keep in sync with the w-64 class on the popup div
+            const POPUP_HEIGHT = 90;  // approximate rendered height; used for upward offset
+            const OFFSET_Y     = 14;  // gap between cursor tip and popup bottom edge
+            const MARGIN       = 8;   // min distance from any viewport edge
+
+            const rawX = event.clientX;
+            const rawY = event.clientY;
+
+            // Center horizontally on the cursor, clamp to viewport width
+            const x = Math.min(
+                Math.max(rawX - POPUP_WIDTH / 2, MARGIN),
+                window.innerWidth - POPUP_WIDTH - MARGIN
+            );
+            // Place bottom of popup above the cursor, clamp so top never goes off-screen
+            const y = Math.max(rawY - POPUP_HEIGHT - OFFSET_Y, MARGIN);
+
+            this.confirmPopup.message = message;
+            this.confirmPopup.x = x;
+            this.confirmPopup.y = y;
+            this.confirmPopup.visible = true;
+
+            return new Promise((resolve) => {
+                this.confirmPopup.resolve = resolve;
+            });
+        },
+
+        // Called by the popup's Confirm button.
+        _confirmPopupAccept() {
+            this.confirmPopup.visible = false;
+            if (this.confirmPopup.resolve) this.confirmPopup.resolve(true);
+        },
+
+        // Called by Cancel, Escape, or clicking the backdrop.
+        _confirmPopupCancel() {
+            this.confirmPopup.visible = false;
+            if (this.confirmPopup.resolve) this.confirmPopup.resolve(false);
+        },
+
+        async deleteSelected(event) {
             const paths = Object.keys(this.selectedFiles);
             if (!paths.length) return;
             const label = `${paths.length} file${paths.length > 1 ? 's' : ''} (${this._fmtBytes(this.selectedBytes)})`;
-            if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+            if (!await this.showConfirm(event, `Delete ${label}? This cannot be undone.`)) return;
             await fetch("/browse/files", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
@@ -2188,11 +2239,11 @@ function designer() {
 
         // Delete a variant and all its iterations (all renders across every size/AR combo).
         // variant_num is the raw integer from scan_output, which maps directly to filenames.
-        async deleteVariant(sessionDirName, conceptName, variantNum, iterationCount) {
+        async deleteVariant(event, sessionDirName, conceptName, variantNum, iterationCount) {
             const iterNote = iterationCount > 0
                 ? ` and ${iterationCount} iteration${iterationCount > 1 ? 's' : ''}`
                 : '';
-            if (!confirm(`Delete this variant${iterNote}? This cannot be undone.`)) return;
+            if (!await this.showConfirm(event, `Delete this variant${iterNote}? This cannot be undone.`)) return;
             await fetch("/browse/variant", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
@@ -2206,8 +2257,8 @@ function designer() {
         },
 
         // Delete an entire session directory (all concepts, finals, and renders).
-        async deleteSession(dirName, displayName) {
-            if (!confirm(`Delete session "${displayName}"? This cannot be undone.`)) return;
+        async deleteSession(event, dirName, displayName) {
+            if (!await this.showConfirm(event, `Delete session "${displayName}"? This cannot be undone.`)) return;
             await fetch(`/browse/session/${encodeURIComponent(dirName)}`, { method: "DELETE" });
             await this.reloadBrowser();
         },
