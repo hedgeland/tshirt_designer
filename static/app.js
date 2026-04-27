@@ -806,6 +806,40 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             }));
         },
 
+        // Reset the column to a blank state. Confirms via the custom popup if there is any
+        // user work (typed text, generated concepts, or loaded variants) to avoid silent data loss.
+        async clearColumn(event) {
+            if (this.isLoading) return;
+
+            const hasWork = this.theme || this.editedConcept || this.concepts.length || this.variants.length;
+            if (hasWork && !await Alpine.$data(document.body).showConfirm(
+                event, "Clear this column? All work will be lost."
+            )) return;
+
+            // Clear reference image on the server before resetting local state
+            if (this.refImageUrl) await this.clearReference();
+
+            // Reset server-side column state
+            const fd = new FormData();
+            fd.append("session_id", this.sessionId);
+            fd.append("column_id", this.colIdx);
+            await fetch("/session/clear-column", { method: "POST", body: fd });
+
+            // Reset all client-side column state
+            this.theme                    = "";
+            this.concepts                 = [];
+            this.variants                 = [];
+            this.variantCombos            = {};
+            this.editedConcept            = "";
+            this.selectedVariant          = null;
+            this.loadedImageRes           = null;
+            this.editModeActive           = false;
+            this.generatedVariantSize     = null;
+            this.generatedVariantAspectRatio = null;
+            this.hasUnsubmittedText       = false;
+            this.step                     = 1;
+        },
+
         openMyBrowser() {
             window.dispatchEvent(new CustomEvent('designer-open-browser', { detail: { colIdx: this.colIdx } }));
         },
