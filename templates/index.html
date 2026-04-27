@@ -1101,8 +1101,8 @@
                                                     <div aria-hidden="true" x-show="selectedVariant === v._origIdx"
                                                         class="absolute top-1.5 right-1.5 bg-indigo-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow">
                                                         ✓</div>
-                                                    <span x-show="getVariantResolutions(v._origIdx).length > 0"
-                                                        x-text="getVariantResolutions(v._origIdx).join(', ')"
+                                                    <span x-show="getVariantResolutions(v._origIdx, variantCombos).length > 0"
+                                                        x-text="getVariantResolutions(v._origIdx, variantCombos).join(', ')"
                                                         aria-hidden="true"
                                                         class="absolute bottom-1.5 right-1.5 text-xs font-semibold text-white pointer-events-none"
                                                         style="text-shadow: 0 0 3px #000, 0 0 3px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"></span>

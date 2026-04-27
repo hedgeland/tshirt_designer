@@ -288,9 +288,9 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
         settingsOpen: false,    // controls collapsible per-column settings panel
 
         // ── Variant resolutions ──────────────────────────────────────────
-        getVariantResolutions(idx) {
+        getVariantResolutions(idx, combosObj) {
             // Returns sorted list of unique sizes for variant idx
-            const combos = this.variantCombos[idx] || [];
+            const combos = (combosObj || this.variantCombos)[idx] || [];
             const sizes = [...new Set(combos.map(c => c.size))];
             return sizes.sort((a, b) => (cfg.sizePx[b] || 0) - (cfg.sizePx[a] || 0));
         },
