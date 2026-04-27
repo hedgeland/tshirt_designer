@@ -64,7 +64,7 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 
 ## Git Workflow
 
-We use **GitHub Flow**: all work happens on branches; `master` only receives changes via merged PRs.
+We use **GitHub Flow**: all work happens on branches; `main` only receives changes via merged PRs.
 
 ### Branch naming
 | Type | Pattern | Example |
@@ -74,7 +74,7 @@ We use **GitHub Flow**: all work happens on branches; `master` only receives cha
 | Hotfix (critical) | `hotfix/short-description` | `hotfix/publish-500-error` |
 
 ### Rules
-- **Never commit directly to `master`** — always branch, even for small bug fixes. Exception: pure housekeeping (moving/renaming files, one-line typo fixes) may land directly on master.
+- **Never commit directly to `main`** — always branch, even for small bug fixes. Exception: pure housekeeping (moving/renaming files, one-line typo fixes) may land directly on main.
 - **Commit and push after every individual change** — each discrete edit gets its own commit and immediate `git push -u origin <branch>`. Don't batch.
 - **Use WIP prefixes** when committing incomplete work: `WIP: <description>`. This makes interrupted sessions easy to spot with `git log`.
 - The `/resume` slash command reconstructs context from git history and diffs when resuming after an interrupted session.
