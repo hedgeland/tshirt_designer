@@ -398,7 +398,7 @@
                                                                     class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 hover:bg-slate-600 transition-colors">⬇
                                                                     No BG</a>
                                                                 <button
-                                                                    @click.stop="loadToVariants(f.png_url, f.width, f.height, session.design_session)"
+                                                                    @click.stop="loadToVariants($event, f.png_url, f.width, f.height, session.design_session)"
                                                                     title="Load to active column"
                                                                     class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-800/80 text-emerald-300 hover:bg-emerald-700 transition-colors">↑
                                                                     Load</button>
@@ -456,7 +456,7 @@
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-emerald-400 hover:bg-emerald-600 transition-colors"
                                                                         :class="showDl && (v.renders||[]).length !== 1 ? 'bg-emerald-600 text-white' : (v.renders||[]).every(r => $store.downloadedUrls[r.url]) ? '!text-slate-600' : ''">↓</a>
                                                                     <button
-                                                                        @click.stop="loadToVariants(v.url, v.width, v.height, session.design_session)"
+                                                                        @click.stop="loadToVariants($event, v.url, v.width, v.height, session.design_session)"
                                                                         title="Load single image as variant"
                                                                         class="text-[10px] px-1 py-0.5 rounded bg-slate-700/80 text-emerald-400 hover:bg-emerald-600 transition-colors">↑</button>
                                                                     <button @click.stop="setReferenceFromBrowser(v.url)"
@@ -557,7 +557,7 @@
 
                             <div class="flex-1"></div>
                             <!-- Close column button — disabled while loading or when it's the only column -->
-                            <button @click="requestClose()" :disabled="isLoading || $store.columnCount <= 1"
+                            <button @click="requestClose($event)" :disabled="isLoading || $store.columnCount <= 1"
                                 title="Close column"
                                 class="flex items-center justify-center w-6 h-6 text-sm rounded transition-colors"
                                 :class="(isLoading || $store.columnCount <= 1)
