@@ -136,7 +136,8 @@
             <div x-data="{ presetsPinned: false }"
                 class="absolute top-0 left-0 h-full z-20 overflow-hidden opacity-95 transition-[width] duration-200"
                 :style="`width: ${showPresetsPanel ? 460 : 30}px`" @mouseenter="showPresetsPanel = true"
-                @mouseleave="if (!presetsPinned && $event.clientX > 0) closePresetsPanel(true)">
+                @click.outside="if (!presetsPinned) closePresetsPanel()"
+                @keydown.escape.window="if (!presetsPinned) closePresetsPanel()">
 
                 <!-- Tab handle — rounded right, sticks out toward columns -->
                 <div class="absolute top-1/2 -translate-y-1/2 w-5 h-14 bg-slate-700 border border-l-0 border-slate-600 rounded-r-lg flex items-center justify-center cursor-pointer opacity-95 z-10"
@@ -145,7 +146,7 @@
                 </div>
 
                 <!-- Drawer panel -->
-                <div x-show="showPresetsPanel" x-transition.opacity @click.outside="closePresetsPanel()"
+                <div x-show="showPresetsPanel" x-transition.opacity
                     class="absolute top-0 left-0 h-full flex flex-col bg-slate-700 shadow-2xl" style="width: 440px"
                     role="dialog" aria-modal="true" aria-labelledby="presets-drawer-title">
 
