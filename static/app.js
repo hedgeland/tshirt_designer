@@ -1171,6 +1171,48 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             });
         },
 
+        async doQuantizeCombo() {
+            if (this.isLoading || !this.activeComboUrl) return;
+            const variantIdx = this.selectedVariant ?? 0;
+            const combo = this.activeComboObj;
+            if (!combo) return;
+
+            // If we already quantized this combo to the *same* number of colors, just swap.
+            // For simplicity, we just cache the last quantized result in qUrl / qColors.
+            if (combo.qUrl && combo.qColors === this.maxColors) {
+                const updated = { ...this.variantCombos };
+                updated[variantIdx] = (updated[variantIdx] || []).map(c =>
+                    c === combo ? { ...c, url: c.qUrl, origUrl: c.origUrl ?? this.activeComboUrl } : c
+                );
+                this.variantCombos = updated;
+                this.activeComboUrl = combo.qUrl;
+                return;
+            }
+
+            this.loadingStep = 5;
+            this._startLoading("Reducing colors...");
+
+            const fd = new FormData();
+            fd.append("combo_url", this.activeComboUrl);
+            fd.append("max_colors", this.maxColors);
+
+            await streamSSE("/quantize/combo", fd, {
+                status: (e) => { this.loadingMsg = e.message; },
+                combo_quantized: (e) => {
+                    const updated = { ...this.variantCombos };
+                    updated[variantIdx] = (updated[variantIdx] || []).map(c =>
+                        c === combo
+                            ? { ...c, origUrl: c.origUrl ?? this.activeComboUrl, qUrl: e.url, qColors: this.maxColors, url: e.url }
+                            : c
+                    );
+                    this.variantCombos = updated;
+                    this.activeComboUrl = e.url;
+                    this._stopLoading();
+                },
+                error: (e) => { this._onError(e.message); },
+            });
+        },
+
         async doRestoreVariantBg() {
             if (this.isLoading || !this.activeComboUrl) return;
             const variantIdx = this.selectedVariant ?? 0;

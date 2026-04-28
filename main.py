@@ -55,7 +55,7 @@ from config import (
 from src import contrast, presets, printify, settings
 from src.background import content_bounds, remove_background_color
 from src.brainstorm import generate_concepts
-from src.image import REFERENCE_INSTRUCTIONS, adapt_for_shirt, finalize_image as finalize_design
+from src.image import REFERENCE_INSTRUCTIONS, adapt_for_shirt, finalize_image as finalize_design, quantize_colors
 from src.image import generate_image
 from src.output import (
     archive_design_session,
@@ -249,6 +249,13 @@ def _clamp(val: int, lo: int, hi: int) -> int:
 def _no_bg_path(path: str) -> str:
     """Derive the no-background output path from a source image path."""
     return path.replace(".png", "_no_bg.png")
+
+
+def _quantized_path(path: str, colors: int) -> str:
+    """Derive the quantized output path from a source image path."""
+    # Remove existing _qX suffix if present so they don't stack infinitely
+    base = re.sub(r"_q\d+", "", path)
+    return base.replace(".png", f"_q{colors}.png")
 
 
 def _zip_response(data: bytes, filename: str) -> Response:
@@ -1150,6 +1157,48 @@ async def remove_final_bg(
 
         url = f"/{no_bg_path}" if no_bg_path else ""
         yield sse({"type": "final_updated", "url": url, "bg_removed": True})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@app.post("/quantize/combo")
+async def quantize_combo_route(
+    combo_url: str = Form(...),
+    max_colors: int = Form(...),
+):
+    """Reduce colors in a rendered combo image and return the new URL."""
+    async def stream():
+        if max_colors <= 0:
+            yield sse({"type": "error", "message": "max_colors must be positive."})
+            return
+
+        clean = combo_url.lstrip("/")
+        abs_path = Path(clean).resolve()
+        if not abs_path.is_relative_to(Path(OUTPUT_DIR).resolve()):
+            yield sse({"type": "error", "message": "Invalid combo path."})
+            return
+
+        q_path_str = _quantized_path(clean, max_colors)
+        q_abs = Path(q_path_str).resolve()
+
+        if q_abs.exists():
+            yield sse({"type": "combo_quantized", "url": f"/{q_path_str}"})
+            return
+
+        if not abs_path.exists():
+            yield sse({"type": "error", "message": "Combo file not found."})
+            return
+
+        yield sse({"type": "status", "message": "Reducing colors..."})
+        try:
+            img = await asyncio.to_thread(lambda: Image.open(abs_path).convert("RGBA"))
+            result = await asyncio.to_thread(quantize_colors, img, max_colors)
+            await asyncio.to_thread(result.save, str(q_abs), "PNG")
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        yield sse({"type": "combo_quantized", "url": f"/{q_path_str}"})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 

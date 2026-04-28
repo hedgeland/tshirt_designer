@@ -42,6 +42,50 @@ def _extract_image(response) -> Image.Image:
     raise RuntimeError("No image returned from model")
 
 
+def quantize_colors(img: Image.Image, max_colors: int) -> Image.Image:
+    """Enforce a maximum number of distinct colors using PIL's quantize method.
+
+    If the image has transparency (mode RGBA), the alpha channel is sharpened
+    to a 1-bit mask (0 or 255) to prevent anti-aliasing from exponentially
+    increasing the unique color count. Dithering is disabled to preserve solid
+    color blocks for screen printing.
+    """
+    if max_colors <= 0:
+        return img
+
+    if img.mode == "RGBA":
+        r, g, b, a = img.split()
+        has_transparency = a.getextrema()[0] < 255
+        
+        if not has_transparency:
+            # Fully opaque, just quantize RGB without dithering
+            rgb = Image.merge("RGB", (r, g, b))
+            q_rgb = rgb.quantize(colors=max_colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGB")
+            return Image.merge("RGBA", (*q_rgb.split(), a))
+            
+        # 1. Make alpha 1-bit (sharp edges) so translucent edges don't multiply colors
+        a_sharp = a.point(lambda p: 255 if p > 127 else 0)
+        
+        # 2. Composite onto a mask color (magenta) that is unlikely to be in the design.
+        # This prevents the RGB values of completely transparent pixels from polluting the palette.
+        mask_color = (255, 0, 255)
+        bg = Image.new("RGB", img.size, mask_color)
+        rgb = Image.merge("RGB", (r, g, b))
+        bg.paste(rgb, mask=a_sharp)
+        
+        # 3. Quantize to max_colors + 1 (to accommodate the magenta mask color).
+        # Disable dithering to get solid, screen-printable color blocks.
+        q = bg.quantize(colors=max_colors + 1, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+        q_rgb = q.convert("RGB")
+        
+        # 4. Re-apply the sharp alpha mask. The magenta background becomes fully transparent,
+        # leaving at most `max_colors` opaque colors + 1 transparent color.
+        return Image.merge("RGBA", (*q_rgb.split(), a_sharp))
+
+    # For RGB images
+    return img.quantize(colors=max_colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGB")
+
+
 def flatten_transparency(img: Image.Image) -> Image.Image:
     """Composite transparent pixels onto white before sending to Gemini.
 
