@@ -33,3 +33,5 @@ gemini.md
 .vscode/sessions.json
 .vscode/tasks.json
 experiments/
+
+gha-creds-*.json
