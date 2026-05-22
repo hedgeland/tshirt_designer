@@ -125,6 +125,66 @@ async def api_brainstorm(request: Request):
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
+# Next.js frontend generate endpoint — streams image variants via SSE.
+# Stateless: uses config defaults for all generation parameters.
+@app.post("/api/generate")
+async def api_generate(request: Request):
+    body = await request.json()
+    theme = body.get("theme", "").strip()
+    concept = body.get("concept", "").strip()
+
+    async def stream():
+        if not GOOGLE_API_KEY:
+            yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
+            return
+        if not concept:
+            yield sse({"type": "error", "message": "No concept selected."})
+            return
+
+        builtin = presets.load_builtin()
+
+        yield sse({"type": "status", "message": "Building prompts..."})
+        try:
+            prompts = await asyncio.to_thread(
+                build_prompts,
+                concept,
+                GOOGLE_API_KEY,
+                variants_template=builtin["variants_prompt"],
+                style_template=builtin["style_suffix"],
+                bg_color=DEFAULT_BG_COLOR,
+                num_variants=NUM_VARIANTS,
+                max_colors=MAX_COLORS,
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        images: list[Image.Image] = []
+        for i, prompt in enumerate(prompts):
+            yield sse({"type": "status", "message": f"Generating variant {i + 1} of {NUM_VARIANTS}..."})
+            try:
+                img = await asyncio.to_thread(
+                    generate_image,
+                    prompt,
+                    GOOGLE_API_KEY,
+                    size=BRAINSTORM_SIZE,
+                    aspect_ratio=DEFAULT_ASPECT_RATIO,
+                )
+            except Exception as e:
+                yield sse({"type": "error", "message": str(e)})
+                return
+            images.append(img)
+
+        # Save variants to disk; paths are served as static files by FastAPI
+        paths, _ = await asyncio.to_thread(
+            save_variants, theme or "unknown", 0, images, DEFAULT_ASPECT_RATIO, BRAINSTORM_SIZE
+        )
+        urls = [f"/{p}" for p in paths]
+        yield sse({"type": "variants", "urls": urls})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 # Auth is active only when GOOGLE_CLIENT_ID is set. Without it the app behaves
 # as before — useful for local dev where OAuth isn't configured.
