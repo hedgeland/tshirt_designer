@@ -90,22 +90,39 @@ app.add_middleware(
 logger = logging.getLogger(__name__)
 
 
-# Temporary endpoint for Next.js frontend development — returns mock concepts as JSON
-@app.post("/api/brainstorm-simple")
-async def brainstorm_simple(request: Request):
+# Next.js frontend brainstorm endpoint — streams real Gemini concepts via SSE.
+# Stateless: no session management, uses the built-in default prompt template.
+@app.post("/api/brainstorm")
+async def api_brainstorm(request: Request):
     body = await request.json()
     theme = body.get("theme", "").strip()
-    if not theme:
-        raise HTTPException(status_code=400, detail="Theme is required")
-    return {
-        "concepts": [
-            f"A bold graphic design inspired by {theme}",
-            f"A minimalist illustration capturing the essence of {theme}",
-            f"A vintage retro poster style take on {theme}",
-            f"An abstract geometric interpretation of {theme}",
-            f"A hand-drawn sketch aesthetic featuring {theme}",
-        ]
-    }
+
+    async def stream():
+        if not GOOGLE_API_KEY:
+            yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
+            return
+        if not theme:
+            yield sse({"type": "error", "message": "Theme is required."})
+            return
+
+        yield sse({"type": "status", "message": "Generating concepts..."})
+
+        # Load the built-in prompt template so the Next.js API stays in sync
+        # with whatever template the main app uses by default.
+        builtin = presets.load_builtin()
+        template = builtin["concepts_prompt"]
+
+        try:
+            concepts = await asyncio.to_thread(
+                generate_concepts, theme, GOOGLE_API_KEY, template
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        yield sse({"type": "concepts", "concepts": concepts})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
