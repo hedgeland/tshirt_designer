@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -76,7 +77,36 @@ from src.prompt_templates import concepts_prompt, variants_prompt
 from src.prompts import build_prompts
 
 app = FastAPI()
+
+# Allow the Next.js dev server to call this API across origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 logger = logging.getLogger(__name__)
+
+
+# Temporary endpoint for Next.js frontend development — returns mock concepts as JSON
+@app.post("/api/brainstorm-simple")
+async def brainstorm_simple(request: Request):
+    body = await request.json()
+    theme = body.get("theme", "").strip()
+    if not theme:
+        raise HTTPException(status_code=400, detail="Theme is required")
+    return {
+        "concepts": [
+            f"A bold graphic design inspired by {theme}",
+            f"A minimalist illustration capturing the essence of {theme}",
+            f"A vintage retro poster style take on {theme}",
+            f"An abstract geometric interpretation of {theme}",
+            f"A hand-drawn sketch aesthetic featuring {theme}",
+        ]
+    }
+
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 # Auth is active only when GOOGLE_CLIENT_ID is set. Without it the app behaves
