@@ -180,7 +180,65 @@ async def api_generate(request: Request):
             save_variants, theme or "unknown", 0, images, DEFAULT_ASPECT_RATIO, BRAINSTORM_SIZE
         )
         urls = [f"/{p}" for p in paths]
-        yield sse({"type": "variants", "urls": urls})
+        # Send prompts alongside URLs so the client can pass them back for finalization
+        yield sse({"type": "variants", "urls": urls, "prompts": prompts, "paths": [str(p) for p in paths]})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# Next.js frontend finalize endpoint — upscales a selected variant to a higher resolution.
+# Stateless: takes the variant's disk path and prompt directly from the client.
+@app.post("/api/finalize")
+async def api_finalize(request: Request):
+    body = await request.json()
+    prompt = body.get("prompt", "").strip()
+    variant_path = body.get("variant_path", "").strip()
+    final_size = body.get("final_size", FINAL_SIZE).strip()
+
+    async def stream():
+        if not GOOGLE_API_KEY:
+            yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
+            return
+        if not prompt or not variant_path:
+            yield sse({"type": "error", "message": "Prompt and variant path are required."})
+            return
+        if final_size not in SIZE_PX:
+            yield sse({"type": "error", "message": f"Invalid size '{final_size}'."})
+            return
+
+        # Resolve path safely — reject anything that escapes the output directory
+        resolved = Path(variant_path).resolve()
+        output_root = Path(OUTPUT_DIR).resolve()
+        if not str(resolved).startswith(str(output_root)):
+            yield sse({"type": "error", "message": "Invalid variant path."})
+            return
+        if not resolved.exists():
+            yield sse({"type": "error", "message": "Variant file not found."})
+            return
+
+        variant_img = Image.open(resolved).copy()
+
+        yield sse({"type": "status", "message": f"Generating {final_size} design..."})
+        try:
+            final_img = await asyncio.to_thread(
+                finalize_design,
+                prompt,
+                variant_img,
+                GOOGLE_API_KEY,
+                size=final_size,
+                aspect_ratio=DEFAULT_ASPECT_RATIO,
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        # Save alongside the variant in the same directory
+        ar_safe = DEFAULT_ASPECT_RATIO.replace(":", "x")
+        final_name = f"final_{ar_safe}_{final_size}.png"
+        final_path = resolved.parent / final_name
+        await asyncio.to_thread(final_img.save, str(final_path), "PNG")
+
+        yield sse({"type": "final", "url": f"/{final_path.relative_to(Path('.').resolve())}"})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
