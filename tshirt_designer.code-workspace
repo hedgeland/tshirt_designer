@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../tshirt_designer_next"
 		}
 	],
 	"settings": {}
