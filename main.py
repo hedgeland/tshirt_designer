@@ -148,6 +148,11 @@ async def api_generate(request: Request):
     variant_size = body.get("variant_size", BRAINSTORM_SIZE).strip()
     if variant_size not in SIZE_PX:
         variant_size = BRAINSTORM_SIZE
+    # Optional reference image: relative path within the output dir + influence mode
+    reference_path = body.get("reference_path", "").strip()
+    reference_mode = body.get("reference_mode", "style").strip()
+    if reference_mode not in ("style", "copy", "edit"):
+        reference_mode = "style"
 
     async def stream():
         if not GOOGLE_API_KEY:
@@ -156,6 +161,17 @@ async def api_generate(request: Request):
         if not concept:
             yield sse({"type": "error", "message": "No concept selected."})
             return
+
+        # Load the reference image from disk if one was supplied.
+        # Reject paths that escape the output directory to prevent traversal.
+        ref_image: Image.Image | None = None
+        if reference_path:
+            ref_resolved = Path(reference_path).resolve()
+            output_root = Path(OUTPUT_DIR).resolve()
+            if str(ref_resolved).startswith(str(output_root)) and ref_resolved.exists():
+                ref_image = await asyncio.to_thread(
+                    lambda: Image.open(ref_resolved).copy()
+                )
 
         builtin = presets.load_builtin()
 
@@ -176,8 +192,9 @@ async def api_generate(request: Request):
             return
 
         images: list[Image.Image] = []
+        ref_note = f" with {reference_mode} reference" if ref_image is not None else ""
         for i, prompt in enumerate(prompts):
-            yield sse({"type": "status", "message": f"Generating variant {i + 1} of {num_variants}..."})
+            yield sse({"type": "status", "message": f"Generating variant {i + 1} of {num_variants}{ref_note}..."})
             try:
                 img = await asyncio.to_thread(
                     generate_image,
@@ -185,6 +202,8 @@ async def api_generate(request: Request):
                     GOOGLE_API_KEY,
                     size=variant_size,
                     aspect_ratio=aspect_ratio,
+                    reference_image=ref_image,
+                    reference_mode=reference_mode,
                 )
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
