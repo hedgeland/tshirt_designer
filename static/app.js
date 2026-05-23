@@ -248,7 +248,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         // ── Settings ───────────────────────────────────────────────────────
         bgColor: cfg.bgColor,
-        numVariants: initialState.num_variants ?? cfg.numVariants,
         bgTolerance: cfg.bgTolerance,
         edgeErode: cfg.edgeErode,
         decontaminate: cfg.decontaminate,
@@ -441,7 +440,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
 
         // ── Computed ───────────────────────────────────────────────────────
         get generateBtnLabel() {
-            const n = this.numVariants;
+            const n = cfg.numVariants;
             return `Generate ${n} ${n === 1 ? "Variant" : "Variants"}`;
         },
 
@@ -881,7 +880,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedConcept = concept;
             this.editedConcept = concept;
             this.hasUnsubmittedText = false;
-            this.numVariants = cfg.numVariants;
             this.step = Math.max(this.step, 3);
         },
 
@@ -896,7 +894,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedConcept = null;
             this.editedConcept = "";
             this.hasUnsubmittedText = false;
-            this.numVariants = cfg.numVariants;
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
@@ -934,7 +931,6 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             this.selectedConcept = null;
             this.editedConcept = this.theme.trim();
             this.hasUnsubmittedText = false;
-            this.numVariants = cfg.numVariants;
             this.variants = [];
             this.prompts = [];
             this.selectedVariant = null;
@@ -971,7 +967,7 @@ function columnDesigner(colIdx, sessionId, cfg, initialState = {}) {
             fd.append("concept", this.editedConcept);
             fd.append("original_concept", this.selectedConcept ?? this.editedConcept);
             fd.append("bg_color", this.bgColor);
-            fd.append("num_variants", this.numVariants);
+            fd.append("num_variants", cfg.numVariants);
             fd.append("max_colors", this.maxColors);
             fd.append("variants_template", this.variantsTemplate);
             fd.append("style_template", this.styleTemplate);
@@ -1821,7 +1817,9 @@ function designer() {
                     // Use session values if present, otherwise fall back to cfg (global defaults)
                     this.maxColumns = data.max_columns ?? cfg.maxColumns;
                     this.minColumns = data.min_columns ?? cfg.minColumns ?? 1;
-                    this.cfg.numVariants = data.num_variants ?? cfg.numVariants;
+                    // cfg.numVariants is already correct from app-config (server renders it from
+                    // user_settings at page load). Overriding it from the session here causes stale
+                    // values to win when the session predates a settings change.
 
                     Alpine.store('minColumns', this.minColumns);
                     // Re-create the column list from persisted server state; each entry
@@ -1895,7 +1893,6 @@ function designer() {
             if (this.columns.length >= this.maxColumns) return;
             const fd = new FormData();
             fd.append("session_id", this.sessionId);
-            fd.append("num_variants", this.cfg.numVariants);
             const res = await fetch("/columns", { method: "POST", body: fd });
             const data = await res.json();
             if (data.error) return;

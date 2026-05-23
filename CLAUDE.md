@@ -62,6 +62,11 @@ This is Google's Gemini 3.1 Flash Image Preview (internally called "Nano Banana 
 - **Always plan before implementing** new functionality or major changes. Present the approach — files affected, key decisions, trade-offs — and wait for confirmation before writing code.
 - Minor fixes and small UI tweaks (single-file, low-risk) can proceed without a plan.
 
+## TODOs
+
+- All todos go in `TODO.md` at the project root — not in memory files.
+- When the user mentions something to do later, append it to `TODO.md`.
+
 ## Git Workflow
 
 We use **GitHub Flow**: all work happens on branches; `main` only receives changes via merged PRs.

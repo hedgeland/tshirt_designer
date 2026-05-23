@@ -667,3 +667,31 @@ def save_variants(
     _write_variants_json(dir_path, [{"variant": i + 1, "root": None} for i in range(len(images))])
 
     return paths, dir_path
+
+
+def write_variant_prompts(
+    concept_dir: Path,
+    theme: str,
+    concept_text: str,
+    prompts: list[str],
+) -> None:
+    """Write a prompts.md sidecar file into a concept directory.
+
+    Called after save_variants so that /api/finalize can look up the prompt for
+    any variant even when no session state is available (stateless Next.js flow).
+    """
+    lines = [
+        "# Prompts\n",
+        f"| Theme | {theme} |\n",
+        f"| Concept | {concept_text} |\n",
+        f"| Variants | {len(prompts)} |\n",
+    ]
+    for i, prompt in enumerate(prompts):
+        lines.append(f"\n## Variant {i + 1}\n\n```\n{prompt}\n```\n")
+    (concept_dir / "prompts.md").write_text("".join(lines))
+
+
+def append_iteration_prompt(prompts_md: Path, variant_num: int, edit_prompt: str) -> None:
+    """Append an iteration's edit prompt to an existing prompts.md sidecar."""
+    with open(prompts_md, "a") as f:
+        f.write(f"\n## Variant {variant_num}\n\n```\n{edit_prompt}\n```\n")

@@ -2,5 +2,22 @@
   "[html]": {
     "editor.formatOnSave": true
   },
-  "css.lint.unknownAtRules": "ignore"
+  "css.lint.unknownAtRules": "ignore",
+  "terminal.integrated.profiles.osx": {
+    "Claude Code": {
+      "path": "zsh",
+      "icon": "robot",
+      "color": "terminal.ansiMagenta"
+    },
+    "FastAPI": {
+      "path": "zsh",
+      "icon": "server",
+      "color": "terminal.ansiGreen"
+    },
+    "Next.js": {
+      "path": "zsh",
+      "icon": "browser",
+      "color": "terminal.ansiCyan"
+    }
+  }
 }

@@ -625,14 +625,6 @@
 
                                 <!-- Sliders -->
                                 <div class="space-y-3">
-                                    <!-- Number of variants -->
-                                    <div>
-                                        <div class="flex justify-between items-baseline mb-1">
-                                            <label :for="'slider-' + index + '-numVariants'" class="text-xs font-medium">Number of variants</label>
-                                            <span class="text-xs font-semibold text-indigo-300" x-text="numVariants"></span>
-                                        </div>
-                                        <input type="range" :id="'slider-' + index + '-numVariants'" aria-label="Number of variants" min="1" max="{{ max_variants }}" step="1" x-model.number="numVariants">
-                                    </div>
                                     <!-- BG removal tolerance -->
                                     <div>
                                         <div class="flex justify-between items-baseline mb-1">
@@ -983,14 +975,6 @@
                                                     class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400">
                                                     {% for s in brainstorm_sizes %}
                                                     <option value="{{ s }}">{{ s }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                                <!-- Variant count selector — mirrors the settings slider but inline for quick access -->
-                                                <select x-model.number="numVariants"
-                                                    title="Number of variants to generate"
-                                                    class="text-xs border border-slate-500 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 w-24">
-                                                    {% for n in range(1, max_variants + 1) %}
-                                                    <option value="{{ n }}">{{ n }} variant{% if n > 1 %}s{% endif %}</option>
                                                     {% endfor %}
                                                 </select>
                                                 <button @click="doGenerate()" :disabled="isLoading"
