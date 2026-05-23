@@ -60,6 +60,8 @@ from src.brainstorm import generate_concepts
 from src.image import REFERENCE_INSTRUCTIONS, finalize_image as finalize_design
 from src.image import generate_image
 from src.output import (
+    _parse_variant_prompts,
+    append_iteration_prompt,
     archive_design_session,
     archive_files,
     delete_files,
@@ -72,6 +74,7 @@ from src.output import (
     safe_design_session_name,
     save_variants,
     scan_output,
+    write_variant_prompts,
 )
 from src.prompt_templates import concepts_prompt, variants_prompt
 from src.prompts import build_prompts
@@ -126,12 +129,25 @@ async def api_brainstorm(request: Request):
 
 
 # Next.js frontend generate endpoint — streams image variants via SSE.
-# Stateless: uses config defaults for all generation parameters.
+# Accepts per-column settings from the client; falls back to config defaults.
 @app.post("/api/generate")
 async def api_generate(request: Request):
     body = await request.json()
     theme = body.get("theme", "").strip()
     concept = body.get("concept", "").strip()
+
+    # Per-column settings — client sends these; fall back to config defaults
+    num_variants = int(body.get("num_variants", NUM_VARIANTS))
+    num_variants = max(1, min(num_variants, MAX_VARIANTS))
+    max_colors = int(body.get("max_colors", MAX_COLORS))
+    max_colors = max(1, min(max_colors, 8))
+    bg_color = body.get("bg_color", DEFAULT_BG_COLOR).strip() or DEFAULT_BG_COLOR
+    aspect_ratio = body.get("aspect_ratio", DEFAULT_ASPECT_RATIO).strip()
+    if aspect_ratio not in ASPECT_RATIOS:
+        aspect_ratio = DEFAULT_ASPECT_RATIO
+    variant_size = body.get("variant_size", BRAINSTORM_SIZE).strip()
+    if variant_size not in SIZE_PX:
+        variant_size = BRAINSTORM_SIZE
 
     async def stream():
         if not GOOGLE_API_KEY:
@@ -151,9 +167,9 @@ async def api_generate(request: Request):
                 GOOGLE_API_KEY,
                 variants_template=builtin["variants_prompt"],
                 style_template=builtin["style_suffix"],
-                bg_color=DEFAULT_BG_COLOR,
-                num_variants=NUM_VARIANTS,
-                max_colors=MAX_COLORS,
+                bg_color=bg_color,
+                num_variants=num_variants,
+                max_colors=max_colors,
             )
         except Exception as e:
             yield sse({"type": "error", "message": str(e)})
@@ -161,14 +177,14 @@ async def api_generate(request: Request):
 
         images: list[Image.Image] = []
         for i, prompt in enumerate(prompts):
-            yield sse({"type": "status", "message": f"Generating variant {i + 1} of {NUM_VARIANTS}..."})
+            yield sse({"type": "status", "message": f"Generating variant {i + 1} of {num_variants}..."})
             try:
                 img = await asyncio.to_thread(
                     generate_image,
                     prompt,
                     GOOGLE_API_KEY,
-                    size=BRAINSTORM_SIZE,
-                    aspect_ratio=DEFAULT_ASPECT_RATIO,
+                    size=variant_size,
+                    aspect_ratio=aspect_ratio,
                 )
             except Exception as e:
                 yield sse({"type": "error", "message": str(e)})
@@ -176,9 +192,11 @@ async def api_generate(request: Request):
             images.append(img)
 
         # Save variants to disk; paths are served as static files by FastAPI
-        paths, _ = await asyncio.to_thread(
-            save_variants, theme or "unknown", 0, images, DEFAULT_ASPECT_RATIO, BRAINSTORM_SIZE
+        paths, concept_dir = await asyncio.to_thread(
+            save_variants, theme or "unknown", 0, images, aspect_ratio, variant_size
         )
+        # Write prompts.md sidecar so /api/finalize can look up the prompt for browser-loaded variants
+        await asyncio.to_thread(write_variant_prompts, concept_dir, theme or "unknown", concept, prompts)
         urls = [f"/{p}" for p in paths]
         # Send prompts alongside URLs so the client can pass them back for finalization
         yield sse({"type": "variants", "urls": urls, "prompts": prompts, "paths": [str(p) for p in paths]})
@@ -199,8 +217,8 @@ async def api_finalize(request: Request):
         if not GOOGLE_API_KEY:
             yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
             return
-        if not prompt or not variant_path:
-            yield sse({"type": "error", "message": "Prompt and variant path are required."})
+        if not variant_path:
+            yield sse({"type": "error", "message": "Variant path is required."})
             return
         if final_size not in SIZE_PX:
             yield sse({"type": "error", "message": f"Invalid size '{final_size}'."})
@@ -216,13 +234,27 @@ async def api_finalize(request: Request):
             yield sse({"type": "error", "message": "Variant file not found."})
             return
 
+        # If no prompt was supplied (e.g. image loaded from browser), look it up
+        # from the prompts.md sidecar stored alongside the variant on disk.
+        active_prompt = prompt
+        if not active_prompt:
+            m = re.match(r"variant_(\d+)_", resolved.name)
+            if m:
+                variant_num = int(m.group(1))
+                prompts_map = await asyncio.to_thread(
+                    _parse_variant_prompts, resolved.parent / "prompts.md"
+                )
+                active_prompt = prompts_map.get(variant_num, "")
+            # No prompt found — uploaded images have no sidecar; finalize_image
+            # works from the reference image alone so an empty prompt is acceptable.
+
         variant_img = Image.open(resolved).copy()
 
         yield sse({"type": "status", "message": f"Generating {final_size} design..."})
         try:
             final_img = await asyncio.to_thread(
                 finalize_design,
-                prompt,
+                active_prompt,
                 variant_img,
                 GOOGLE_API_KEY,
                 size=final_size,
@@ -239,6 +271,174 @@ async def api_finalize(request: Request):
         await asyncio.to_thread(final_img.save, str(final_path), "PNG")
 
         yield sse({"type": "final", "url": f"/{final_path.relative_to(Path('.').resolve())}"})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# Next.js frontend upload endpoint — saves a user-uploaded image as a variant on disk.
+# Returns {url, path} so the client can load it directly into Step 3 without generation.
+@app.post("/api/upload_variant")
+async def api_upload_variant(file: UploadFile = File(...)):
+    """Accept an image upload, convert to RGB, and save under the output directory."""
+    contents = await file.read()
+    img = Image.open(io.BytesIO(contents))
+    img.load()
+    # Flatten alpha to white — Gemini rejects transparency and finalize uses this image
+    if img.mode in ("RGBA", "LA"):
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        bg.paste(img, mask=img.split()[-1])
+        img = bg
+    else:
+        img = img.convert("RGB")
+    # Use "1:1" as a neutral AR placeholder; the actual image dimensions are preserved
+    paths, _ = await asyncio.to_thread(save_variants, "upload", 0, [img], "1:1", "upload")
+    path = paths[0]
+    return {"url": f"/{path}", "path": path}
+
+
+# Next.js frontend render endpoint — re-renders an existing variant at a new size/AR.
+# File existence on disk is the cache; returns immediately on a hit.
+@app.post("/api/render")
+async def api_render(request: Request):
+    body = await request.json()
+    variant_path = body.get("variant_path", "").strip()
+    size = body.get("size", BRAINSTORM_SIZE).strip()
+    aspect_ratio = body.get("aspect_ratio", DEFAULT_ASPECT_RATIO).strip()
+
+    async def stream():
+        if not GOOGLE_API_KEY:
+            yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
+            return
+        if not variant_path:
+            yield sse({"type": "error", "message": "Variant path is required."})
+            return
+        if size not in SIZE_PX:
+            yield sse({"type": "error", "message": f"Invalid size '{size}'."})
+            return
+        if aspect_ratio not in ASPECT_RATIOS:
+            yield sse({"type": "error", "message": f"Invalid aspect ratio '{aspect_ratio}'."})
+            return
+
+        resolved = Path(variant_path).resolve()
+        output_root = Path(OUTPUT_DIR).resolve()
+        if not str(resolved).startswith(str(output_root)):
+            yield sse({"type": "error", "message": "Invalid variant path."})
+            return
+        if not resolved.exists():
+            yield sse({"type": "error", "message": "Variant file not found."})
+            return
+
+        m = re.match(r"variant_(\d+)_", resolved.name)
+        if not m:
+            yield sse({"type": "error", "message": "Unrecognised variant filename."})
+            return
+        variant_num = int(m.group(1))
+
+        # Deterministic target — existence on disk is the cache
+        ar_safe = aspect_ratio.replace(":", "x")
+        target_path = resolved.parent / f"variant_{variant_num}_{ar_safe}_{size}.png"
+        if target_path.exists():
+            yield sse({"type": "render", "url": f"/{target_path.relative_to(Path('.').resolve())}", "path": str(target_path.relative_to(Path('.').resolve()))})
+            return
+
+        prompts_map = await asyncio.to_thread(_parse_variant_prompts, resolved.parent / "prompts.md")
+        prompt = prompts_map.get(variant_num, "")
+        if not prompt:
+            yield sse({"type": "error", "message": "No prompt found for this variant."})
+            return
+
+        yield sse({"type": "status", "message": f"Rendering at {size} {aspect_ratio}..."})
+        try:
+            img = await asyncio.to_thread(
+                generate_image, prompt, GOOGLE_API_KEY, size=size, aspect_ratio=aspect_ratio,
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        await asyncio.to_thread(img.save, str(target_path), "PNG")
+        yield sse({"type": "render", "url": f"/{target_path.relative_to(Path('.').resolve())}", "path": str(target_path.relative_to(Path('.').resolve()))})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# Next.js frontend iterate endpoint — applies an edit to an existing variant and saves
+# it as a new variant_N, recording ancestry in variants.json.
+@app.post("/api/iterate")
+async def api_iterate(request: Request):
+    body = await request.json()
+    variant_path = body.get("variant_path", "").strip()
+    edit_prompt = body.get("edit_prompt", "").strip()
+    size = body.get("size", BRAINSTORM_SIZE).strip()
+    aspect_ratio = body.get("aspect_ratio", DEFAULT_ASPECT_RATIO).strip()
+
+    async def stream():
+        if not GOOGLE_API_KEY:
+            yield sse({"type": "error", "message": "GOOGLE_API_KEY is not set."})
+            return
+        if not variant_path or not edit_prompt:
+            yield sse({"type": "error", "message": "Variant path and edit prompt are required."})
+            return
+        if size not in SIZE_PX:
+            yield sse({"type": "error", "message": f"Invalid size '{size}'."})
+            return
+        if aspect_ratio not in ASPECT_RATIOS:
+            yield sse({"type": "error", "message": f"Invalid aspect ratio '{aspect_ratio}'."})
+            return
+
+        resolved = Path(variant_path).resolve()
+        output_root = Path(OUTPUT_DIR).resolve()
+        if not str(resolved).startswith(str(output_root)):
+            yield sse({"type": "error", "message": "Invalid variant path."})
+            return
+        if not resolved.exists():
+            yield sse({"type": "error", "message": "Variant file not found."})
+            return
+
+        m = re.match(r"variant_(\d+)_", resolved.name)
+        if not m:
+            yield sse({"type": "error", "message": "Unrecognised variant filename."})
+            return
+        root_variant_num = int(m.group(1))
+        concept_dir = resolved.parent
+
+        # Find the next free variant number across all renders in this concept dir
+        existing_nums = {
+            int(mm.group(1))
+            for f in concept_dir.glob("variant_*.png")
+            if "_no_bg" not in f.name
+            for mm in [re.match(r"variant_(\d+)_", f.name)]
+            if mm
+        }
+        next_num = max(existing_nums, default=0) + 1
+
+        source_img = await asyncio.to_thread(lambda: Image.open(resolved).copy())
+
+        yield sse({"type": "status", "message": "Generating iteration..."})
+        try:
+            iterated_img = await asyncio.to_thread(
+                generate_image,
+                edit_prompt,
+                GOOGLE_API_KEY,
+                size=size,
+                aspect_ratio=aspect_ratio,
+                reference_image=source_img,
+                reference_mode="edit",
+            )
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+
+        ar_safe = aspect_ratio.replace(":", "x")
+        target_path = concept_dir / f"variant_{next_num}_{ar_safe}_{size}.png"
+        await asyncio.to_thread(iterated_img.save, str(target_path), "PNG")
+
+        # Record ancestry and append edit prompt to sidecar
+        await asyncio.to_thread(record_iteration_variant, concept_dir, next_num, root_variant_num)
+        await asyncio.to_thread(append_iteration_prompt, concept_dir / "prompts.md", next_num, edit_prompt)
+
+        rel = target_path.relative_to(Path(".").resolve())
+        yield sse({"type": "iteration", "url": f"/{rel}", "path": str(rel), "variant_num": next_num})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -339,7 +539,6 @@ _SERIALIZABLE_COLUMN_KEYS = {
     "iteration_roots",  # rootIdx for each iteration in order; parallel to image_paths[len(original_image_paths):]
     "selected_idx",
     "final_path",
-    "num_variants",
     "hasUnsubmittedText",
     "concept_dir",  # str path — needed by /render to locate/save variant files after page reload
 }
@@ -354,7 +553,6 @@ def init_column_state() -> dict:
         "images": [],  # PIL Images kept in memory for bg removal
         "image_paths": [],  # on-disk paths, used to build static URLs
         "selected_idx": None,
-        "num_variants": NUM_VARIANTS,
         "hasUnsubmittedText": False,
         "concept_dir": None,  # str path to concept_N/ dir; set by /generate, used by /render
         "final_image": None,  # kept for /finalize backward compat during transition
@@ -371,15 +569,13 @@ def get_session(session_id: str) -> dict:
     if session_id not in sessions:
         user_settings = settings.load_settings()
 
-        # Clamp num_variants from settings against the current hard max
+        # Clamp num_variants from settings against the current hard max (kept at session level
+        # for the sidebar's save/restore; columns no longer track their own count).
         loaded_num_variants = user_settings.get("default_num_variants", NUM_VARIANTS)
         clamped_num_variants = _clamp(loaded_num_variants, 1, MAX_VARIANTS)
 
-        initial_col = init_column_state()
-        initial_col["num_variants"] = clamped_num_variants
-
         sessions[session_id] = {
-            "columns": [initial_col],  # start with one column
+            "columns": [init_column_state()],
             "max_columns": user_settings.get("default_max_columns", MAX_COLUMNS),
             "min_columns": user_settings.get("default_min_columns", 1),
             "num_variants": clamped_num_variants,
@@ -834,7 +1030,6 @@ async def generate(
         session.update(
             {
                 "prompts": prompts,
-                "num_variants": num_variants,
                 "variant_size": variant_size,
                 "variant_aspect_ratio": aspect_ratio,
                 "images": images,
@@ -1940,7 +2135,7 @@ async def printify_publish(
 
 
 @app.post("/columns")
-async def add_column(session_id: str = Form(...), num_variants: int | None = Form(None)):
+async def add_column(session_id: str = Form(...)):
     """Append a new column to the session up to the session's max_columns limit."""
     sess = get_session(session_id)
     columns = sess["columns"]
@@ -1950,10 +2145,6 @@ async def add_column(session_id: str = Form(...), num_variants: int | None = For
             status_code=400,
         )
     new_col = init_column_state()
-    if num_variants is not None:
-        new_col["num_variants"] = _clamp(num_variants, 1, MAX_VARIANTS)
-    else:
-        new_col["num_variants"] = sess.get("num_variants", NUM_VARIANTS)
     columns.append(new_col)
     return {
         "column_id": len(columns) - 1,
@@ -2006,11 +2197,9 @@ async def session_columns(session_id: str):
 
 @app.post("/session/clear-column")
 async def clear_column(session_id: str = Form(...), column_id: int = Form(...)):
-    """Reset a column to blank initial state, preserving the user's num_variants preference."""
+    """Reset a column to blank initial state."""
     col = get_column(session_id, column_id)
-    num_variants = col.get("num_variants", NUM_VARIANTS)  # keep user's variant count setting
     fresh = init_column_state()
-    fresh["num_variants"] = num_variants
     col.clear()
     col.update(fresh)
     return {"ok": True}
